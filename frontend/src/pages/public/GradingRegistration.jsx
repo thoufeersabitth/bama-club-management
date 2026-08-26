@@ -346,7 +346,7 @@ export default function GradingRegistration() {
           </h1>
 
           <p className="text-xs sm:text-sm text-gray-400 max-w-2xl mx-auto leading-relaxed">
-            Eliminate physical paper forms! Register online for the upcoming JKK Kerala & JKA Japan Official Martial Arts Belt Examinations.
+            Eliminate physical paper forms! Register online for the upcoming JKA Official Martial Arts Belt Examinations.
           </p>
         </div>
 
@@ -753,7 +753,7 @@ export default function GradingRegistration() {
             <div className="space-y-4 border-b border-gray-900 pb-6 bg-amber-950/20 p-5 rounded-2xl border border-amber-500/40">
               <h2 className="text-base sm:text-lg font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
                 <FileText className="w-5 h-5 text-amber-400" />
-                <span>3. JKK BROWN FORM MANDATORY PARTICULARS (JKA KERALA REGISTER)</span>
+                <span>3. JKA BROWN FORM MANDATORY PARTICULARS (JKA REGISTER)</span>
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
@@ -1062,7 +1062,7 @@ export default function GradingRegistration() {
                   <p className="text-xs text-amber-400 font-mono">REG REF: #{submittedReg.registration_no}</p>
                 </div>
                 <span className="px-3 py-1 bg-red-950 text-amber-400 border border-red-800 text-[10px] font-black rounded-full uppercase">
-                  {submittedReg.form_type === 'JKA_JAPAN' ? 'JKA Japan Form' : 'JKK Kerala Form'}
+                  {submittedReg.form_type === 'JAPAN_DIRECT_BLACK_BELT' || submittedReg.form_type === 'JKA_JAPAN' ? 'JKA Japan Form' : 'JKA Kyu Form'}
                 </span>
               </div>
 
