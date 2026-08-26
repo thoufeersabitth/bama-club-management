@@ -164,10 +164,14 @@ export default function DashboardPortal() {
     window.addEventListener('bama_fee_settings_updated', loadDashboardData);
     window.addEventListener('bama_data_updated', loadDashboardData);
     window.addEventListener('bama_active_branch_changed', loadDashboardData);
+    window.addEventListener('focus', loadDashboardData);
+    document.addEventListener('visibilitychange', loadDashboardData);
     return () => {
       window.removeEventListener('bama_fee_settings_updated', loadDashboardData);
       window.removeEventListener('bama_data_updated', loadDashboardData);
       window.removeEventListener('bama_active_branch_changed', loadDashboardData);
+      window.removeEventListener('focus', loadDashboardData);
+      document.removeEventListener('visibilitychange', loadDashboardData);
     };
   }, [effectiveBranchScope]);
 
