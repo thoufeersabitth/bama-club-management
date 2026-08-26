@@ -352,56 +352,64 @@ export const fetchDashboardStats = async () => {
 
 export const fetchStudents = async (params = {}) => {
   try {
-    const res = await api.get('/students/', { params: { ...params, _t: Date.now() } });
-    const serverData = res.data.results || res.data;
+    const url = new URL('https://bama-club-backend.fly.dev/api/students/');
+    url.searchParams.set('_t', Date.now().toString());
+    const res = await fetch(url.toString(), {
+      headers: { 'Accept': 'application/json' }
+    });
 
-    if (Array.isArray(serverData) && serverData.length > 0) {
-      const filteredServer = filterOutDummyCadets(serverData);
-      const normalizedServer = filteredServer.map(s => {
-        const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
-        const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
+    if (res.ok) {
+      const data = await res.json();
+      const serverData = data.results || data;
 
-        const adm = s.admissionNo || s.admission_no || '';
-        const admFee = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
-        const admPaid = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? admFee);
-        const monthlyFee = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
-        const monthlyPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
-        const pendingDues = parseFloat(s.pendingAmount ?? s.pending_amount ?? Math.max(0, (admFee + monthlyFee) - (admPaid + monthlyPaid)));
-        const feeStat = s.feeStatus || s.fee_status || (pendingDues === 0 ? 'Paid' : (admPaid + monthlyPaid) > 0 ? 'Partial' : 'Pending');
+      if (Array.isArray(serverData)) {
+        const filteredServer = filterOutDummyCadets(serverData);
+        const normalizedServer = filteredServer.map(s => {
+          const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
+          const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
 
-        return {
-          ...s,
-          name: s.name || s.student_name || 'Cadet',
-          student_name: s.student_name || s.name || 'Cadet',
-          admissionNo: adm,
-          admission_no: adm,
-          admissionFee: admFee,
-          admission_fee: admFee,
-          admissionFeePaidAmount: admPaid,
-          admission_fee_paid_amount: admPaid,
-          admissionFeePaid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
-          feeAmount: monthlyFee,
-          fee_amount: monthlyFee,
-          initialPaidAmount: monthlyPaid,
-          initial_paid_amount: monthlyPaid,
-          pendingAmount: pendingDues,
-          pending_amount: pendingDues,
-          feeStatus: feeStat,
-          fee_status: feeStat,
-          branch: sBranchName,
-          branch_id: sBranchId,
-          branch_name: sBranchName,
-          branchName: sBranchName,
-          dojo_branch: sBranchName
-        };
-      });
+          const adm = s.admissionNo || s.admission_no || '';
+          const admFee = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
+          const admPaid = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? admFee);
+          const monthlyFee = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
+          const monthlyPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
+          const pendingDues = parseFloat(s.pendingAmount ?? s.pending_amount ?? Math.max(0, (admFee + monthlyFee) - (admPaid + monthlyPaid)));
+          const feeStat = s.feeStatus || s.fee_status || (pendingDues === 0 ? 'Paid' : (admPaid + monthlyPaid) > 0 ? 'Partial' : 'Pending');
 
-      const serialized = JSON.stringify(normalizedServer);
-      localStorage.setItem('bama_cadets_roster', serialized);
-      localStorage.setItem('bama_students', serialized);
-      localStorage.setItem('bama_cadets', serialized);
-      localStorage.setItem('bama_students_list', serialized);
-      return normalizedServer;
+          return {
+            ...s,
+            name: s.name || s.student_name || 'Cadet',
+            student_name: s.student_name || s.name || 'Cadet',
+            admissionNo: adm,
+            admission_no: adm,
+            admissionFee: admFee,
+            admission_fee: admFee,
+            admissionFeePaidAmount: admPaid,
+            admission_fee_paid_amount: admPaid,
+            admissionFeePaid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
+            feeAmount: monthlyFee,
+            fee_amount: monthlyFee,
+            initialPaidAmount: monthlyPaid,
+            initial_paid_amount: monthlyPaid,
+            pendingAmount: pendingDues,
+            pending_amount: pendingDues,
+            feeStatus: feeStat,
+            fee_status: feeStat,
+            branch: sBranchName,
+            branch_id: sBranchId,
+            branch_name: sBranchName,
+            branchName: sBranchName,
+            dojo_branch: sBranchName
+          };
+        });
+
+        const serialized = JSON.stringify(normalizedServer);
+        localStorage.setItem('bama_cadets_roster', serialized);
+        localStorage.setItem('bama_students', serialized);
+        localStorage.setItem('bama_cadets', serialized);
+        localStorage.setItem('bama_students_list', serialized);
+        return normalizedServer;
+      }
     }
   } catch (err) {
     console.error('Failed to fetch students from live server:', err);
@@ -421,18 +429,20 @@ export const createStudent = async (data) => {
   const pendingAmt = parseFloat(data.pendingAmount ?? data.pending_amount ?? Math.max(0, (admFee + amount) - totalCollected));
   const status = data.feeStatus ?? data.fee_status ?? (pendingAmt === 0 ? 'Paid' : totalCollected > 0 ? 'Partial' : 'Pending');
 
-  const branchVal = data.branch_id || data.branch || data.branch_name || 'Pulikkal Branch (Head Office)';
-  const branchName = data.branch_name || (typeof data.branch === 'string' && data.branch.length < 50 ? data.branch : 'Pulikkal Branch (Head Office)');
+  const branchVal = data.branch_id || data.branch || data.branch_name || '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
+  const branchName = data.branch_name || data.branchName || (typeof data.branch === 'string' && data.branch.length < 50 ? data.branch : 'Pulikkal Branch (Head Office)');
 
   const payload = {
     admission_no: data.admissionNo || data.admission_no || `BAMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
     name: data.name || data.student_name || 'Cadet Student',
     guardian_name: data.guardianName || data.guardian_name || 'Parent',
+    relationship: data.relationship || 'Father',
     phone: data.phone || '+91 9544085442',
     whatsapp: data.whatsapp || data.phone || '+91 9544085442',
     age: parseInt(data.age) || 12,
+    dob: data.dob || null,
     gender: data.gender || 'Male',
-    blood_group: data.bloodGroup || data.blood_group || 'O+',
+    blood_group: (data.bloodGroup || data.blood_group || 'O+').slice(0, 20),
     current_belt: data.currentBelt || data.current_belt || 'White Belt',
     branch: branchVal,
     shift: data.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
@@ -449,38 +459,52 @@ export const createStudent = async (data) => {
   };
 
   try {
-    const res = await api.post('/students/', payload);
-    const serverCadet = res.data;
-    const serverBranchName = serverCadet?.branch_name || serverCadet?.branch_detail?.name || branchName;
-    const serverBranchId = serverCadet?.branch_id || serverCadet?.branch_detail?.id || serverCadet?.branch || branchVal;
-    const adm = serverCadet?.admission_no || payload.admission_no;
+    const res = await fetch('https://bama-club-backend.fly.dev/api/students/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
 
-    const saved = {
-      ...payload,
-      ...serverCadet,
-      id: serverCadet?.id || `std-${Date.now()}`,
-      admissionNo: adm,
-      admission_no: adm,
-      branch: serverBranchName,
-      branch_id: serverBranchId,
-      branch_name: serverBranchName,
-      branchName: serverBranchName,
-      dojo_branch: serverBranchName
-    };
+    if (res.ok) {
+      const serverCadet = await res.json();
+      const serverBranchName = serverCadet?.branch_name || serverCadet?.branch_detail?.name || branchName;
+      const serverBranchId = serverCadet?.branch_id || serverCadet?.branch_detail?.id || serverCadet?.branch || branchVal;
+      const adm = serverCadet?.admission_no || payload.admission_no;
 
-    const latestList = getStoredStudents();
-    const updatedRoster = [saved, ...latestList.filter(s => String(s.id) !== String(saved.id) && String(s.admissionNo || s.admission_no) !== String(adm))];
-    saveStoredStudents(updatedRoster);
-    window.dispatchEvent(new Event('bama_data_updated'));
-    return saved;
+      const saved = {
+        ...payload,
+        ...serverCadet,
+        id: serverCadet?.id || `std-${Date.now()}`,
+        admissionNo: adm,
+        admission_no: adm,
+        branch: serverBranchName,
+        branch_id: serverBranchId,
+        branch_name: serverBranchName,
+        branchName: serverBranchName,
+        dojo_branch: serverBranchName
+      };
+
+      const latestList = getStoredStudents();
+      const updatedRoster = [saved, ...latestList.filter(s => String(s.id) !== String(saved.id) && String(s.admissionNo || s.admission_no) !== String(adm))];
+      saveStoredStudents(updatedRoster);
+      window.dispatchEvent(new Event('bama_data_updated'));
+      return saved;
+    } else {
+      const errText = await res.text();
+      console.error('Server error creating student:', res.status, errText);
+    }
   } catch (err) {
-    console.error('Failed to post student to backend:', err);
-    const newStudent = { id: `std-${Date.now()}`, ...payload };
-    const latestList = getStoredStudents();
-    saveStoredStudents([newStudent, ...latestList]);
-    window.dispatchEvent(new Event('bama_data_updated'));
-    return newStudent;
+    console.error('Network error creating student:', err);
   }
+
+  const newStudent = { id: `std-${Date.now()}`, ...payload };
+  const latestList = getStoredStudents();
+  saveStoredStudents([newStudent, ...latestList]);
+  window.dispatchEvent(new Event('bama_data_updated'));
+  return newStudent;
 };
 
 export const updateStudent = async (id, data) => {
