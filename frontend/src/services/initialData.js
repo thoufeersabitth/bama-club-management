@@ -62,9 +62,9 @@ export const BELT_LEVELS = [
 
 export const INITIAL_BRANCHES = [
   {
-    id: "283e0cc2-0009-494f-a3e1-7d8b14356213",
+    id: "4d04730d-8de9-4a3f-9dc4-705b31ef2630",
     name: "Pulikkal Branch (Head Office)",
-    code: "BAMA-DOJO-01",
+    code: "PLK-01",
     address: "Andiyoorkunnu Road, Pulikkal, Malappuram, Kerala - 673637",
     phone: "+91 95440 85442",
     whatsapp: "+91 95440 85442",
@@ -78,15 +78,15 @@ export const INITIAL_BRANCHES = [
     mapUrl: "https://maps.google.com/?q=Pulikkal+Malappuram"
   },
   {
-    id: "20c924cd-2dc7-4f82-a459-5e86286748c5",
+    id: "a9e9ccd7-27c4-4fd5-bf69-5a487cbf2b9e",
     name: "Chungam Branch Dojo",
-    code: "BAMA-DOJO-02",
+    code: "CGM-02",
     address: "Main Road Junction, Chungam, Malappuram, Kerala - 673638",
     phone: "+91 98471 22334",
     whatsapp: "+91 98471 22334",
     email: "chungam@bama.org",
-    branch_head: "Sensei Rahul Kumar (3rd Dan)",
-    head: "Sensei Rahul Kumar (3rd Dan)",
+    branch_head: "Sensei Muhammad Shafi (3rd Dan)",
+    head: "Sensei Muhammad Shafi (3rd Dan)",
     timings: "Tue, Thu, Sat: 5:30 PM - 7:30 PM",
     facilities: ["🥋 High-Density Mats", "🎯 Focus Strike Pads", "📢 Smart Sound System"],
     status: "Active",
@@ -94,20 +94,20 @@ export const INITIAL_BRANCHES = [
     mapUrl: "https://maps.google.com/?q=Chungam+Malappuram"
   },
   {
-    id: "d4639193-c693-46e2-a46e-5e25dcf427a1",
-    name: "Mongam Branch Dojo",
-    code: "BAMA-DOJO-03",
-    address: "Main Road, Mongam, Malappuram, Kerala - 673639",
-    phone: "+91 97450 67890",
-    whatsapp: "+91 97450 67890",
-    email: "mongam@bama.org",
-    branch_head: "Sensei Muhammed Haneen (2nd Dan)",
-    head: "Sensei Muhammed Haneen (2nd Dan)",
-    timings: "Mon, Wed, Fri: 6:00 AM - 7:30 AM & 5:00 PM - 7:00 PM",
-    facilities: ["🥋 Pro Karate Mats", "🥊 Kickboxing Shields", "🛡️ First Aid Station"],
+    id: "67b5ad14-f63f-4be4-9df8-f541bff86b12",
+    name: "Feroke Branch",
+    code: "FRK-03",
+    address: "Station Road, Near Town Hall, Feroke, Kozhikode, Kerala - 673631",
+    phone: "+91 94462 88990",
+    whatsapp: "+91 94462 88990",
+    email: "feroke@bama.org",
+    branch_head: "Sensei Rajesh Kumar (4th Dan)",
+    head: "Sensei Rajesh Kumar (4th Dan)",
+    timings: "Sat & Sun: 7:00 AM - 9:30 AM & 4:00 PM - 6:00 PM",
+    facilities: ["🥋 Professional Tatami Flooring", "🥊 Sparring Gear Sets"],
     status: "Active",
     isHeadOffice: false,
-    mapUrl: "https://maps.google.com/?q=Mongam+Malappuram"
+    mapUrl: "https://maps.google.com/?q=Feroke+Kozhikode"
   }
 ];
 
