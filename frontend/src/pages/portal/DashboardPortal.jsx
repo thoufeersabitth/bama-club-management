@@ -178,34 +178,42 @@ export default function DashboardPortal() {
   const totalStudentsCount = filteredStudents.length;
   const activeStudentsCount = filteredStudents.filter(s => s.status !== 'Inactive').length;
 
-  // Comprehensive Real-time Fee & Pending Dues Calculation strictly from Students Roster (No Double Counting)
+  // Comprehensive Real-time Fee & Pending Dues Calculation strictly from Students Roster
   const { totalCollectedAmount, totalPendingAmount, cadetsDueCount } = React.useMemo(() => {
     let collected = 0;
     let pending = 0;
     let dueCadets = 0;
 
+    let defaultMonthlyFee = 500;
+    try {
+      const globalSettings = JSON.parse(localStorage.getItem('bama_global_fee_settings') || '{}');
+      if (globalSettings.defaultMonthlyFee) {
+        defaultMonthlyFee = parseFloat(globalSettings.defaultMonthlyFee) || 500;
+      }
+    } catch(e) {}
+
     filteredStudents.forEach(s => {
-      const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? s.monthlyFee ?? 500) || 500;
-      const isPaid = (s.feeStatus === 'Paid' || s.fee_status === 'Paid');
-      
-      let monthlyPaid = 0;
-      if (isPaid) {
-        monthlyPaid = monthlyTotal;
-      } else if (s.initialPaidAmount !== undefined && s.initialPaidAmount !== null && !isNaN(parseFloat(s.initialPaidAmount))) {
-        monthlyPaid = parseFloat(s.initialPaidAmount);
-      } else if (s.initial_paid_amount !== undefined && s.initial_paid_amount !== null && !isNaN(parseFloat(s.initial_paid_amount))) {
-        monthlyPaid = parseFloat(s.initial_paid_amount);
-      } else if (s.paid_amount !== undefined && s.paid_amount !== null && !isNaN(parseFloat(s.paid_amount))) {
-        monthlyPaid = parseFloat(s.paid_amount);
+      let monthlyRate = parseFloat(s.feeAmount ?? s.fee_amount ?? s.monthlyFee);
+      if (isNaN(monthlyRate) || monthlyRate < 100) {
+        monthlyRate = defaultMonthlyFee;
       }
 
-      // Calculate strictly the monthly fee dues: (Monthly Fee - Monthly Paid)
-      const sPending = isPaid ? 0 : Math.max(0, monthlyTotal - monthlyPaid);
-      const sCollected = isPaid ? monthlyTotal : Math.min(monthlyTotal, monthlyPaid);
+      const isFullyPaid = (s.feeStatus === 'Paid' || s.fee_status === 'Paid');
+      
+      let monthlyPaid = 0;
+      if (isFullyPaid) {
+        monthlyPaid = monthlyRate;
+      } else {
+        const rawPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? s.paid_amount ?? 0);
+        monthlyPaid = isNaN(rawPaid) ? 0 : Math.min(monthlyRate, rawPaid);
+      }
+
+      const sPending = isFullyPaid ? 0 : Math.max(0, monthlyRate - monthlyPaid);
+      const sCollected = monthlyPaid;
 
       collected += sCollected;
       pending += sPending;
-      if (sPending > 0 || !isPaid) {
+      if (sPending > 0) {
         dueCadets++;
       }
     });
