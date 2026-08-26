@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchStudents, createBranchBackend } from '../../services/api';
+import { fetchBranches, fetchStudents, createBranchBackend, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
 
 const INITIAL_TRAINING_SCHEDULES = [
@@ -306,7 +306,7 @@ export default function BranchManagement() {
       `🎯 *Target Cadets:* ${sch.targetGroup}\n\n` +
       `Dear Parent, please report on time in clean Karate Gi. Confirm participation with your Sensei. OSS 🥋`
     );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    openWhatsApp({ message: text });
   };
 
   // Filtered branches & schedules

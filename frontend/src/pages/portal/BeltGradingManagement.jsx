@@ -4,7 +4,7 @@ import {
   Award, Shield, Trophy, Medal, Search, Plus, Calendar, MapPin, User,
   CheckCircle2, AlertCircle, Send, QrCode, Sparkles, ExternalLink, RefreshCw, FileText, Printer, X, Star, MessageSquare, ArrowRight, Filter
 } from 'lucide-react';
-import { fetchBeltGradings, fetchStudents, saveBeltGradingBackend } from '../../services/api';
+import { fetchBeltGradings, fetchStudents, saveBeltGradingBackend, openWhatsApp } from '../../services/api';
 import OfficeGrading from '../office/OfficeGrading';
 import { BELT_LEVELS, ACADEMY_INFO, UPCOMING_EVENTS } from '../../services/initialData';
 
@@ -202,7 +202,7 @@ export default function BeltGradingManagement() {
   };
 
   const sendWhatsAppAnnouncement = (evt) => {
-    const text = encodeURIComponent(
+    const text = (
       `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
       `📢 *${evt.type === 'BELT_EXAM' ? 'EXAM ANNOUNCEMENT' : 'SPECIAL EVENT NOTICE'}*\n` +
       `📌 *Event:* ${evt.title}\n` +
@@ -213,12 +213,12 @@ export default function BeltGradingManagement() {
       `💰 *Reg Fee:* ₹${evt.registrationFee || 0}\n\n` +
       `Dear Parent, please report on time in clean Karate Gi. Confirm participation with your Sensei. OSS 🥋`
     );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    openWhatsApp({ message: text });
     setEvents(events.map(e => e.id === evt.id ? { ...e, whatsappAlertSent: true } : e));
   };
 
   const sendWinnerWhatsAppAlert = (comp) => {
-    const text = encodeURIComponent(
+    const text = (
       `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
       `🏆 *OFFICIAL CHAMPIONSHIP & PROGRAM RESULTS*\n` +
       `📌 *Event:* ${comp.title}\n` +
@@ -228,7 +228,7 @@ export default function BeltGradingManagement() {
       `🥉 *3rd Place (BRONZE):* ${comp.thirdPlace}\n\n` +
       `Congratulations to all the winners and participants! Official Merit Certificates have been issued. OSS 🥋`
     );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    openWhatsApp({ message: text });
   };
 
   // Filtered Roster Data
@@ -840,7 +840,7 @@ export default function BeltGradingManagement() {
 
               <button
                 onClick={() => {
-                  const text = encodeURIComponent(
+                  const text = (
                     `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
                     `🏆 *OFFICIAL CERTIFICATE ISSUED*\n` +
                     `👤 *Cadet Name:* ${activeCert.student_detail?.name || 'Cadet'}\n` +
@@ -849,7 +849,7 @@ export default function BeltGradingManagement() {
                     `📅 *Date:* ${activeCert.exam_date}\n\n` +
                     `Congratulations! OSS 🥋`
                   );
-                  window.open(`https://wa.me/?text=${text}`, '_blank');
+                  openWhatsApp({ message: text });
                 }}
                 className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
               >

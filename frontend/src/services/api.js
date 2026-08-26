@@ -1023,57 +1023,85 @@ export const isAndroidDevice = () => {
 };
 
 export const openWhatsApp = ({ phone, message, channel }) => {
-  const cleanPhone = formatWhatsAppNumber(phone);
-  const encodedText = encodeURIComponent(message || '');
+  const cleanPhone = phone ? formatWhatsAppNumber(phone) : '';
+  const rawMsg = message || '';
+  const encodedText = encodeURIComponent(rawMsg);
   const activeChannel = channel || getPreferredWhatsAppChannel();
   const onMobile = isMobileDevice();
   const onAndroid = isAndroidDevice();
 
-  // 1. WhatsApp Business App
+  // 1. WhatsApp Business App (com.whatsapp.w4b)
   if (activeChannel === 'BUSINESS') {
     if (onAndroid) {
-      const androidIntentUri = `intent://send?phone=${cleanPhone}&text=${encodedText}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end`;
+      const androidIntentUri = cleanPhone 
+        ? `intent://send?phone=${cleanPhone}&text=${encodedText}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end`
+        : `intent://send?text=${encodedText}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end`;
       window.location.href = androidIntentUri;
       setTimeout(() => {
-        const fallbackUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+        const fallbackUrl = cleanPhone 
+          ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
+          : `https://api.whatsapp.com/send?text=${encodedText}`;
         window.open(fallbackUrl, '_blank');
       }, 800);
       return;
     } else if (onMobile) {
-      window.location.href = `whatsapp-business://send?phone=${cleanPhone}&text=${encodedText}`;
+      const iosUri = cleanPhone 
+        ? `whatsapp-business://send?phone=${cleanPhone}&text=${encodedText}`
+        : `whatsapp-business://send?text=${encodedText}`;
+      window.location.href = iosUri;
       setTimeout(() => {
-        window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+        const fallbackUrl = cleanPhone 
+          ? `https://wa.me/${cleanPhone}?text=${encodedText}`
+          : `https://wa.me/?text=${encodedText}`;
+        window.open(fallbackUrl, '_blank');
       }, 800);
       return;
     } else {
-      window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`, '_blank');
+      const webUrl = cleanPhone 
+        ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
+        : `https://web.whatsapp.com/send?text=${encodedText}`;
+      window.open(webUrl, '_blank');
       return;
     }
   }
 
-  // 2. Regular Personal WhatsApp App
+  // 2. Regular Personal WhatsApp
   if (activeChannel === 'REGULAR') {
     if (onAndroid) {
-      const androidIntentUri = `intent://send?phone=${cleanPhone}&text=${encodedText}#Intent;package=com.whatsapp;scheme=whatsapp;end`;
+      const androidIntentUri = cleanPhone 
+        ? `intent://send?phone=${cleanPhone}&text=${encodedText}#Intent;package=com.whatsapp;scheme=whatsapp;end`
+        : `intent://send?text=${encodedText}#Intent;package=com.whatsapp;scheme=whatsapp;end`;
       window.location.href = androidIntentUri;
       setTimeout(() => {
-        window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+        const fallbackUrl = cleanPhone 
+          ? `https://wa.me/${cleanPhone}?text=${encodedText}`
+          : `https://wa.me/?text=${encodedText}`;
+        window.open(fallbackUrl, '_blank');
       }, 800);
       return;
     } else {
-      window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+      const regularUrl = cleanPhone 
+        ? `https://wa.me/${cleanPhone}?text=${encodedText}`
+        : `https://wa.me/?text=${encodedText}`;
+      window.open(regularUrl, '_blank');
       return;
     }
   }
 
   // 3. WhatsApp Web (Direct Browser Tab)
   if (activeChannel === 'WEB') {
-    window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`, '_blank');
+    const webUrl = cleanPhone 
+      ? `https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
+      : `https://web.whatsapp.com/send?text=${encodedText}`;
+    window.open(webUrl, '_blank');
     return;
   }
 
   // 4. Universal Fallback
-  window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+  const fallbackUrl = cleanPhone 
+    ? `https://wa.me/${cleanPhone}?text=${encodedText}`
+    : `https://wa.me/?text=${encodedText}`;
+  window.open(fallbackUrl, '_blank');
 };
 
 export default api;

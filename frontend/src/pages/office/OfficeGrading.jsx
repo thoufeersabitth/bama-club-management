@@ -5,7 +5,7 @@ import {
   Share2, Copy, Send, QrCode
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
-import { fetchStudents, saveStoredStudents } from '../../services/api';
+import { fetchStudents, saveStoredStudents, openWhatsApp } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 export const DEFAULT_BELT_FEE_MAP = {
@@ -168,7 +168,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       `സംശയങ്ങൾക്ക് ബന്ധപ്പെടുക: 9961576993 / 9544085442\n` +
       `OSS 🥋`;
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    openWhatsApp({ message: text });
   };
 
   // Broadcast Category Specific WhatsApp Message (JKK Kerala vs JKA Japan)
@@ -190,7 +190,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       `സംശയങ്ങൾക്ക് ബന്ധപ്പെടുക: 9961576993 / 9544085442\n` +
       `OSS 🥋`;
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    openWhatsApp({ message: text });
   };
 
   // Send Personal Link to Individual Student
@@ -218,13 +218,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       `🔗 *നിങ്ങളുടെ പേഴ്‌സണൽ എക്സാം ലിങ്ക്:*\n${personalUrl}\n\n` +
       `OSS 🥋`;
 
-    if (r.phone) {
-      const cleanPhone = r.phone.replace(/[^0-9]/g, '');
-      const fullPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(text)}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-    }
+    openWhatsApp({ phone: r.phone, message: text });
   };
 
   // Loop WhatsApp Broadcast to Candidates
@@ -246,7 +240,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       text += `${idx + 1}. *${r.student_name}* (${r.current_belt} ➔ ${r.target_belt})\n🔗 ${link}\n\n`;
     });
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    openWhatsApp({ message: text });
   };
 
   // Bulk Multi-Select Handlers
@@ -280,7 +274,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       text += `${idx + 1}. *${r.student_name}* (${r.current_belt} ➔ ${r.target_belt})\n📌 Exam Fee: ₹${r.exam_fee || 1000}\n🔗 Registration Link:\n${link}\n\n`;
     });
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    openWhatsApp({ message: text });
   };
 
   // Bulk Print Forms Handler

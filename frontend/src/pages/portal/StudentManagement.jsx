@@ -690,7 +690,7 @@ export default function StudentManagement() {
       setPromoteModalStudent(null);
 
       if (window.confirm(`🎉 ${cadetName} promoted to ${promoTargetBelt} successfully!\n\nWould you like to send WhatsApp congratulations to parent (+91 ${phone})?`)) {
-        window.open(`https://wa.me/${waPhone}?text=${text}`, '_blank');
+        openWhatsApp({ phone: waPhone, message: text });
       }
     } catch (err) {
       alert('Promotion recorded locally.');
@@ -2345,14 +2345,16 @@ export default function StudentManagement() {
 
             {/* Action Buttons */}
             <div className="no-print flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
-              <a
-                href={`https://wa.me/91${(activeCardStudent.phone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`OSS Cadet ${activeCardStudent.name} (Admission No: ${activeCardStudent.admissionNo || activeCardStudent.admission_no})`)}`}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => openWhatsApp({ 
+                  phone: activeCardStudent.phone, 
+                  message: `OSS Cadet ${activeCardStudent.name} (Admission No: ${activeCardStudent.admissionNo || activeCardStudent.admission_no}) - Welcome to B.A.M.A Karate Academy!` 
+                })}
                 className="w-full py-2 px-3 bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl font-black text-xs text-center flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Parent
-              </a>
+              </button>
               <button
                 onClick={() => window.print()}
                 className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
@@ -2580,14 +2582,16 @@ export default function StudentManagement() {
                     {/* Action Bar */}
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                       <div className="flex items-center gap-2">
-                        <a
-                          href={`https://wa.me/${inquiry.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${inquiry.name}, thank you for inquiring about B.A.M.A Karate Academy for ${inquiry.program} at ${inquiry.branch}. When would you like to visit for a trial class?`)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-2xs transition"
+                        <button
+                          type="button"
+                          onClick={() => openWhatsApp({ 
+                            phone: inquiry.phone, 
+                            message: `Hello ${inquiry.name}, thank you for inquiring about B.A.M.A Karate Academy for ${inquiry.program} at ${inquiry.branch}. When would you like to visit for a trial class?` 
+                          })}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
                         >
                           <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Sensei Chat
-                        </a>
+                        </button>
 
                         <button
                           type="button"
