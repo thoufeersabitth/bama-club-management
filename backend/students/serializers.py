@@ -39,6 +39,20 @@ class StudentSerializer(serializers.ModelSerializer):
             if camel in data and snake not in data:
                 data[snake] = data[camel]
 
+        # Sanitize string field lengths to prevent DB errors
+        if 'blood_group' in data and data['blood_group']:
+            data['blood_group'] = str(data['blood_group'])[:20]
+        if 'gender' in data and data['gender']:
+            data['gender'] = str(data['gender'])[:50]
+        if 'current_belt' in data and data['current_belt']:
+            data['current_belt'] = str(data['current_belt'])[:100]
+        if 'shift' in data and data['shift']:
+            data['shift'] = str(data['shift'])[:200]
+        if 'phone' in data and data['phone']:
+            data['phone'] = str(data['phone'])[:30]
+        if 'whatsapp' in data and data['whatsapp']:
+            data['whatsapp'] = str(data['whatsapp'])[:30]
+
         # Strip non-UUID string IDs sent by local storage frontend
         if 'id' in data:
             try:

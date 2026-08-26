@@ -30,6 +30,17 @@ import SettingsPortal from './pages/portal/SettingsPortal';
 import OfficeGrading from './pages/office/OfficeGrading';
 
 export default function App() {
+  React.useEffect(() => {
+    const APP_VERSION = 'bama_v2026_08_26_final_sync';
+    if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
+      localStorage.removeItem('bama_cadets_roster');
+      localStorage.removeItem('bama_students');
+      localStorage.removeItem('bama_cadets');
+      localStorage.removeItem('bama_students_list');
+      localStorage.setItem('bama_app_cache_version', APP_VERSION);
+    }
+  }, []);
+
   return (
     <ErrorBoundary>
       <Routes>
