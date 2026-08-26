@@ -131,3 +131,20 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# CSRF & CORS Trusted Origins
+CSRF_TRUSTED_ORIGINS = [
+    'https://bama-club-backend.fly.dev',
+    'https://*.fly.dev',
+    'https://bama-academy.vercel.app',
+    'https://*.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:8000',
+    'http://127.0.0.1:3000',
+]
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
