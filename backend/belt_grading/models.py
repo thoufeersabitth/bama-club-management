@@ -69,34 +69,6 @@ class ExamSchedule(models.Model):
 
 
 class GradingRegistration(models.Model):
-    PAYMENT_MODE_CHOICES = [
-        ('UPI / GPay / PhonePe', 'UPI / GPay / PhonePe'),
-        ('Cash at Dojo / Club', 'Cash at Dojo / Club')
-    ]
-    PAYMENT_STATUS_CHOICES = [
-        ('Unpaid', 'Unpaid'),
-        ('Pending', 'Pending'),
-        ('Partially Paid', 'Partially Paid'),
-        ('Paid / Verified', 'Paid / Verified'),
-        ('Paid', 'Paid'),
-        ('Refunded', 'Refunded')
-    ]
-    EXAM_STATUS_CHOICES = [
-        ('Draft', 'Draft'),
-        ('Submitted', 'Submitted'),
-        ('Pending Payment', 'Pending Payment'),
-        ('Registered', 'Registered'),
-        ('Under Review', 'Under Review'),
-        ('Approved', 'Approved'),
-        ('Rejected', 'Rejected'),
-        ('Exam Completed', 'Exam Completed'),
-        ('Passed', 'Passed'),
-        ('Failed', 'Failed'),
-        ('Probation', 'Probation'),
-        ('Absent', 'Absent'),
-        ('Result Published', 'Result Published')
-    ]
-
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     exam_schedule = models.ForeignKey(ExamSchedule, on_delete=models.SET_NULL, null=True, blank=True, related_name='registrations')
     registration_no = models.CharField(max_length=50, unique=True)
@@ -109,31 +81,31 @@ class GradingRegistration(models.Model):
     photo = models.TextField(blank=True, null=True)
     photo_secondary = models.TextField(blank=True, null=True)
     dob = models.DateField(blank=True, null=True)
-    age = models.IntegerField(default=10)
-    gender = models.CharField(max_length=10, default='Male')
-    height_cm = models.DecimalField(max_digits=5, decimal_places=1, default=140.0)
-    weight_kg = models.DecimalField(max_digits=5, decimal_places=1, default=35.0)
-    nationality = models.CharField(max_length=50, default='INDIAN')
-    organization = models.CharField(max_length=100, default='JKK / JKA')
+    age = models.IntegerField(default=10, blank=True, null=True)
+    gender = models.CharField(max_length=10, default='Male', blank=True, null=True)
+    height_cm = models.DecimalField(max_digits=5, decimal_places=1, default=140.0, blank=True, null=True)
+    weight_kg = models.DecimalField(max_digits=5, decimal_places=1, default=35.0, blank=True, null=True)
+    nationality = models.CharField(max_length=50, default='INDIAN', blank=True, null=True)
+    organization = models.CharField(max_length=100, default='JKK / JKA', blank=True, null=True)
     
     # Contact & Dojo Info
-    branch_name = models.CharField(max_length=255, default='Pulikkal Dojo')
+    branch_name = models.CharField(max_length=255, default='Pulikkal Dojo', blank=True, null=True)
     school_or_employer = models.CharField(max_length=255, blank=True, null=True)
     employer_address = models.TextField(blank=True, null=True)
     class_or_occupation = models.CharField(max_length=100, blank=True, null=True)
-    guardian_name = models.CharField(max_length=255)
-    guardian_relationship = models.CharField(max_length=50, default='Father')
-    phone = models.CharField(max_length=20)
+    guardian_name = models.CharField(max_length=255, blank=True, null=True, default='Parent/Guardian')
+    guardian_relationship = models.CharField(max_length=50, default='Father', blank=True, null=True)
+    phone = models.CharField(max_length=20, blank=True, null=True, default='')
     whatsapp = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     
     # Belt Exam Details
-    current_belt = models.CharField(max_length=50, default='White Belt')
-    current_kyu = models.CharField(max_length=20, default='10th Kyu')
-    target_belt = models.CharField(max_length=50, default='Yellow Belt')
-    target_kyu_or_dan = models.CharField(max_length=20, default='9th Kyu')
-    belt_size = models.CharField(max_length=50, default='Size 3 (160 cm)')
-    training_period_years = models.CharField(max_length=50, default='1 Year 0 Months')
+    current_belt = models.CharField(max_length=50, default='White Belt', blank=True, null=True)
+    current_kyu = models.CharField(max_length=20, default='10th Kyu', blank=True, null=True)
+    target_belt = models.CharField(max_length=50, default='Yellow Belt', blank=True, null=True)
+    target_kyu_or_dan = models.CharField(max_length=20, default='9th Kyu', blank=True, null=True)
+    belt_size = models.CharField(max_length=50, default='Size 3 (160 cm)', blank=True, null=True)
+    training_period_years = models.CharField(max_length=50, default='1 Year 0 Months', blank=True, null=True)
     years_months_training = models.CharField(max_length=50, blank=True, null=True)
     present_rank = models.CharField(max_length=50, blank=True, null=True)
     date_of_confirmation = models.DateField(blank=True, null=True)
@@ -141,11 +113,11 @@ class GradingRegistration(models.Model):
     
     # Special JKA / JKK Japan Fields
     jka_member_no = models.CharField(max_length=100, blank=True, null=True)
-    jka_nationality = models.CharField(max_length=50, default='INDIAN')
-    jka_organization = models.CharField(max_length=100, default='JKA INDIA')
-    instructor_reference_name = models.CharField(max_length=255, default='Sensei Abdul Rahman')
+    jka_nationality = models.CharField(max_length=50, default='INDIAN', blank=True, null=True)
+    jka_organization = models.CharField(max_length=100, default='JKA INDIA', blank=True, null=True)
+    instructor_reference_name = models.CharField(max_length=255, default='Sensei Abdul Rahman', blank=True, null=True)
     instructor_reference_address = models.TextField(blank=True, null=True, default='Pulikkal, Malappuram')
-    instructor_reference_phone = models.CharField(max_length=20, default='9961576993')
+    instructor_reference_phone = models.CharField(max_length=30, default='+91 95440 85442', blank=True, null=True)
     dan_kyu_certificate_no = models.CharField(max_length=100, blank=True, null=True)
     date_of_last_conferral = models.DateField(blank=True, null=True)
     instructor_qualification = models.CharField(max_length=50, blank=True, null=True)
@@ -153,22 +125,22 @@ class GradingRegistration(models.Model):
     judge_qualification = models.CharField(max_length=50, blank=True, null=True)
     
     # Financial & Fee Details
-    exam_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1000.00)
-    applied_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1000.00)
-    payment_mode = models.CharField(max_length=50, choices=PAYMENT_MODE_CHOICES, default='UPI / GPay / PhonePe')
+    exam_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1000.00, blank=True, null=True)
+    applied_fee = models.DecimalField(max_digits=10, decimal_places=2, default=1000.00, blank=True, null=True)
+    payment_mode = models.CharField(max_length=100, default='UPI / GPay / PhonePe', blank=True, null=True)
     transaction_id = models.CharField(max_length=100, blank=True, null=True)
-    payment_status = models.CharField(max_length=30, choices=PAYMENT_STATUS_CHOICES, default='Pending')
-    registration_status = models.CharField(max_length=30, choices=EXAM_STATUS_CHOICES, default='Submitted')
+    payment_status = models.CharField(max_length=50, default='Pending', blank=True, null=True)
+    registration_status = models.CharField(max_length=50, default='Submitted', blank=True, null=True)
     
     # Evaluation & Exam Result Details
     exam_date = models.DateField(blank=True, null=True)
-    exam_status = models.CharField(max_length=30, choices=EXAM_STATUS_CHOICES, default='Submitted')
+    exam_status = models.CharField(max_length=50, default='Submitted', blank=True, null=True)
     kihon_score = models.CharField(max_length=20, blank=True, null=True)
     kata_score = models.CharField(max_length=20, blank=True, null=True)
     kumite_score = models.CharField(max_length=20, blank=True, null=True)
     adaptation_score = models.CharField(max_length=20, blank=True, null=True)
     examiner_remarks = models.TextField(blank=True, null=True)
-    examiner_signature = models.CharField(max_length=255, default='Sensei Abdul Rahman (5th Dan)')
+    examiner_signature = models.CharField(max_length=255, default='Sensei Abdul Rahman (5th Dan)', blank=True, null=True)
     
     form_data_json = models.JSONField(blank=True, null=True)
     qr_code = models.CharField(max_length=100, blank=True, null=True)

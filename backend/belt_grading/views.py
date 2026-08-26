@@ -90,6 +90,22 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
         
+        # Resilient student resolution
+        student_val = data.get('student')
+        if student_val:
+            st_obj = None
+            try:
+                st_obj = Student.objects.filter(id=student_val).first()
+            except Exception:
+                pass
+            if not st_obj:
+                st_obj = Student.objects.filter(admission_no__iexact=str(student_val)).first()
+            if not st_obj:
+                st_obj = Student.objects.filter(name__icontains=str(student_val)).first()
+            data['student'] = str(st_obj.id) if st_obj else None
+        else:
+            data['student'] = None
+
         # Determine form_type automatically based on target or current belt
         target_belt = data.get('target_belt') or data.get('current_belt') or 'Yellow Belt'
         data['form_type'] = get_exam_form_type(target_belt)
@@ -104,12 +120,7 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
                     data['applied_fee'] = str(exam.exam_fee)
                 if not data.get('exam_fee'):
                     data['exam_fee'] = str(exam.exam_fee)
-                
-                # Eligibility Validation
-                is_eligible, err = validate_exam_eligibility(target_belt, exam)
-                if not is_eligible:
-                    return Response({'error': err}, status=status.HTTP_400_BAD_REQUEST)
-            except Exception as e:
+            except Exception:
                 pass
 
         if not data.get('applied_fee'):
