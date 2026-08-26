@@ -1,0 +1,690 @@
+[
+{
+    "model": "sessions.session",
+    "pk": "3qwqvfmmrstol9ckx9c1vypai2zj7xiw",
+    "fields": {
+        "session_data": ".eJxVjDkOwjAQRe_imliOPV6Gkp4zRDP2mLAokbJUiLuTSCmg_e-9_1YdrUvfrbNM3b2os2IXKFqojSmWG_DADbpsGw81Ro9kHbfq9Jsx5acMe1seNNxGncdhme6sd0UfdNbXscjrcrh_Bz3N_VZDC0mcJyxsi2epYhg5BqRkt8GSQ0FfXWJyISYwVJGCiQwsXDCrzxe-dUFO:1wyMnb:mL8Y-s83AMnoJxpuYWDtvI63P35qhRwoSvFKcJKuv-U",
+        "expire_date": "2026-09-07T05:00:43.325Z"
+    }
+},
+{
+    "model": "sessions.session",
+    "pk": "qrkewohmqh9ry2xarcttnr8uyie648j9",
+    "fields": {
+        "session_data": ".eJxVjjsOwjAQBe_iGlv-xWtT0nOGaL32kgCKpXwqxN0hUgqo38zovUSP2zr021LnfiziLGL0EWyqsjAH6bOPMlKK0lewyIl09U6cfrWM9KjT7pY7TremqE3rPGa1I-pYF3VtpT4vB_sXGHAZvrYz3DFCBDbsDGgHSDkhaa0tWEuZiVI2IWEFMGG_g1AssDcagu7E-wPpv0DP:1wsIGY:7gaOoK7ELcw0Ad8EdZTFEBzZWUYKae9V1-9eRRJbHWY",
+        "expire_date": "2026-08-21T10:57:30.345Z"
+    }
+},
+{
+    "model": "sessions.session",
+    "pk": "ry5a061c9gaiczoj7znxxhirca7wy8pg",
+    "fields": {
+        "session_data": ".eJxVjjsOwjAQBe_iGlsJ9sY2JT1niJ7XaxJAiZRPhbg7iZQC6jczem_VYl26dp1lavusLqoQXKht0SkFaOdio3EG6Tr5HIkzNcLq9Ksl8FOG3c0PDPfR8DgsU5_Mjphjnc1tzPK6HuxfoMPcbba3LiRLJZPYQsVHsajIiaSGqK4s4IPz8bz9Q2EXiKMXcOHsYUFQny80l0IZ:1wyNOw:6tZIgAMBoB8Q5OKwmnVl2ACtL2y4QMsf1lszyUagHWI",
+        "expire_date": "2026-09-07T05:39:18.752Z"
+    }
+},
+{
+    "model": "accounts.user",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$14TA61DbDkEaimhBLANdV2$4j0gOXMwu5Cegn6nkg6y18l2pcyAZlGPTzdhQbhhjfg=",
+        "last_login": "2026-08-07T10:57:30.270Z",
+        "is_superuser": true,
+        "username": "admin1",
+        "first_name": "",
+        "last_name": "",
+        "email": "",
+        "is_staff": true,
+        "is_active": true,
+        "date_joined": "2026-08-07T10:56:37.877Z",
+        "role": "SUPER_ADMIN",
+        "phone": null,
+        "whatsapp": null,
+        "assigned_branch_id": null,
+        "created_at": "2026-08-07T10:56:38.287Z",
+        "updated_at": "2026-08-07T10:56:38.287Z",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "accounts.user",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$YqgsOqH5bwSNj0QiCFv3fE$I1X332ieHfxWvv9nzFlC0R/ftxt0udtVZJ3KrGSx8/k=",
+        "last_login": "2026-08-24T05:00:43.256Z",
+        "is_superuser": true,
+        "username": "superadmin",
+        "first_name": "Sensei Master",
+        "last_name": "",
+        "email": "admin@bama.org",
+        "is_staff": true,
+        "is_active": true,
+        "date_joined": "2026-08-24T04:58:51.268Z",
+        "role": "SUPER_ADMIN",
+        "phone": null,
+        "whatsapp": null,
+        "assigned_branch_id": null,
+        "created_at": "2026-08-24T04:58:51.269Z",
+        "updated_at": "2026-08-24T05:37:49.171Z",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "accounts.user",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$BMuKQD4hz7B8K2YzWVORQH$khXTP1eT7Q/3EdoMlXezu/YfB+W3yo1RG6EP4tDUM1o=",
+        "last_login": null,
+        "is_superuser": false,
+        "username": "instructor",
+        "first_name": "Sensei Muhammad Shafi",
+        "last_name": "",
+        "email": "shafi@bama.org",
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2026-08-24T04:51:12.253Z",
+        "role": "INSTRUCTOR",
+        "phone": "+919847122334",
+        "whatsapp": null,
+        "assigned_branch_id": "CGM-02",
+        "created_at": "2026-08-24T04:51:12.688Z",
+        "updated_at": "2026-08-24T04:51:12.688Z",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "accounts.user",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$ZjwoZCZZA9EA2FWb1K1xX7$j7iRNYE2kZcZIzIUq68IazJXifOvfJpyHUJB1kgpYRY=",
+        "last_login": null,
+        "is_superuser": false,
+        "username": "branchadmin",
+        "first_name": "Sensei Abdul Rahman",
+        "last_name": "",
+        "email": "pulikkal@bama.org",
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2026-08-24T04:51:11.730Z",
+        "role": "BRANCH_ADMIN",
+        "phone": "+919544085442",
+        "whatsapp": null,
+        "assigned_branch_id": "PLK-01",
+        "created_at": "2026-08-24T04:51:12.155Z",
+        "updated_at": "2026-08-24T04:51:12.155Z",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "accounts.user",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$pAdymGZ5IiC7QoLh9ehZuX$Oq/XK6Jnroqjw1Ed/M0IZ8IzaJDvNSMoiaHKLfrE/E8=",
+        "last_login": "2026-08-24T05:39:18.684Z",
+        "is_superuser": true,
+        "username": "admin",
+        "first_name": "Master Founder",
+        "last_name": "",
+        "email": "admin@bama.org",
+        "is_staff": true,
+        "is_active": true,
+        "date_joined": "2026-08-05T06:15:00.451Z",
+        "role": "SUPER_ADMIN",
+        "phone": "+919544085442",
+        "whatsapp": null,
+        "assigned_branch_id": "PLK-01",
+        "created_at": "2026-08-05T06:15:00.861Z",
+        "updated_at": "2026-08-24T05:37:48.644Z",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "branches.branch",
+    "pk": "20c924cd-2dc7-4f82-a459-5e86286748c5",
+    "fields": {
+        "name": "Chungam Branch Dojo",
+        "code": "BAMA-DOJO-02",
+        "address": "Main Road Junction, Chungam, Malappuram",
+        "phone": "+91 98471 22334",
+        "whatsapp": null,
+        "email": null,
+        "branch_head": "Sensei Rahul Kumar (3rd Dan)",
+        "opening_date": null,
+        "is_head_office": false,
+        "status": "Active",
+        "timings": "Mon-Sat: 6 AM - 7 PM",
+        "created_at": "2026-08-17T05:26:59.831Z",
+        "updated_at": "2026-08-17T05:26:59.831Z"
+    }
+},
+{
+    "model": "branches.branch",
+    "pk": "283e0cc2-0009-494f-a3e1-7d8b14356213",
+    "fields": {
+        "name": "Pulikkal Branch (Head Office)",
+        "code": "BAMA-DOJO-01",
+        "address": "Andiyoorkunnu Road, Pulikkal, Malappuram",
+        "phone": "+91 95440 85442",
+        "whatsapp": null,
+        "email": null,
+        "branch_head": "Sensei Abdul Rahman (5th Dan)",
+        "opening_date": null,
+        "is_head_office": true,
+        "status": "Active",
+        "timings": "Mon-Sat: 6 AM - 7 PM",
+        "created_at": "2026-08-17T05:26:59.750Z",
+        "updated_at": "2026-08-17T05:26:59.750Z"
+    }
+},
+{
+    "model": "branches.branch",
+    "pk": "3318495c-fd61-4135-bc31-d58458ee65e9",
+    "fields": {
+        "name": "Chungam Branch",
+        "code": "CGM-02",
+        "address": "Main Road Junction, Chungam, Malappuram, Kerala - 673638",
+        "phone": "+91 98471 22334",
+        "whatsapp": "+91 98471 22334",
+        "email": "chungam@bama.org",
+        "branch_head": "Sensei Muhammad Shafi (3rd Dan)",
+        "opening_date": null,
+        "is_head_office": false,
+        "status": "Active",
+        "timings": "Tue, Thu, Sat: 5:00 PM - 7:00 PM",
+        "created_at": "2026-08-05T06:15:00.377Z",
+        "updated_at": "2026-08-05T06:15:00.377Z"
+    }
+},
+{
+    "model": "branches.branch",
+    "pk": "5f429f1f-1a33-40af-a621-cae5ecbccb41",
+    "fields": {
+        "name": "Feroke Branch",
+        "code": "FRK-03",
+        "address": "Station Road, Near Town Hall, Feroke, Kozhikode, Kerala - 673631",
+        "phone": "+91 94462 88990",
+        "whatsapp": "+91 94462 88990",
+        "email": "feroke@bama.org",
+        "branch_head": "Sensei Rajesh Kumar (4th Dan)",
+        "opening_date": null,
+        "is_head_office": false,
+        "status": "Active",
+        "timings": "Sat & Sun: 7:00 AM - 9:30 AM & 4:00 PM - 6:00 PM",
+        "created_at": "2026-08-05T06:15:00.413Z",
+        "updated_at": "2026-08-05T06:15:00.413Z"
+    }
+},
+{
+    "model": "branches.branch",
+    "pk": "6ddf514b-5401-4fb7-97ab-9008e0da4cd8",
+    "fields": {
+        "name": "Pulikkal Branch (Head Office)",
+        "code": "PLK-01",
+        "address": "Andiyoorkunnu Road, Pulikkal, Malappuram, Kerala - 673637",
+        "phone": "+91 95440 85442",
+        "whatsapp": "+91 95440 85442",
+        "email": "pulikkal@bama.org",
+        "branch_head": "Sensei Abdul Rahman (5th Dan)",
+        "opening_date": null,
+        "is_head_office": true,
+        "status": "Active",
+        "timings": "Mon, Wed, Fri: 6:00 AM - 7:30 AM & 5:00 PM - 7:00 PM",
+        "created_at": "2026-08-05T06:15:00.298Z",
+        "updated_at": "2026-08-05T06:15:00.298Z"
+    }
+},
+{
+    "model": "branches.branch",
+    "pk": "d4639193-c693-46e2-a46e-5e25dcf427a1",
+    "fields": {
+        "name": "Mongam Branch Dojo",
+        "code": "BAMA-DOJO-03",
+        "address": "Main Road, Mongam, Malappuram",
+        "phone": "+91 97450 67890",
+        "whatsapp": null,
+        "email": null,
+        "branch_head": "Sensei Muhammed Haneen (2nd Dan)",
+        "opening_date": null,
+        "is_head_office": false,
+        "status": "Active",
+        "timings": "Mon-Sat: 6 AM - 7 PM",
+        "created_at": "2026-08-17T05:26:59.866Z",
+        "updated_at": "2026-08-17T05:26:59.866Z"
+    }
+},
+{
+    "model": "students.student",
+    "pk": "8e731819-392f-4f95-94f4-7cba0a12ce63",
+    "fields": {
+        "admission_no": "BAMA-2026-6615",
+        "name": "fghvjb",
+        "photo": null,
+        "gender": "Male",
+        "dob": null,
+        "age": 10,
+        "blood_group": null,
+        "guardian_name": "zdfghjkl",
+        "relationship": "Father",
+        "phone": "7356310450",
+        "whatsapp": null,
+        "email": null,
+        "address": "Pulikkal, Malappuram, Kerala",
+        "emergency_contact": null,
+        "branch": "283e0cc2-0009-494f-a3e1-7d8b14356213",
+        "shift": "Evening Batch (5:00 PM - 7:00 PM)",
+        "instructor": "Sensei Abdul Rahman",
+        "joining_date": null,
+        "current_belt": "White Belt",
+        "fee_amount": "1200.00",
+        "initial_paid_amount": "1200.00",
+        "pending_amount": "0.00",
+        "fee_status": "Paid",
+        "medical_notes": null,
+        "status": "Active",
+        "qr_code": null,
+        "created_at": "2026-08-24T05:32:59.375Z",
+        "updated_at": "2026-08-24T05:32:59.375Z"
+    }
+},
+{
+    "model": "students.student",
+    "pk": "bd0ea2f6-c651-49d9-9d67-a07e5ef78298",
+    "fields": {
+        "admission_no": "BAMA-2026-1277",
+        "name": "bnm,",
+        "photo": null,
+        "gender": "Male",
+        "dob": null,
+        "age": 10,
+        "blood_group": null,
+        "guardian_name": "hj",
+        "relationship": "Father",
+        "phone": "7356310450",
+        "whatsapp": null,
+        "email": null,
+        "address": "Pulikkal, Malappuram, Kerala",
+        "emergency_contact": null,
+        "branch": "283e0cc2-0009-494f-a3e1-7d8b14356213",
+        "shift": "Evening Batch (5:00 PM - 7:00 PM)",
+        "instructor": "Sensei Abdul Rahman",
+        "joining_date": null,
+        "current_belt": "White Belt",
+        "fee_amount": "1200.00",
+        "initial_paid_amount": "1200.00",
+        "pending_amount": "0.00",
+        "fee_status": "Paid",
+        "medical_notes": null,
+        "status": "Active",
+        "qr_code": null,
+        "created_at": "2026-08-24T05:32:59.267Z",
+        "updated_at": "2026-08-24T05:32:59.267Z"
+    }
+},
+{
+    "model": "students.student",
+    "pk": "e219a5b2-ca8c-4bfc-8811-e74a9ed39781",
+    "fields": {
+        "admission_no": "BAMA-2026-7889",
+        "name": "t sbaith",
+        "photo": null,
+        "gender": "Male",
+        "dob": null,
+        "age": 10,
+        "blood_group": null,
+        "guardian_name": "ali",
+        "relationship": "Father",
+        "phone": "7356310450",
+        "whatsapp": null,
+        "email": null,
+        "address": "Pulikkal, Malappuram, Kerala",
+        "emergency_contact": null,
+        "branch": "283e0cc2-0009-494f-a3e1-7d8b14356213",
+        "shift": "Evening Batch (5:00 PM - 7:00 PM)",
+        "instructor": "Sensei Abdul Rahman",
+        "joining_date": null,
+        "current_belt": "White Belt",
+        "fee_amount": "1200.00",
+        "initial_paid_amount": "1200.00",
+        "pending_amount": "0.00",
+        "fee_status": "Paid",
+        "medical_notes": null,
+        "status": "Active",
+        "qr_code": null,
+        "created_at": "2026-08-24T05:32:59.465Z",
+        "updated_at": "2026-08-24T05:32:59.465Z"
+    }
+},
+{
+    "model": "attendance.attendancerecord",
+    "pk": "0e0ed4ad-8794-4dae-ad3a-097b6ebbaa33",
+    "fields": {
+        "student": "e219a5b2-ca8c-4bfc-8811-e74a9ed39781",
+        "branch": "20c924cd-2dc7-4f82-a459-5e86286748c5",
+        "date": "2026-08-24",
+        "status": "Present",
+        "marked_by": "Instructor",
+        "remarks": null,
+        "created_at": "2026-08-24T06:06:42.875Z"
+    }
+},
+{
+    "model": "attendance.attendancerecord",
+    "pk": "9a29f61d-c123-4973-a63b-c879fc729499",
+    "fields": {
+        "student": "8e731819-392f-4f95-94f4-7cba0a12ce63",
+        "branch": "20c924cd-2dc7-4f82-a459-5e86286748c5",
+        "date": "2026-08-24",
+        "status": "Present",
+        "marked_by": "Instructor",
+        "remarks": null,
+        "created_at": "2026-08-24T06:04:16.421Z"
+    }
+},
+{
+    "model": "attendance.attendancerecord",
+    "pk": "e47b9cb7-674e-4a60-952c-a0e540f98389",
+    "fields": {
+        "student": "bd0ea2f6-c651-49d9-9d67-a07e5ef78298",
+        "branch": "20c924cd-2dc7-4f82-a459-5e86286748c5",
+        "date": "2026-08-24",
+        "status": "Absent",
+        "marked_by": "Instructor",
+        "remarks": null,
+        "created_at": "2026-08-24T06:06:42.666Z"
+    }
+},
+{
+    "model": "fees.feeratehistory",
+    "pk": "003e02a6-717e-492e-ba41-edacf8bde468",
+    "fields": {
+        "fee_type": "MONTHLY",
+        "amount": "500.00",
+        "effective_from": "2026-01-01",
+        "effective_to": null,
+        "is_active": true,
+        "note": "Base rate",
+        "created_at": "2026-08-17T07:06:14.281Z",
+        "updated_at": "2026-08-17T07:06:14.281Z"
+    }
+},
+{
+    "model": "fees.feeratehistory",
+    "pk": "f4f30040-e283-4f05-abb6-d6641134bdfe",
+    "fields": {
+        "fee_type": "MONTHLY",
+        "amount": "1000.00",
+        "effective_from": "2026-09-01",
+        "effective_to": null,
+        "is_active": true,
+        "note": "September fee hike",
+        "created_at": "2026-08-17T07:06:14.313Z",
+        "updated_at": "2026-08-17T07:06:14.313Z"
+    }
+},
+{
+    "model": "fees.feeconfiguration",
+    "pk": "00000000-0000-0000-0000-000000000001",
+    "fields": {
+        "default_admission_fee": "2000.00",
+        "default_monthly_fee": "1000.00",
+        "effective_month": "September 2026",
+        "apply_to_existing_cadets": true,
+        "created_at": "2026-08-17T06:54:07.855Z",
+        "updated_at": "2026-08-17T07:06:14.350Z"
+    }
+},
+{
+    "model": "belt_grading.examschedule",
+    "pk": "3487d9a2-f68c-48d5-b4f4-06618c02470f",
+    "fields": {
+        "exam_name": "September Color Belt Examination",
+        "exam_code": "EXAM-2026-SEP",
+        "exam_date": "2026-09-20",
+        "registration_start": "2026-08-01",
+        "registration_end": "2026-09-15",
+        "venue": "Main Dojo, Pulikkal",
+        "exam_fee": "1000.00",
+        "currency": "INR",
+        "eligible_belt": "All Belts",
+        "target_belt": null,
+        "max_candidates": 100,
+        "status": "Active",
+        "payment_required": true,
+        "instructions": null,
+        "notes": null,
+        "created_at": "2026-08-17T07:52:34.257Z",
+        "updated_at": "2026-08-17T07:52:34.257Z"
+    }
+},
+{
+    "model": "belt_grading.examschedule",
+    "pk": "f0635e9e-4153-4aff-93ed-cc6e2ab18e67",
+    "fields": {
+        "exam_name": "October Kyu & Dan Senior Grading",
+        "exam_code": "EXAM-2026-OCT",
+        "exam_date": "2026-10-25",
+        "registration_start": "2026-09-01",
+        "registration_end": "2026-10-20",
+        "venue": "Head Office Dojo, Pulikkal",
+        "exam_fee": "1200.00",
+        "currency": "INR",
+        "eligible_belt": "Brown Belt (3rd Kyu)",
+        "target_belt": null,
+        "max_candidates": 100,
+        "status": "Active",
+        "payment_required": true,
+        "instructions": null,
+        "notes": null,
+        "created_at": "2026-08-17T07:52:34.302Z",
+        "updated_at": "2026-08-17T07:52:34.302Z"
+    }
+},
+{
+    "model": "website.herobanner",
+    "pk": "8dd97efc-8c5c-453c-89f8-210184deb915",
+    "fields": {
+        "title": "Brave Academy of Martial Arts",
+        "subtitle": "Discipline • Respect • Strength • Excellence. Train under certified Senseis affiliated with JKA India, KKA, and Kick Boxing Association of Kerala.",
+        "image_url": null,
+        "button_text": "Explore Programs",
+        "button_link": "/programs",
+        "is_active": true,
+        "order": 1
+    }
+},
+{
+    "model": "website.faq",
+    "pk": "0ab99d12-d235-49a0-acad-5e54ace50baf",
+    "fields": {
+        "question": "What age group can join B.A.M.A.?",
+        "answer": "We welcome students from age 5 upwards. We have special Kids Karate, Adults, and Women’s Self Defence programs tailored to every skill level.",
+        "category": "General",
+        "order": 1
+    }
+},
+{
+    "model": "website.testimonial",
+    "pk": "5fb7521b-0146-4ec6-8c26-a37050fdb0b7",
+    "fields": {
+        "name": "Dr. Anver Sadath",
+        "role": "Parent of Kid Cadet",
+        "comment": "B.A.M.A. transformed my son’s confidence and physical agility. The Senseis are extremely dedicated to character building and discipline.",
+        "rating": 5,
+        "photo_url": null
+    }
+},
+{
+    "model": "notifications.whatsapplog",
+    "pk": "01fe9637-924a-4d1d-8674-cde0dc6f53fa",
+    "fields": {
+        "recipient_name": "sanil",
+        "phone": "9207337713",
+        "template_name": "Bulk Monthly Fee Reminder",
+        "message_text": "",
+        "status": "Sent",
+        "sent_at": "2026-08-07T05:34:35.703Z"
+    }
+},
+{
+    "model": "notifications.whatsapplog",
+    "pk": "01fe9df9-7a7f-4634-a1bc-8bf41fc5332c",
+    "fields": {
+        "recipient_name": "sanil",
+        "phone": "919207337713",
+        "template_name": "Bulk Monthly Fee Reminder",
+        "message_text": "",
+        "status": "Sent",
+        "sent_at": "2026-08-07T05:41:07.016Z"
+    }
+},
+{
+    "model": "notifications.whatsapplog",
+    "pk": "09567bdf-a15b-4e0a-8bec-3e73e086b279",
+    "fields": {
+        "recipient_name": "sabith",
+        "phone": "9562825852",
+        "template_name": "Bulk Monthly Fee Reminder",
+        "message_text": "",
+        "status": "Sent",
+        "sent_at": "2026-08-07T05:34:36.186Z"
+    }
+},
+{
+    "model": "notifications.whatsapplog",
+    "pk": "52691f9e-6557-44f1-9e0f-44c5f2d41a87",
+    "fields": {
+        "recipient_name": "Cadet Parent",
+        "phone": "919846011223",
+        "template_name": "Automatic API Welcome",
+        "message_text": "",
+        "status": "Sent",
+        "sent_at": "2026-08-06T07:02:50.878Z"
+    }
+},
+{
+    "model": "notifications.whatsapplog",
+    "pk": "67246bc7-2b68-4607-bbb4-620a6f148aa8",
+    "fields": {
+        "recipient_name": "sabith",
+        "phone": "919562825852",
+        "template_name": "Bulk Monthly Fee Reminder",
+        "message_text": "",
+        "status": "Sent",
+        "sent_at": "2026-08-07T05:41:07.485Z"
+    }
+},
+{
+    "model": "notifications.whatsapplog",
+    "pk": "a2e8cf53-2ef3-4bb9-81e9-1a86bba9d7d1",
+    "fields": {
+        "recipient_name": "sanil",
+        "phone": "919207337713",
+        "template_name": "Bulk Monthly Fee Reminder",
+        "message_text": "",
+        "status": "Sent",
+        "sent_at": "2026-08-07T05:41:23.487Z"
+    }
+},
+{
+    "model": "notifications.whatsapplog",
+    "pk": "f438178f-a406-4250-a1d5-0f36f6fc807a",
+    "fields": {
+        "recipient_name": "sabith",
+        "phone": "919562825852",
+        "template_name": "Bulk Monthly Fee Reminder",
+        "message_text": "",
+        "status": "Sent",
+        "sent_at": "2026-08-07T05:41:23.559Z"
+    }
+},
+{
+    "model": "admin.logentry",
+    "pk": 1,
+    "fields": {
+        "action_time": "2026-08-07T11:01:17.799Z",
+        "user": [
+            "admin1"
+        ],
+        "content_type": [
+            "accounts",
+            "user"
+        ],
+        "object_id": "b97af3d6-f010-4f6c-839c-b74c98af4ebf",
+        "object_repr": "branchadmin (Branch Admin)",
+        "action_flag": 3,
+        "change_message": ""
+    }
+},
+{
+    "model": "admin.logentry",
+    "pk": 2,
+    "fields": {
+        "action_time": "2026-08-07T11:01:17.799Z",
+        "user": [
+            "admin1"
+        ],
+        "content_type": [
+            "accounts",
+            "user"
+        ],
+        "object_id": "a9c20625-5a3e-4a87-b08f-1056a72f2ce2",
+        "object_repr": "instructor (Instructor)",
+        "action_flag": 3,
+        "change_message": ""
+    }
+},
+{
+    "model": "admin.logentry",
+    "pk": 3,
+    "fields": {
+        "action_time": "2026-08-07T11:01:17.799Z",
+        "user": [
+            "admin1"
+        ],
+        "content_type": [
+            "accounts",
+            "user"
+        ],
+        "object_id": "a5bb6c05-d2d1-481a-ab34-32482f7956ac",
+        "object_repr": "parent (PARENT)",
+        "action_flag": 3,
+        "change_message": ""
+    }
+},
+{
+    "model": "admin.logentry",
+    "pk": 4,
+    "fields": {
+        "action_time": "2026-08-07T11:01:17.799Z",
+        "user": [
+            "admin1"
+        ],
+        "content_type": [
+            "accounts",
+            "user"
+        ],
+        "object_id": "4980c3a5-6846-4e6b-9c74-89e8a3176ef6",
+        "object_repr": "student (STUDENT)",
+        "action_flag": 3,
+        "change_message": ""
+    }
+},
+{
+    "model": "admin.logentry",
+    "pk": 5,
+    "fields": {
+        "action_time": "2026-08-24T05:17:27.151Z",
+        "user": [
+            "superadmin"
+        ],
+        "content_type": [
+            "students",
+            "student"
+        ],
+        "object_id": "8aca128e-15d8-4750-9616-440ffa3568b2",
+        "object_repr": "BAMA-TEST-001 - Test Cadet Shafi (White Belt) [Evening Batch (5:00 PM - 7:00 PM)]",
+        "action_flag": 3,
+        "change_message": ""
+    }
+}
+]

@@ -1,0 +1,204 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary-ruby: #DC2626;
+    --dark-ruby: #991B1B;
+    --gold-accent: #F59E0B;
+    --gold-light: #FBBF24;
+    --bg-dark: #07080C;
+    --card-dark: #0F111A;
+  }
+
+  body {
+    background-color: #F4F6FB;
+    color: #1F2937;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F4F6FB;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #DC2626;
+}
+
+/* Ultra Premium Keyframes */
+@keyframes hero-sun-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 15px rgba(229, 9, 20, 0.4));
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+    filter: drop-shadow(0 0 35px rgba(229, 9, 20, 0.75));
+  }
+}
+
+@keyframes hero-artwork-float {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.02);
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@keyframes gradient-sweep {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes ribbon-infinite-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ribbon-loop {
+  display: flex;
+  width: max-content;
+  animation: ribbon-infinite-scroll 70s linear infinite;
+}
+
+.animate-ribbon-loop:hover,
+.animate-ribbon-loop:active,
+.animate-ribbon-loop:focus {
+  animation-play-state: paused;
+}
+
+@keyframes crown-bounce {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(6deg);
+  }
+}
+
+@keyframes pulse-glow-ring {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(229, 9, 20, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(229, 9, 20, 0);
+  }
+}
+
+/* Utility Animation Classes */
+.animate-sun-pulse {
+  animation: hero-sun-pulse 3.5s ease-in-out infinite;
+}
+
+.animate-crown-bounce {
+  animation: crown-bounce 2s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow-ring 2.5s infinite;
+}
+
+.shimmer-btn-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-btn-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: shimmer-sweep 2.8s infinite;
+}
+
+/* Ultra Card Hover Dynamics */
+.pro-card-hover {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pro-card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 40px -10px rgba(229, 9, 20, 0.15), 0 10px 20px -5px rgba(0, 0, 0, 0.04);
+  border-color: rgba(229, 9, 20, 0.4);
+}
+
+/* =======================================================
+   PRO MAX SCROLL REVEAL ANIMATION ENGINE
+   ======================================================= */
+.reveal-on-scroll {
+  opacity: 0;
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1), transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-on-scroll.slide-left {
+  transform: translateX(-50px);
+}
+
+.reveal-on-scroll.slide-right {
+  transform: translateX(50px);
+}
+
+.reveal-on-scroll.slide-up {
+  transform: translateY(40px);
+}
+
+.reveal-on-scroll.zoom-in {
+  transform: scale(0.92);
+}
+
+.reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateX(0) translateY(0) scale(1);
+}
+
+/* Mobile Responsive Animation Polish */
+@media (max-width: 640px) {
+  .reveal-on-scroll.slide-left,
+  .reveal-on-scroll.slide-right {
+    transform: translateY(25px);
+  }
+  .reveal-on-scroll {
+    transition-duration: 0.65s;
+  }
+}
