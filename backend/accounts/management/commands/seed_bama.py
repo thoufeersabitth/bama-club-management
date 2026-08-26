@@ -60,11 +60,9 @@ class Command(BaseCommand):
             }
         )
 
-        # 2. Create Demo Users
+        # 2. Create Single Official Super Admin User
         users_data = [
-            ('admin', 'admin123', UserRole.SUPER_ADMIN, 'Master Founder', 'admin@bama.org', '+919544085442', 'PLK-01'),
-            ('branchadmin', 'branch123', UserRole.BRANCH_ADMIN, 'Sensei Abdul Rahman', 'pulikkal@bama.org', '+919544085442', 'PLK-01'),
-            ('instructor', 'inst123', UserRole.INSTRUCTOR, 'Sensei Muhammad Shafi', 'shafi@bama.org', '+919847122334', 'CGM-02'),
+            ('nafih', 'Pulikkal@1', UserRole.SUPER_ADMIN, 'Sensei Nafih', 'braveacademypkl@gmail.com', '+919544085442', 'PLK-01'),
         ]
 
         for username, password, role, name, email, phone, branch_id in users_data:

@@ -113,40 +113,21 @@ export const INITIAL_BRANCHES = [
 
 export const INITIAL_STAFF = [
   {
-    id: 'STF-101',
-    username: 'admin',
-    name: 'Sensei Abdul Rahman',
+    id: 'STF-001',
+    username: 'nafih',
+    name: 'Sensei Nafih',
     role: 'SUPER_ADMIN',
-    designation: 'Chief Instructor & Founder (5th Dan)',
+    designation: 'Chief Administrator & Head Instructor',
     branch: 'Pulikkal Branch (Head Office)',
-    assigned_branch_id: '283e0cc2-0009-494f-a3e1-7d8b14356213',
     phone: '+91 95440 85442',
-    email: 'admin@bama.org',
-    password: 'admin',
-    salary: '35000',
+    email: 'braveacademypkl@gmail.com',
+    password: 'Pulikkal@1',
+    salary: '50000',
     joiningDate: '2020-01-01',
     status: 'ACTIVE',
     classesTaken: 0,
     lastClassDate: '2026-08-26',
-    permissions: { students: true, attendance: true, fees: true, whatsapp: true, beltGrading: true, reports: true }
-  },
-  {
-    id: 'STF-102',
-    username: 'shafi',
-    name: 'Sensei Muhammad Shafi',
-    role: 'INSTRUCTOR',
-    designation: 'Senior Instructor (3rd Dan)',
-    branch: 'Chungam Branch Dojo',
-    assigned_branch_id: '20c924cd-2dc7-4f82-a459-5e86286748c5',
-    phone: '+91 98471 22334',
-    email: 'shafi@bama.org',
-    password: 'shafi',
-    salary: '25000',
-    joiningDate: '2022-06-15',
-    status: 'ACTIVE',
-    classesTaken: 0,
-    lastClassDate: '2026-08-26',
-    permissions: { students: true, attendance: true, fees: true, whatsapp: true, beltGrading: true, reports: false }
+    permissions: { students: true, attendance: true, fees: true, whatsapp: true, beltGrading: true, reports: true, instructors: true, branches: true, settings: true, cms: true }
   }
 ];
 
