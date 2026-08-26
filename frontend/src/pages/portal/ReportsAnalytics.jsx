@@ -163,9 +163,13 @@ export default function ReportsAnalytics() {
       }
     }
 
+    // Ensure cadet was admitted on or before the 'To Date' of the filter period
     const joiningDate = s.joiningDate || s.created_at || s.joining_date;
-    if (joiningDate && !isDateInRange(joiningDate)) {
-      return false;
+    if (joiningDate && toDate) {
+      try {
+        const jDate = new Date(joiningDate).toISOString().split('T')[0];
+        if (jDate > toDate) return false;
+      } catch (e) {}
     }
 
     return true;
