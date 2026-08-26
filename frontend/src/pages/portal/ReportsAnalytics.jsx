@@ -3,7 +3,7 @@ import {
   BarChart3, Download, FileSpreadsheet, FileText, Calendar, Filter,
   Users, CreditCard, CalendarCheck, Award, Building2, TrendingUp, CheckCircle2, DollarSign, AlertCircle, Clock, Check, RefreshCw, Briefcase, BookOpen, Trash2
 } from 'lucide-react';
-import { fetchStudents, fetchFees } from '../../services/api';
+import { fetchStudents, fetchFees, getStoredStaff } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -29,18 +29,13 @@ export default function ReportsAnalytics() {
   const [attendanceData, setAttendanceData] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // Staff & Class Logs State
+  // Staff & Class Logs State - strictly live data only (0 mock records)
   const [staffList, setStaffList] = useState(() => {
     try {
       const saved = localStorage.getItem('bama_staff_list');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return [
-      { id: 'STF-101', name: 'Sensei Abdul Rahman', designation: 'Chief Instructor (5th Dan)', branch: 'Pulikkal Branch (Head Office)', salary: '35000', classesTaken: 124, lastClassDate: todayStr },
-      { id: 'STF-102', name: 'Sensei Muhammad Shafi', designation: 'Senior Instructor (3rd Dan)', branch: 'Chungam Branch', salary: '25000', classesTaken: 86, lastClassDate: todayStr },
-      { id: 'STF-103', name: 'Sensei Muhammed Haneen', designation: 'Instructor (2nd Dan)', branch: 'Mongam Branch', salary: '20000', classesTaken: 64, lastClassDate: todayStr },
-      { id: 'STF-104', name: 'Sensei Rajesh Kumar', designation: 'Fitness Coach', branch: 'Chungam Branch', salary: '18000', classesTaken: 45, lastClassDate: todayStr }
-    ];
+    return getStoredStaff();
   });
 
   const [classLogs, setClassLogs] = useState(() => {
@@ -48,22 +43,21 @@ export default function ReportsAnalytics() {
       const saved = localStorage.getItem('bama_class_logs');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Automatic Deduplication of duplicate test logs on same date/shift/staff
+        // Automatically purge any dummy logs (log-1, log-2, log-3)
+        const realLogs = Array.isArray(parsed) ? parsed.filter(l => l.id !== 'log-1' && l.id !== 'log-2' && l.id !== 'log-3') : [];
         const uniqueMap = new Map();
-        parsed.forEach(log => {
+        realLogs.forEach(log => {
           const key = `${log.staffId || log.staffName}_${log.date}_${log.shift}`;
           if (!uniqueMap.has(key)) {
             uniqueMap.set(key, log);
           }
         });
-        return Array.from(uniqueMap.values());
+        const result = Array.from(uniqueMap.values());
+        localStorage.setItem('bama_class_logs', JSON.stringify(result));
+        return result;
       }
     } catch (e) {}
-    return [
-      { id: 'log-1', staffId: 'STF-101', staffName: 'Sensei Abdul Rahman', date: todayStr, branch: 'Pulikkal Branch (Head Office)', shift: 'Evening Batch (5:00 PM - 7:00 PM)', cadetsCount: 28, topic: 'Bassai Dai Kata & Sparring' },
-      { id: 'log-2', staffId: 'STF-102', staffName: 'Sensei Muhammad Shafi', date: todayStr, branch: 'Chungam Branch', shift: 'Evening Batch (5:00 PM - 7:00 PM)', cadetsCount: 22, topic: 'Kumite Pads & Counter Attacks' },
-      { id: 'log-3', staffId: 'STF-103', staffName: 'Sensei Muhammed Haneen', date: todayStr, branch: 'Mongam Branch', shift: 'Morning Batch (6:00 AM - 7:30 AM)', cadetsCount: 18, topic: 'Yellow & Orange Belt Stances' }
-    ];
+    return [];
   });
 
   useEffect(() => {
