@@ -96,6 +96,28 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         serializer.save()
 
+    def destroy(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        student = None
+        # 1. Try UUID lookup
+        try:
+            student = Student.objects.filter(id=pk).first()
+        except Exception:
+            pass
+        # 2. Try admission_no lookup
+        if not student and pk:
+            student = Student.objects.filter(admission_no__iexact=str(pk).strip()).first()
+        # 3. Try name lookup if passed
+        if not student and pk:
+            student = Student.objects.filter(name__iexact=str(pk).strip()).first()
+
+        if student:
+            student_name = student.name
+            student.delete()
+            return Response({'message': f'Cadet {student_name} permanently deleted from database.'}, status=status.HTTP_204_NO_CONTENT)
+        
+        return Response({'message': 'Cadet record already removed.'}, status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=['post'], url_path='promote')
     def promote(self, request, pk=None):
         import random

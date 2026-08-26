@@ -577,12 +577,29 @@ export const promoteStudent = async (studentId, { target_belt, exam_date, examin
   }
 };
 
-export const deleteStudent = async (id) => {
+export const deleteStudent = async (id, admissionNo) => {
   try {
-    await api.delete(`/students/${id}/`);
-  } catch (err) {}
+    if (id) {
+      await api.delete(`/students/${id}/`);
+    } else if (admissionNo) {
+      await api.delete(`/students/${admissionNo}/`);
+    }
+  } catch (err) {
+    if (admissionNo && admissionNo !== id) {
+      try {
+        await api.delete(`/students/${admissionNo}/`);
+      } catch (e) {}
+    }
+  }
   const currentList = getStoredStudents();
-  saveStoredStudents(currentList.filter(s => s.id !== id && s.admissionNo !== id && s.admission_no !== id));
+  const filtered = currentList.filter(s => 
+    String(s.id).trim() !== String(id).trim() && 
+    String(s.admissionNo || '').trim() !== String(id).trim() && 
+    String(s.admission_no || '').trim() !== String(id).trim() &&
+    (!admissionNo || (String(s.admissionNo || '').trim() !== String(admissionNo).trim() && String(s.admission_no || '').trim() !== String(admissionNo).trim()))
+  );
+  saveStoredStudents(filtered);
+  window.dispatchEvent(new Event('bama_data_updated'));
   return { success: true, id };
 };
 

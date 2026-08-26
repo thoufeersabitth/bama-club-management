@@ -789,14 +789,23 @@ export default function StudentManagement() {
   // Confirm Delete Student
   const handleDeleteConfirm = async () => {
     if (!deletingStudent) return;
+    const stdId = deletingStudent.id;
+    const admNo = deletingStudent.admissionNo || deletingStudent.admission_no;
+    
     try {
-      await deleteStudent(deletingStudent.id);
+      await deleteStudent(stdId, admNo);
     } catch (err) {}
 
-    const updatedList = students.filter(s => s.id !== deletingStudent.id);
+    const updatedList = students.filter(s => 
+      String(s.id).trim() !== String(stdId).trim() && 
+      String(s.admissionNo || '').trim() !== String(stdId).trim() && 
+      String(s.admission_no || '').trim() !== String(stdId).trim() &&
+      (!admNo || (String(s.admissionNo || '').trim() !== String(admNo).trim() && String(s.admission_no || '').trim() !== String(admNo).trim()))
+    );
     setStudents(updatedList);
     saveStoredStudents(updatedList);
     setDeletingStudent(null);
+    window.dispatchEvent(new Event('bama_data_updated'));
   };
 
   // Filter cadets based on Search, Belt, Branch, Shift Batch, Category, and Selected Tab
