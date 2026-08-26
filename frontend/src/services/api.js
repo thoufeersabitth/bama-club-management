@@ -354,7 +354,7 @@ export const fetchDashboardStats = async () => {
 
 export const fetchStudents = async (params = {}) => {
   try {
-    const res = await api.get('/students/', { params });
+    const res = await api.get('/students/', { params: { ...params, _t: Date.now() } });
     const serverData = res.data.results || res.data;
 
     if (Array.isArray(serverData) && serverData.length > 0) {
