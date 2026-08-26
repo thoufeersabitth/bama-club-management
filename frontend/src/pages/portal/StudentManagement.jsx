@@ -6,7 +6,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase
 } from 'lucide-react';
-import { fetchStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
+import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -23,7 +23,7 @@ const calculateAgeFromDOB = (dobString) => {
   if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
     age--;
   }
-  return Math.max(1, age);
+  return Math.max(4, Math.min(age, 75));
 };
 
 // Helper to get dynamically active training shift options for a specific branch
@@ -122,7 +122,7 @@ const getActiveShiftOptions = (branchName = '') => {
 };
 
 export default function StudentManagement() {
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState(getStoredStudents);
   const [search, setSearch] = useState('');
   const [selectedBelt, setSelectedBelt] = useState('ALL');
   const [selectedBranch, setSelectedBranch] = useState('ALL');

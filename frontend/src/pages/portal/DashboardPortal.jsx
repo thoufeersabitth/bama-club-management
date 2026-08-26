@@ -7,7 +7,7 @@ import {
   PieChart, Activity, UserPlus, Check, Star, Sparkles, Flame, LogIn, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { fetchStudents, fetchFees } from '../../services/api';
+import { fetchStudents, fetchFees, getStoredStudents } from '../../services/api';
 import { INITIAL_BRANCHES } from '../../services/initialData';
 import { buildRealDatabaseActivities } from '../../services/activityLogger';
 
@@ -15,9 +15,9 @@ export default function DashboardPortal() {
   const { user, activeBranch } = useAuth();
   const navigate = useNavigate();
 
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState(getStoredStudents);
   const [fees, setFees] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Active Branch Filtering Engine for Dashboard
   const activeBranchName = activeBranch || localStorage.getItem('bama_active_branch') || (user?.role === 'INSTRUCTOR' ? user?.branch : 'ALL');
