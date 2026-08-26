@@ -186,14 +186,32 @@ export default function DashboardPortal() {
 
     // 1. Calculate strictly from Students Monthly Tuition Fees
     filteredStudents.forEach(s => {
-      const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
+      const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? s.monthlyFee ?? 500) || 500;
       const isPaid = (s.feeStatus === 'Paid' || s.fee_status === 'Paid');
-      const monthlyPaid = isPaid 
-        ? monthlyTotal 
-        : parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
       
-      const sCollected = Math.min(monthlyTotal, monthlyPaid);
-      const sPending = Math.max(0, monthlyTotal - sCollected);
+      let monthlyPaid = 0;
+      if (isPaid) {
+        monthlyPaid = monthlyTotal;
+      } else if (s.initialPaidAmount !== undefined && s.initialPaidAmount !== null && !isNaN(parseFloat(s.initialPaidAmount))) {
+        monthlyPaid = parseFloat(s.initialPaidAmount);
+      } else if (s.initial_paid_amount !== undefined && s.initial_paid_amount !== null && !isNaN(parseFloat(s.initial_paid_amount))) {
+        monthlyPaid = parseFloat(s.initial_paid_amount);
+      } else if (s.paid_amount !== undefined && s.paid_amount !== null && !isNaN(parseFloat(s.paid_amount))) {
+        monthlyPaid = parseFloat(s.paid_amount);
+      }
+
+      let sPending = 0;
+      if (isPaid) {
+        sPending = 0;
+      } else if (s.pendingAmount !== undefined && s.pendingAmount !== null && !isNaN(parseFloat(s.pendingAmount))) {
+        sPending = parseFloat(s.pendingAmount);
+      } else if (s.pending_amount !== undefined && s.pending_amount !== null && !isNaN(parseFloat(s.pending_amount))) {
+        sPending = parseFloat(s.pending_amount);
+      } else {
+        sPending = Math.max(0, monthlyTotal - monthlyPaid);
+      }
+
+      const sCollected = isPaid ? monthlyTotal : (monthlyPaid > 0 ? monthlyPaid : Math.max(0, monthlyTotal - sPending));
 
       collected += sCollected;
       pending += sPending;
@@ -206,7 +224,7 @@ export default function DashboardPortal() {
     filteredFees.forEach(f => {
       const feePaid = parseFloat(f.paid_amount ?? f.paidAmount ?? 0);
       const feeTotal = parseFloat(f.amount ?? 500);
-      const feePending = Math.max(0, feeTotal - feePaid);
+      const feePending = parseFloat(f.pending_amount ?? f.pendingAmount ?? Math.max(0, feeTotal - feePaid));
       const stdId = f.student || f.student_admission_no;
       if (!filteredStudents.some(s => s.id === stdId || s.admissionNo === stdId)) {
         collected += feePaid;
