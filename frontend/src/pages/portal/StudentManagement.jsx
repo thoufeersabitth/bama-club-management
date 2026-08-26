@@ -374,8 +374,37 @@ export default function StudentManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 1. Strict Validation on Mandatory Fields
+    const trimmedName = (formData.name || '').trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      alert('⚠️ Cadet Name is required! ദയവായി കുട്ടിയുടെ മുഴുവൻ പേര് നൽകുക.');
+      return;
+    }
+
+    const trimmedGuardian = (formData.guardianName || '').trim();
+    if (!trimmedGuardian || trimmedGuardian.length < 2) {
+      alert('⚠️ Parent / Guardian Name is required! ദയവായി രക്ഷാകർത്താവിന്റെ പേര് നൽകുക.');
+      return;
+    }
+
+    const cleanPhone = (formData.phone || '').replace(/[^0-9]/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      alert('⚠️ Valid 10-digit Phone Number is required! ദയവായി 10 അക്ക മൊബൈൽ നമ്പർ നൽകുക.');
+      return;
+    }
+
     if (!formData.branch || formData.branch.trim() === '') {
-      alert('Please select a Dojo Branch before submitting cadet admission!');
+      alert('⚠️ Dojo Branch is required! ദയവായി ഒരു ബ്രാഞ്ച് സെലക്ട് ചെയ്യുക.');
+      return;
+    }
+
+    if (!formData.shift || formData.shift.trim() === '') {
+      alert('⚠️ Training Shift is required! ദയവായി ട്രെയിനിങ് ഷിഫ്റ്റ് ബാച്ച് സെലക്ട് ചെയ്യുക.');
+      return;
+    }
+
+    if (!formData.address || formData.address.trim().length < 3) {
+      alert('⚠️ Residential Address is required! ദയവായി മേൽവിലാസം നൽകുക.');
       return;
     }
 
@@ -421,6 +450,11 @@ export default function StudentManagement() {
 
     const newStudentData = {
       ...formData,
+      name: trimmedName,
+      guardianName: trimmedGuardian,
+      guardian_name: trimmedGuardian,
+      phone: cleanPhone,
+      whatsapp: (formData.whatsapp || cleanPhone).replace(/[^0-9]/g, '') || cleanPhone,
       branch: branchTargetId,
       branch_id: branchTargetId,
       branch_name: branchTargetName,
