@@ -741,17 +741,6 @@ export default function ReportsAnalytics() {
                   const attObj = attendanceData[stdKey] || { recordsByDate: {} };
                   const recordsByDate = attObj.recordsByDate || {};
 
-                  // Calculate total conducted sessions for cadet's dojo branch in selected date range
-                  const stdBranch = typeof s.branch === 'object' ? (s.branch?.name || '') : (s.branch || '');
-                  const dojoLogsInRange = classLogs.filter(log => {
-                    if (!isDateInRange(log.date)) return false;
-                    if (stdBranch && log.branch && !log.branch.toLowerCase().includes(stdBranch.toLowerCase())) return false;
-                    return true;
-                  });
-
-                  // Count total conducted classes for cadet's branch (default fallback to 12 monthly sessions if logs not yet generated)
-                  const branchTotalClassesConducted = dojoLogsInRange.length > 0 ? dojoLogsInRange.length : 12;
-
                   let presentInPeriod = 0;
                   let absentInPeriod = 0;
                   let totalMarkedInPeriod = 0;
@@ -764,9 +753,24 @@ export default function ReportsAnalytics() {
                     }
                   });
 
-                  const finalPresent = totalMarkedInPeriod > 0 ? presentInPeriod : (attObj.present > 0 ? attObj.present : 10);
-                  const finalTotal = totalMarkedInPeriod > 0 ? Math.max(totalMarkedInPeriod, branchTotalClassesConducted) : branchTotalClassesConducted;
-                  const pct = finalTotal > 0 ? ((finalPresent / finalTotal) * 100).toFixed(1) : '100.0';
+                  let finalPresent = 0;
+                  let finalTotal = 0;
+                  let pct = '100.0';
+
+                  if (totalMarkedInPeriod > 0) {
+                    finalPresent = presentInPeriod;
+                    finalTotal = totalMarkedInPeriod;
+                    pct = ((finalPresent / finalTotal) * 100).toFixed(1);
+                  } else if (attObj.total > 0) {
+                    finalPresent = attObj.present;
+                    finalTotal = attObj.total;
+                    pct = ((finalPresent / finalTotal) * 100).toFixed(1);
+                  } else {
+                    const defaultRate = parseFloat(s.attendanceRate ?? s.attendance_rate ?? 100);
+                    finalPresent = 1;
+                    finalTotal = 1;
+                    pct = defaultRate.toFixed(1);
+                  }
 
                   return (
                     <tr key={s.id || s.admissionNo} className="hover:bg-gray-50 transition-colors font-sans">
