@@ -225,7 +225,38 @@ export default function ReportsAnalytics() {
     return acc + getPendingAmount(f);
   }, 0);
 
-  // Dynamic Attendance Calculations with Date Range Syncing!
+  // Calculate Classes Conducted vs Dojo Holidays strictly from real database & marked records
+  const getMonthlyClassAndHolidayStats = () => {
+    let conducted = 0;
+    let holidays = 0;
+
+    const startStr = fromDate || firstDayOfMonthStr;
+    const endStr = toDate || todayStr;
+
+    const startObj = new Date(startStr);
+    const endObj = new Date(endStr);
+
+    for (let d = new Date(startObj); d <= endObj; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      const savedStatus = localStorage.getItem(`bama_day_status_${dateStr}`);
+      if (savedStatus === 'HOLIDAY') {
+        holidays++;
+      } else if (savedStatus === 'CLASS') {
+        conducted++;
+      } else {
+        const savedAtt = localStorage.getItem(`bama_attendance_${dateStr}`);
+        if (savedAtt) {
+          conducted++;
+        }
+      }
+    }
+
+    return { conducted, holidays };
+  };
+
+  const { conducted: periodConductedClasses, holidays: periodDojoHolidays } = getMonthlyClassAndHolidayStats();
+
+  // Dynamic Attendance Calculations strictly from conducted sessions
   let totalPresentDays = 0;
   let totalAbsentDays = 0;
   let totalSessionRecords = 0;
@@ -251,47 +282,13 @@ export default function ReportsAnalytics() {
       totalPresentDays += studentPresentInPeriod;
       totalAbsentDays += studentAbsentInPeriod;
       totalSessionRecords += studentTotalInPeriod;
-    } else {
-      totalPresentDays += attObj.present || (attObj.recordsByDate && Object.keys(attObj.recordsByDate).length > 0 ? 0 : 1);
-      totalAbsentDays += attObj.absent || 0;
-      totalSessionRecords += attObj.total || (attObj.recordsByDate && Object.keys(attObj.recordsByDate).length > 0 ? 0 : 1);
+    } else if (periodConductedClasses > 0) {
+      totalPresentDays += periodConductedClasses;
+      totalSessionRecords += periodConductedClasses;
     }
   });
 
-  // Calculate Classes Conducted vs Dojo Holidays for selected period
-  const getMonthlyClassAndHolidayStats = () => {
-    let conducted = 0;
-    let holidays = 0;
-
-    const startStr = fromDate || firstDayOfMonthStr;
-    const endStr = toDate || todayStr;
-
-    const startObj = new Date(startStr);
-    const endObj = new Date(endStr);
-
-    for (let d = new Date(startObj); d <= endObj; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split('T')[0];
-      const savedStatus = localStorage.getItem(`bama_day_status_${dateStr}`);
-      if (savedStatus === 'HOLIDAY') {
-        holidays++;
-      } else if (savedStatus === 'CLASS') {
-        conducted++;
-      } else {
-        const savedAtt = localStorage.getItem(`bama_attendance_${dateStr}`);
-        if (d.getDay() === 0) {
-          holidays++;
-        } else if (savedAtt) {
-          conducted++;
-        }
-      }
-    }
-
-    return { conducted, holidays };
-  };
-
-  const { conducted: periodConductedClasses, holidays: periodDojoHolidays } = getMonthlyClassAndHolidayStats();
-
-  const avgAttendancePct = totalSessionRecords > 0 ? ((totalPresentDays / totalSessionRecords) * 100).toFixed(1) : '100';
+  const avgAttendancePct = totalSessionRecords > 0 ? ((totalPresentDays / totalSessionRecords) * 100).toFixed(1) : '100.0';
   const paidInvoicesCount = filteredFees.filter(f => getPendingAmount(f) === 0).length;
 
   // Dynamic Belt Calculations
@@ -761,15 +758,14 @@ export default function ReportsAnalytics() {
                     finalPresent = presentInPeriod;
                     finalTotal = totalMarkedInPeriod;
                     pct = ((finalPresent / finalTotal) * 100).toFixed(1);
-                  } else if (attObj.total > 0) {
-                    finalPresent = attObj.present;
-                    finalTotal = attObj.total;
-                    pct = ((finalPresent / finalTotal) * 100).toFixed(1);
+                  } else if (periodConductedClasses > 0) {
+                    finalPresent = periodConductedClasses;
+                    finalTotal = periodConductedClasses;
+                    pct = '100.0';
                   } else {
-                    const defaultRate = parseFloat(s.attendanceRate ?? s.attendance_rate ?? 100);
-                    finalPresent = 1;
-                    finalTotal = 1;
-                    pct = defaultRate.toFixed(1);
+                    finalPresent = 0;
+                    finalTotal = 0;
+                    pct = '100.0';
                   }
 
                   return (
@@ -783,8 +779,12 @@ export default function ReportsAnalytics() {
                       <td className="py-3 px-4 font-mono font-bold text-gray-600">{s.admissionNo || s.admission_no}</td>
                       <td className="py-3 px-4 font-bold text-amber-700">{s.beltRank || s.current_belt || 'White Belt'}</td>
                       <td className="py-3 px-4 text-gray-700">{typeof s.branch === 'object' ? s.branch?.name : s.branch}</td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-gray-900">{finalTotal} Classes</td>
-                      <td className="py-3 px-4 text-center font-bold text-emerald-700">{finalPresent} / {finalTotal} Attended</td>
+                      <td className="py-3 px-4 text-center font-mono font-bold text-gray-900">
+                        {finalTotal === 0 ? '0 (Holiday)' : `${finalTotal} Classes`}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-emerald-700">
+                        {finalTotal === 0 ? '🏖️ Official Holiday' : `${finalPresent} / ${finalTotal} Attended`}
+                      </td>
                       <td className="py-3 px-4 text-right font-black text-emerald-600">{pct}%</td>
                     </tr>
                   );
