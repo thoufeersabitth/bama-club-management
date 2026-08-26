@@ -237,12 +237,13 @@ export default function AttendanceManagement() {
     return true;
   });
 
-  // Calculate live stats for base students
-  const presentCount = baseBranchShiftStudents.filter(s => (attendanceRecords[s.id || s.admissionNo] || 'PRESENT') === 'PRESENT').length;
-  const absentCount = baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'ABSENT').length;
-  const lateCount = baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'LATE').length;
+  // Calculate live stats for base students (strictly adapting to Holiday vs Class)
+  const isHoliday = dayStatus === 'HOLIDAY';
+  const presentCount = isHoliday ? 0 : baseBranchShiftStudents.filter(s => (attendanceRecords[s.id || s.admissionNo] || 'PRESENT') === 'PRESENT').length;
+  const absentCount = isHoliday ? 0 : baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'ABSENT').length;
+  const lateCount = isHoliday ? 0 : baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'LATE').length;
   const totalCount = baseBranchShiftStudents.length;
-  const attendanceRate = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 100;
+  const attendanceRate = isHoliday ? '100.0' : (totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 100);
 
   // Final filtered list considering search and active status filter
   const filteredStudents = baseBranchShiftStudents.filter(s => {

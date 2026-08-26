@@ -99,10 +99,19 @@ export default function DashboardPortal() {
           // Compute Live Attendance Summary
           try {
             const today = new Date().toISOString().split('T')[0];
+            const savedDayStatus = localStorage.getItem(`bama_day_status_${today}`);
             const savedRecordsToday = localStorage.getItem(`bama_attendance_${today}`);
             const savedSummary = localStorage.getItem('bama_latest_attendance_summary');
 
-            if (savedRecordsToday) {
+            if (savedDayStatus === 'HOLIDAY') {
+              setAttendanceStats({
+                attendanceRate: 100.0,
+                presentCount: 0,
+                absentCount: 0,
+                isMarkedToday: true,
+                isHoliday: true
+              });
+            } else if (savedRecordsToday) {
               const records = JSON.parse(savedRecordsToday);
               let pCount = 0;
               let aCount = 0;
@@ -120,23 +129,26 @@ export default function DashboardPortal() {
                 attendanceRate: rate,
                 presentCount: pCount,
                 absentCount: aCount,
-                isMarkedToday: true
+                isMarkedToday: true,
+                isHoliday: false
               });
             } else if (savedSummary) {
               const parsed = JSON.parse(savedSummary);
               if (parsed.date === today) {
                 setAttendanceStats({
                   attendanceRate: parsed.attendanceRate || 100.0,
-                  presentCount: parsed.presentCount || cadetList.length,
-                  absentCount: parsed.absentCount || 0,
-                  isMarkedToday: true
+                  presentCount: parsed.isHoliday ? 0 : (parsed.presentCount || cadetList.length),
+                  absentCount: parsed.isHoliday ? 0 : (parsed.absentCount || 0),
+                  isMarkedToday: true,
+                  isHoliday: !!parsed.isHoliday
                 });
               } else {
                 setAttendanceStats({
                   attendanceRate: 100.0,
                   presentCount: cadetList.length,
                   absentCount: 0,
-                  isMarkedToday: false
+                  isMarkedToday: false,
+                  isHoliday: false
                 });
               }
             } else {
@@ -144,7 +156,8 @@ export default function DashboardPortal() {
                 attendanceRate: 100.0,
                 presentCount: cadetList.length,
                 absentCount: 0,
-                isMarkedToday: false
+                isMarkedToday: false,
+                isHoliday: false
               });
             }
           } catch (e) {
