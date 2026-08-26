@@ -174,19 +174,53 @@ export default function DashboardPortal() {
   const totalStudentsCount = filteredStudents.length;
   const activeStudentsCount = filteredStudents.filter(s => s.status !== 'Inactive').length;
 
-  const pendingFeeRecords = filteredFees.filter(f => {
-    const pendingVal = getPendingDuesAmount(f);
-    return f.status === 'Pending' || f.status === 'Partial' || pendingVal > 0;
-  });
+  // Comprehensive Real-time Fee & Pending Dues Calculation from Students & Fees
+  const { totalCollectedAmount, totalPendingAmount, cadetsDueCount } = React.useMemo(() => {
+    let collected = 0;
+    let pending = 0;
+    let dueCadets = 0;
 
-  const totalPendingAmount = pendingFeeRecords.reduce((acc, f) => acc + getPendingDuesAmount(f), 0);
-  const totalCollectedAmount = filteredFees.reduce((acc, f) => {
-    const paid = parseFloat(f.paid_amount ?? f.paidAmount ?? f.student_detail?.initialPaidAmount ?? 0);
-    return acc + (isNaN(paid) ? 0 : paid);
-  }, 0);
+    // 1. Calculate from Students Roster (Includes Admission Fee + Monthly Tuition Fee dues)
+    filteredStudents.forEach(s => {
+      const admTotal = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
+      const admPaid = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? (s.admissionFeePaid === true || s.admission_fee_paid === true ? admTotal : 0));
+      const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
+      const monthlyPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
+      
+      let sCollected = parseFloat(s.totalCollectedNow ?? (admPaid + monthlyPaid));
+      if (isNaN(sCollected)) sCollected = admPaid + monthlyPaid;
+
+      let sPending = parseFloat(s.pendingAmount ?? s.pending_amount ?? Math.max(0, (admTotal + monthlyTotal) - sCollected));
+      if (isNaN(sPending)) sPending = Math.max(0, (admTotal + monthlyTotal) - sCollected);
+
+      collected += sCollected;
+      pending += sPending;
+      if (sPending > 0 || s.feeStatus === 'Pending' || s.feeStatus === 'Partial' || s.fee_status === 'Pending' || s.fee_status === 'Partial') {
+        dueCadets++;
+      }
+    });
+
+    // 2. Also check and merge any standalone fee invoices in filteredFees not already in student roster
+    filteredFees.forEach(f => {
+      const feePaid = parseFloat(f.paid_amount ?? f.paidAmount ?? 0);
+      const feePending = parseFloat(f.pending_amount ?? f.pendingAmount ?? (f.amount ? Math.max(0, f.amount - feePaid) : 0));
+      const stdId = f.student || f.student_admission_no;
+      if (!filteredStudents.some(s => s.id === stdId || s.admissionNo === stdId)) {
+        collected += feePaid;
+        pending += feePending;
+        if (feePending > 0) dueCadets++;
+      }
+    });
+
+    return {
+      totalCollectedAmount: collected,
+      totalPendingAmount: pending,
+      cadetsDueCount: dueCadets
+    };
+  }, [filteredStudents, filteredFees]);
 
   const totalFeeCombined = (totalCollectedAmount + totalPendingAmount) || 1;
-  const collectedPct = Math.round((totalCollectedAmount / totalFeeCombined) * 100);
+  const collectedPct = totalFeeCombined > 0 ? Math.round((totalCollectedAmount / totalFeeCombined) * 100) : 100;
   const pendingPct = Math.max(0, 100 - collectedPct);
   // 100% REAL DYNAMIC SYSTEM STATS
   const systemStats = React.useMemo(() => {
@@ -438,7 +472,7 @@ export default function DashboardPortal() {
           <div>
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">PENDING DUES</span>
             <div className="text-2xl font-black text-amber-600 font-mono tracking-tight">₹{totalPendingAmount.toLocaleString()}</div>
-            <p className="text-[9px] text-amber-600 font-bold mt-0.5">{pendingFeeRecords.length} Cadets Due</p>
+            <p className="text-[9px] text-amber-600 font-bold mt-0.5">{cadetsDueCount} Cadets Due</p>
           </div>
         </div>
 
