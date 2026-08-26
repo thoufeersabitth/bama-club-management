@@ -1,4 +1,4 @@
-﻿app = "bama-backend"
+app = "bama-club-backend"
 primary_region = "sin"
 
 [build]
