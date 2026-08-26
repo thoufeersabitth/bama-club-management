@@ -357,7 +357,7 @@ export const fetchStudents = async (params = {}) => {
     const res = await api.get('/students/', { params });
     const serverData = res.data.results || res.data;
 
-    if (Array.isArray(serverData)) {
+    if (Array.isArray(serverData) && serverData.length > 0) {
       const filteredServer = filterOutDummyCadets(serverData);
       const normalizedServer = filteredServer.map(s => {
         const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
@@ -405,7 +405,9 @@ export const fetchStudents = async (params = {}) => {
       localStorage.setItem('bama_students_list', serialized);
       return normalizedServer;
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error('Failed to fetch students from live server:', err);
+  }
 
   return getStoredStudents();
 };
@@ -426,85 +428,59 @@ export const createStudent = async (data) => {
 
   const payload = {
     admission_no: data.admissionNo || data.admission_no || `BAMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-    admissionNo: data.admissionNo || data.admission_no || `BAMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
     name: data.name || data.student_name || 'Cadet Student',
-    student_name: data.student_name || data.name || 'Cadet Student',
     guardian_name: data.guardianName || data.guardian_name || 'Parent',
-    guardianName: data.guardianName || data.guardian_name || 'Parent',
-    occupation: data.occupation || data.guardian_occupation || '',
     phone: data.phone || '+91 9544085442',
     whatsapp: data.whatsapp || data.phone || '+91 9544085442',
     age: parseInt(data.age) || 12,
     gender: data.gender || 'Male',
     blood_group: data.bloodGroup || data.blood_group || 'O+',
-    bloodGroup: data.bloodGroup || data.blood_group || 'O+',
     current_belt: data.currentBelt || data.current_belt || 'White Belt',
-    currentBelt: data.currentBelt || data.current_belt || 'White Belt',
     branch: branchVal,
-    branch_id: data.branch_id || (typeof data.branch === 'string' && data.branch.includes('-') ? data.branch : null),
-    branch_name: branchName,
-    branchName: branchName,
-    dojo_branch: branchName,
     shift: data.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
     admission_fee: admFee,
-    admissionFee: admFee,
-    admission_fee_paid_amount: admPaid,
-    admissionFeePaidAmount: admPaid,
-    admission_fee_paid: isAdmPaid,
-    admissionFeePaid: isAdmPaid,
     fee_amount: amount,
-    feeAmount: amount,
     initial_paid_amount: initialPaid,
-    initialPaidAmount: initialPaid,
+    admission_fee_paid_amount: admPaid,
     pending_amount: pendingAmt,
-    pendingAmount: pendingAmt,
-    totalCollectedNow: totalCollected,
     fee_status: status,
-    feeStatus: status,
-    hasCustomFee: true,
-    has_custom_fee: true,
     joining_date: data.joiningDate || data.joining_date || new Date().toISOString().split('T')[0],
-    joiningDate: data.joiningDate || data.joining_date || new Date().toISOString().split('T')[0],
     address: data.address || 'Pulikkal, Malappuram, Kerala',
     photo: data.photo || '',
-    status: data.status || 'Active',
-    attendanceRate: data.attendanceRate || 100
+    status: data.status || 'Active'
   };
 
-  const newStudent = { id: `std-${Date.now()}`, ...payload };
-
-  // Save to local roster immediately so UI reflects in 0.0s
-  const currentList = getStoredStudents();
-  const updatedRoster = [newStudent, ...currentList.filter(s => s.id !== newStudent.id && s.admissionNo !== newStudent.admissionNo)];
-  saveStoredStudents(updatedRoster);
-  window.dispatchEvent(new Event('bama_data_updated'));
-
   try {
-    const postPayload = { ...payload };
-    delete postPayload.id;
-    const res = await api.post('/students/', postPayload);
-    const serverBranchName = res.data?.branch_name || res.data?.branch_detail?.name || branchName;
-    const serverBranchId = res.data?.branch_id || res.data?.branch_detail?.id || res.data?.branch || payload.branch_id;
-    const adm = res.data?.admission_no || res.data?.admissionNo || payload.admissionNo;
+    const res = await api.post('/students/', payload);
+    const serverCadet = res.data;
+    const serverBranchName = serverCadet?.branch_name || serverCadet?.branch_detail?.name || branchName;
+    const serverBranchId = serverCadet?.branch_id || serverCadet?.branch_detail?.id || serverCadet?.branch || branchVal;
+    const adm = serverCadet?.admission_no || payload.admission_no;
 
-    const saved = { 
-      ...newStudent, 
-      ...res.data,
-      id: res.data?.id || newStudent.id,
+    const saved = {
+      ...payload,
+      ...serverCadet,
+      id: serverCadet?.id || `std-${Date.now()}`,
       admissionNo: adm,
       admission_no: adm,
       branch: serverBranchName,
       branch_id: serverBranchId,
       branch_name: serverBranchName,
       branchName: serverBranchName,
-      dojo_branch: serverBranchName,
-      photo: payload.photo || (res.data ? res.data.photo : '') 
+      dojo_branch: serverBranchName
     };
+
     const latestList = getStoredStudents();
-    saveStoredStudents([saved, ...latestList.filter(s => String(s.id) !== String(saved.id) && String(s.admissionNo || s.admission_no) !== String(saved.admissionNo))]);
+    const updatedRoster = [saved, ...latestList.filter(s => String(s.id) !== String(saved.id) && String(s.admissionNo || s.admission_no) !== String(adm))];
+    saveStoredStudents(updatedRoster);
     window.dispatchEvent(new Event('bama_data_updated'));
     return saved;
   } catch (err) {
+    console.error('Failed to post student to backend:', err);
+    const newStudent = { id: `std-${Date.now()}`, ...payload };
+    const latestList = getStoredStudents();
+    saveStoredStudents([newStudent, ...latestList]);
+    window.dispatchEvent(new Event('bama_data_updated'));
     return newStudent;
   }
 };
