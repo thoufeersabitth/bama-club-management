@@ -180,30 +180,29 @@ export default function DashboardPortal() {
     let pending = 0;
     let dueCadets = 0;
 
-    // 1. Calculate from Students Roster (Includes Admission Fee + Monthly Tuition Fee dues)
+    // 1. Calculate strictly from Students Monthly Tuition Fees
     filteredStudents.forEach(s => {
-      const admTotal = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
-      const admPaid = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? (s.admissionFeePaid === true || s.admission_fee_paid === true ? admTotal : 0));
       const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
-      const monthlyPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
+      const isPaid = (s.feeStatus === 'Paid' || s.fee_status === 'Paid');
+      const monthlyPaid = isPaid 
+        ? monthlyTotal 
+        : parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
       
-      let sCollected = parseFloat(s.totalCollectedNow ?? (admPaid + monthlyPaid));
-      if (isNaN(sCollected)) sCollected = admPaid + monthlyPaid;
-
-      let sPending = parseFloat(s.pendingAmount ?? s.pending_amount ?? Math.max(0, (admTotal + monthlyTotal) - sCollected));
-      if (isNaN(sPending)) sPending = Math.max(0, (admTotal + monthlyTotal) - sCollected);
+      const sCollected = Math.min(monthlyTotal, monthlyPaid);
+      const sPending = Math.max(0, monthlyTotal - sCollected);
 
       collected += sCollected;
       pending += sPending;
-      if (sPending > 0 || s.feeStatus === 'Pending' || s.feeStatus === 'Partial' || s.fee_status === 'Pending' || s.fee_status === 'Partial') {
+      if (sPending > 0 || !isPaid) {
         dueCadets++;
       }
     });
 
-    // 2. Also check and merge any standalone fee invoices in filteredFees not already in student roster
+    // 2. Also check any standalone monthly invoices
     filteredFees.forEach(f => {
       const feePaid = parseFloat(f.paid_amount ?? f.paidAmount ?? 0);
-      const feePending = parseFloat(f.pending_amount ?? f.pendingAmount ?? (f.amount ? Math.max(0, f.amount - feePaid) : 0));
+      const feeTotal = parseFloat(f.amount ?? 500);
+      const feePending = Math.max(0, feeTotal - feePaid);
       const stdId = f.student || f.student_admission_no;
       if (!filteredStudents.some(s => s.id === stdId || s.admissionNo === stdId)) {
         collected += feePaid;
@@ -261,9 +260,30 @@ export default function DashboardPortal() {
     };
   }, [filteredStudents]);
 
-  // 100% REAL DATABASE PENDING DUES LIST
+  // 100% REAL DATABASE MONTHLY PENDING DUES LIST
   const realPendingDuesList = React.useMemo(() => {
-    // 1. Look in fees array for records with pending dues
+    // 1. Look in students array for students with pending monthly amounts
+    const stdPending = filteredStudents.filter(s => {
+      const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
+      const isPaid = (s.feeStatus === 'Paid' || s.fee_status === 'Paid');
+      const monthlyPaid = isPaid ? monthlyTotal : parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
+      return !isPaid || monthlyPaid < monthlyTotal;
+    }).map(s => {
+      const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
+      const isPaid = (s.feeStatus === 'Paid' || s.fee_status === 'Paid');
+      const monthlyPaid = isPaid ? monthlyTotal : parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
+      const pendingVal = Math.max(0, monthlyTotal - monthlyPaid);
+      return {
+        id: s.id || s.admissionNo,
+        name: s.name,
+        amount: `₹${pendingVal.toLocaleString()}`,
+        due: `Due August 2026`
+      };
+    });
+
+    if (stdPending.length > 0) return stdPending.slice(0, 4);
+
+    // 2. Look in fees array for standalone fee records
     const feePending = filteredFees.filter(f => getPendingDuesAmount(f) > 0).map(f => {
       const std = f.student_detail || {};
       const pendingVal = getPendingDuesAmount(f);
@@ -275,31 +295,7 @@ export default function DashboardPortal() {
       };
     });
 
-    if (feePending.length > 0) return feePending.slice(0, 4);
-
-    // 2. Look in students array for students with pending amounts
-    const stdPending = filteredStudents.filter(s => {
-      const p = parseFloat(s.pendingAmount || s.pending_amount || 0);
-      return p > 0 || s.paymentStatus === 'Pending' || s.payment_status === 'Pending';
-    }).map(s => {
-      const pendingVal = parseFloat(s.pendingAmount || s.pending_amount || 2500);
-      return {
-        id: s.id || s.admissionNo,
-        name: s.name,
-        amount: `₹${pendingVal.toLocaleString()}`,
-        due: `Due ${s.dojoShift || 'August 2026'}`
-      };
-    });
-
-    if (stdPending.length > 0) return stdPending.slice(0, 4);
-
-    // 3. Fallback: Active students in database
-    return filteredStudents.slice(0, 4).map(s => ({
-      id: s.id || s.admissionNo,
-      name: s.name,
-      amount: '₹' + parseFloat(s.pendingAmount || s.feeAmount || 2500).toLocaleString(),
-      due: `Due August 2026`
-    }));
+    return feePending.slice(0, 4);
   }, [filteredFees, filteredStudents]);
 
   // Dynamic 7-day Attendance Trend Calculation from actual student data
