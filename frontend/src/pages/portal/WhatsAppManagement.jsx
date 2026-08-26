@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award } from 'lucide-react';
+import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award, Settings, Smartphone } from 'lucide-react';
 import { WHATSAPP_TEMPLATES, SAMPLE_STUDENTS } from '../../services/initialData';
-import { fetchStudents } from '../../services/api';
+import { fetchStudents, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 export default function WhatsAppManagement() {
@@ -11,6 +11,7 @@ export default function WhatsAppManagement() {
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [cadetSearch, setCadetSearch] = useState('');
   const [customMessage, setCustomMessage] = useState('');
+  const [activeChannel, setActiveChannel] = useState(getPreferredWhatsAppChannel);
 
   // Bulk WhatsApp Queue State
   const [showBulkQueueModal, setShowBulkQueueModal] = useState(false);
@@ -21,6 +22,11 @@ export default function WhatsAppManagement() {
     { id: 1, student: 'Fathima Riya', phone: '+91 94471 33445', template: 'Monthly Fee Due Reminder', time: '10:15 AM Today', status: 'Delivered' },
     { id: 2, student: 'Adithya Suresh', phone: '+91 98460 11223', template: 'Fee Payment Receipt', time: 'Yesterday', status: 'Delivered' }
   ]);
+
+  const handleChannelChange = (newChan) => {
+    setActiveChannel(newChan);
+    setPreferredWhatsAppChannel(newChan);
+  };
 
   const formatWhatsAppPhone = (phoneStr) => {
     let clean = (phoneStr || '').replace(/[^0-9]/g, '');
@@ -111,7 +117,7 @@ export default function WhatsAppManagement() {
     setShowBulkQueueModal(true);
   };
 
-  const sendIndividualWhatsApp = (std) => {
+  const sendIndividualWhatsApp = (std, channelOverride) => {
     let body = selectedTemplate.body;
     body = body.replace('{STUDENT_NAME}', std.name || 'Cadet');
     body = body.replace('{GUARDIAN_NAME}', std.guardianName || std.guardian_name || 'Parent');
@@ -119,10 +125,12 @@ export default function WhatsAppManagement() {
     body = body.replace('{BRANCH_NAME}', std.branch?.name || std.branch || 'BAMA Dojo');
     body = body.replace('{DATE}', new Date().toLocaleDateString());
 
-    const phone = formatWhatsAppPhone(std.whatsapp || std.phone);
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(body)}`;
     setSentStudentIds(prev => Array.from(new Set([...prev, std.id])));
-    window.open(url, '_blank');
+    openWhatsApp({
+      phone: std.whatsapp || std.phone,
+      message: body,
+      channel: channelOverride || activeChannel
+    });
 
     setSentLogs(prev => [
       {
@@ -166,8 +174,30 @@ export default function WhatsAppManagement() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 px-3.5 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-black text-emerald-800 shadow-sm flex-shrink-0">
-          <Zap className="w-4 h-4 text-emerald-600" /> {selectedStudentIds.length} Parents Selected for WhatsApp Dispatch
+        {/* WhatsApp Sender Channel Switcher */}
+        <div className="bg-gray-50 p-1.5 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleChannelChange('BUSINESS')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+              activeChannel === 'BUSINESS'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" /> 🟢 WhatsApp Business
+          </button>
+          <button
+            type="button"
+            onClick={() => handleChannelChange('REGULAR')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+              activeChannel === 'REGULAR'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" /> 💬 Personal WhatsApp
+          </button>
         </div>
       </div>
 

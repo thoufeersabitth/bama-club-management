@@ -993,4 +993,91 @@ export const loginBackendUser = async (username, password) => {
   }
 };
 
+// ==========================================
+// B.A.M.A. Official WhatsApp Routing Engine
+// Supports WhatsApp Business (com.whatsapp.w4b), Regular WhatsApp, and WhatsApp Web
+// ==========================================
+
+export const getPreferredWhatsAppChannel = () => {
+  return localStorage.getItem('bama_preferred_whatsapp_channel') || 'BUSINESS';
+};
+
+export const setPreferredWhatsAppChannel = (channel) => {
+  localStorage.setItem('bama_preferred_whatsapp_channel', channel);
+  window.dispatchEvent(new Event('bama_whatsapp_pref_changed'));
+};
+
+export const formatWhatsAppNumber = (rawPhone) => {
+  if (!rawPhone) return '919544085442';
+  let clean = String(rawPhone).replace(/[^0-9]/g, '');
+  if (clean.length === 10) clean = '91' + clean;
+  if (clean.startsWith('0')) clean = '91' + clean.slice(1);
+  return clean;
+};
+
+export const isMobileDevice = () => {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+};
+
+export const isAndroidDevice = () => {
+  if (typeof navigator === 'undefined') return false;
+  return /Android/i.test(navigator.userAgent || '');
+};
+
+export const openWhatsApp = ({ phone, message, channel }) => {
+  const cleanPhone = formatWhatsAppNumber(phone);
+  const encodedText = encodeURIComponent(message || '');
+  const activeChannel = channel || getPreferredWhatsAppChannel();
+  const onMobile = isMobileDevice();
+  const onAndroid = isAndroidDevice();
+
+  // 1. WhatsApp Business App
+  if (activeChannel === 'BUSINESS') {
+    if (onAndroid) {
+      const androidIntentUri = `intent://send?phone=${cleanPhone}&text=${encodedText}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end`;
+      window.location.href = androidIntentUri;
+      setTimeout(() => {
+        const fallbackUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+        window.open(fallbackUrl, '_blank');
+      }, 800);
+      return;
+    } else if (onMobile) {
+      window.location.href = `whatsapp-business://send?phone=${cleanPhone}&text=${encodedText}`;
+      setTimeout(() => {
+        window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+      }, 800);
+      return;
+    } else {
+      window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`, '_blank');
+      return;
+    }
+  }
+
+  // 2. Regular Personal WhatsApp App
+  if (activeChannel === 'REGULAR') {
+    if (onAndroid) {
+      const androidIntentUri = `intent://send?phone=${cleanPhone}&text=${encodedText}#Intent;package=com.whatsapp;scheme=whatsapp;end`;
+      window.location.href = androidIntentUri;
+      setTimeout(() => {
+        window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+      }, 800);
+      return;
+    } else {
+      window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+      return;
+    }
+  }
+
+  // 3. WhatsApp Web (Direct Browser Tab)
+  if (activeChannel === 'WEB') {
+    window.open(`https://web.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`, '_blank');
+    return;
+  }
+
+  // 4. Universal Fallback
+  window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+};
+
 export default api;
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink } from 'lucide-react';
-import { fetchStudents, saveAttendanceToBackend } from '../../services/api';
+import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings } from 'lucide-react';
+import { fetchStudents, saveAttendanceToBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -273,7 +273,7 @@ export default function AttendanceManagement() {
   };
 
   // Send WhatsApp Alert to cadet's parent for any status (Present, Absent, Late)
-  const sendCadetWhatsApp = (student) => {
+  const sendCadetWhatsApp = (student, channelOverride) => {
     const parentName = student.guardianName || student.guardian_name || 'Parent';
     const cadetName = student.name || 'Cadet';
     const studentId = student.id || student.admissionNo;
@@ -286,18 +286,21 @@ export default function AttendanceManagement() {
       statusMsg = `cadet ${cadetName} arrived LATE for today's Karate training session. OSS 🥋`;
     }
 
-    const text = encodeURIComponent(
+    const rawMessage = 
       `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
       `📌 *DAILY ATTENDANCE NOTICE*\n` +
       `Date: *${selectedDate}*\n` +
       `Cadet Name: *${cadetName}* (${student.admissionNo || student.admission_no})\n` +
       `Shift/Batch: *${student.shift || 'Evening Batch'}*\n` +
       `Status: *${status}*\n\n` +
-      `Dear Parent (${parentName}), ${statusMsg}`
-    );
-    const phone = formatWhatsAppPhone(student.whatsapp || student.phone);
+      `Dear Parent (${parentName}), ${statusMsg}`;
+
     setSentAbsentStudentIds(prev => Array.from(new Set([...prev, studentId])));
-    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+    openWhatsApp({
+      phone: student.whatsapp || student.phone,
+      message: rawMessage,
+      channel: channelOverride
+    });
   };
 
   const absentStudentsList = absentCount > 0 

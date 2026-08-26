@@ -6,7 +6,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase
 } from 'lucide-react';
-import { fetchStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent } from '../../services/api';
+import { fetchStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -456,7 +456,7 @@ export default function StudentManagement() {
       if (autoWhatsAppWelcome) {
         const cleanPhone = (formData.phone || '').replace(/[^0-9]/g, '');
         const waPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
-        const text = encodeURIComponent(
+        const rawText = 
           `🥋 *WELCOME TO BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
           `Dear Parent (${formData.guardianName}),\n\n` +
           `We are delighted to confirm the successful admission of cadet *${formData.name}*!\n\n` +
@@ -471,14 +471,13 @@ export default function StudentManagement() {
           `• Remaining Dues Balance: *₹${totalPendingDues}* (${calculatedFeeStatus})\n` +
           `• Residential Address: *${formData.address || 'N/A'}*\n` +
           `• Joining Date: *${formData.joiningDate}*\n\n` +
-          `Thank you for trusting B.A.M.A.! Discipline • Respect • Excellence. OSS 🥋`
-        );
+          `Thank you for trusting B.A.M.A.! Discipline • Respect • Excellence. OSS 🥋`;
 
         setWelcomeDispatchModal({
           studentName: formData.name,
           parentName: formData.guardianName,
           phone: waPhone,
-          waLink: `https://wa.me/${waPhone}?text=${text}`,
+          rawMessage: rawText,
           admNo: saved.admissionNo || saved.admission_no
         });
       }
@@ -1261,34 +1260,52 @@ export default function StudentManagement() {
       {/* MODAL: Automatic WhatsApp Welcome Dispatch Confirmation */}
       {welcomeDispatchModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md glass-card rounded-3xl p-6 border border-green-500/50 text-center space-y-4 shadow-2xl">
-            <div className="w-16 h-16 bg-green-950 text-green-400 border border-green-500 rounded-full flex items-center justify-center mx-auto shadow-xl">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 border border-emerald-200 text-center space-y-4 shadow-2xl">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 border border-emerald-300 rounded-full flex items-center justify-center mx-auto shadow-sm">
               <CheckCircle2 className="w-8 h-8" />
             </div>
 
             <div className="space-y-1">
-              <h3 className="text-xl font-black text-white">Cadet Registered Successfully!</h3>
-              <p className="text-xs text-gray-300">
-                Admission No <strong className="text-amber-400 font-mono">{welcomeDispatchModal.admNo}</strong> for <strong className="text-white">{welcomeDispatchModal.studentName}</strong> has been saved.
+              <h3 className="text-xl font-black text-gray-900">Cadet Registered Successfully!</h3>
+              <p className="text-xs text-gray-600">
+                Admission No <strong className="text-red-600 font-mono">{welcomeDispatchModal.admNo}</strong> for <strong className="text-gray-900">{welcomeDispatchModal.studentName}</strong> has been saved.
               </p>
             </div>
 
-            <div className="flex items-center justify-center gap-3 pt-2">
+            <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-200/80 space-y-2 text-left">
+              <span className="text-[10px] font-black text-emerald-900 uppercase tracking-wider block">Choose WhatsApp Sender:</span>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    openWhatsApp({ phone: welcomeDispatchModal.phone, message: welcomeDispatchModal.rawMessage, channel: 'BUSINESS' });
+                    setWelcomeDispatchModal(null);
+                  }}
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <MessageSquare className="w-4 h-4" /> 🟢 Send via WhatsApp Business (Official)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    openWhatsApp({ phone: welcomeDispatchModal.phone, message: welcomeDispatchModal.rawMessage, channel: 'REGULAR' });
+                    setWelcomeDispatchModal(null);
+                  }}
+                  className="w-full py-2 px-4 bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 rounded-xl text-xs font-bold transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <MessageSquare className="w-4 h-4 text-emerald-600" /> 💬 Send via Personal WhatsApp
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-1">
               <button
+                type="button"
                 onClick={() => setWelcomeDispatchModal(null)}
-                className="px-4 py-2.5 rounded-xl bg-gray-800 text-gray-300 hover:text-white text-xs font-bold"
+                className="w-full py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition cursor-pointer"
               >
                 Close Window
               </button>
-              <a
-                href={welcomeDispatchModal.waLink}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setWelcomeDispatchModal(null)}
-                className="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-black shadow-lg flex items-center gap-2"
-              >
-                <MessageSquare className="w-4 h-4" /> Send WhatsApp Welcome
-              </a>
             </div>
           </div>
         </div>
