@@ -165,7 +165,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       `1. ലിങ്ക് ഓപ്പൺ ചെയ്ത് വിദ്യാർത്ഥിയുടെ Admission No അല്ലെങ്കിൽ Phone നമ്പർ നൽകി വിവരങ്ങൾ ഫോമിൽ ഓട്ടോ-ഫിൽ ചെയ്യുക.\n` +
       `2. പരീക്ഷ എഴുതുന്ന ബെൽറ്റും യൂണിഫോം സൈസും തിരഞ്ഞെടുക്കുക.\n` +
       `3. സബ്‌മിറ്റ് ചെയ്ത ശേഷം ഡിജിറ്റൽ ഹോൾ ടിക്കറ്റ് സേവ് ചെയ്ത് പ്രിന്റ് ചെയ്യുക.\n\n` +
-      `സംശയങ്ങൾക്ക് ബന്ധപ്പെടുക: 9961576993 / 9544085442\n` +
+      `സംശയങ്ങൾക്ക് ബന്ധപ്പെടുക: +91 95440 85442\n` +
       `OSS 🥋`;
 
     openWhatsApp({ message: text });
@@ -187,7 +187,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       `ഇതിനായുള്ള പ്രത്യേക ഓൺലൈൻ ഫോം ലിങ്ക് താഴെ നൽകുന്നു:\n\n` +
       `🔗 *ഓൺലൈൻ എക്സാം ലിങ്ക്:*\n${linkUrl}\n\n` +
       `📌 ലിങ്ക് ഓപ്പൺ ചെയ്ത് വിദ്യാർത്ഥിയുടെ വിവരങ്ങൾ നൽകി ഓൺലൈനായി തന്നെ ഫോം ഫിൽ ചെയ്യുക.\n` +
-      `സംശയങ്ങൾക്ക് ബന്ധപ്പെടുക: 9961576993 / 9544085442\n` +
+      `സംശയങ്ങൾക്ക് ബന്ധപ്പെടുക: +91 95440 85442\n` +
       `OSS 🥋`;
 
     openWhatsApp({ message: text });
@@ -2003,7 +2003,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                   {(fType === 'JKK_BROWN' || fType === 'JAPAN_DIRECT_BLACK_BELT' || fType === 'JKA_JAPAN') && (
                     <>
                       <p className="flex justify-between"><strong className="text-gray-700">Instructor Reference:</strong> <span className="font-bold text-gray-900">{c.instructor_reference_name || 'Sensei Abdul Rahman'}</span></p>
-                      <p className="flex justify-between"><strong className="text-gray-700">Reference Dojo / Phone:</strong> <span className="font-bold text-gray-900">{c.instructor_reference_address || c.instructor_reference_phone || '9961576993'}</span></p>
+                      <p className="flex justify-between"><strong className="text-gray-700">Reference Dojo / Phone:</strong> <span className="font-bold text-gray-900">{c.instructor_reference_address || c.instructor_reference_phone || '+91 95440 85442'}</span></p>
                     </>
                   )}
 

@@ -40,7 +40,7 @@ export default function GradingFormPrint({ reg }) {
                 Affiliated to Japan Karate Association
               </p>
               <p className="text-[9px] font-medium text-gray-700">
-                Near Akshaya Centre, Andiyoorkunnu Road, PULIKKAL, Pin: 673637, Mob: 9961576993
+                Near Akshaya Centre, Andiyoorkunnu Road, PULIKKAL, Pin: 673637, Mob: +91 95440 85442
               </p>
               <div className="text-[9px] font-black uppercase tracking-widest text-red-800 border-t border-b border-black py-0.5 mt-1">
                 NOTE: TO BE FILLED IN BLOCK LETTER
@@ -199,7 +199,7 @@ export default function GradingFormPrint({ reg }) {
             <h1 className="text-lg font-black uppercase tracking-tight text-black">
               Japan Karate Association of India - Kerala
             </h1>
-            <p className="text-[10px] font-bold text-gray-800">Mob. : 8129604426, 9961576993</p>
+            <p className="text-[10px] font-bold text-gray-800">Mob. : +91 95440 85442</p>
             <div className="bg-black text-white py-1 px-4 text-xs font-black uppercase tracking-wider inline-block">
               APPLICATION FOR "KYU" REGISTRATION
             </div>
@@ -414,7 +414,7 @@ export default function GradingFormPrint({ reg }) {
                 <td colSpan={2} className="border border-black p-1 font-bold bg-gray-100">Relationship</td>
                 <td className="border border-black p-1 font-bold text-center">TEACHER</td>
                 <td className="border border-black p-1 font-bold bg-gray-100">Tel( )</td>
-                <td className="border border-black p-1 font-mono font-bold">{reg.instructor_reference_phone || '9961576993'}</td>
+                <td className="border border-black p-1 font-mono font-bold">{reg.instructor_reference_phone || '+91 95440 85442'}</td>
               </tr>
             </tbody>
           </table>

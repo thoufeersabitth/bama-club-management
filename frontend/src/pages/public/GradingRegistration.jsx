@@ -98,7 +98,7 @@ export default function GradingRegistration() {
     jka_organization: 'JKA INDIA',
     instructor_reference_name: 'Sensei Abdul Rahman',
     instructor_reference_address: 'Pulikkal, Malappuram',
-    instructor_reference_phone: '9961576993',
+    instructor_reference_phone: '+91 95440 85442',
     exam_fee: getFeeForBelt('Yellow Belt'),
     payment_mode: 'UPI / GPay / PhonePe',
     transaction_id: '',
@@ -875,7 +875,7 @@ export default function GradingRegistration() {
                   <input
                     type="tel"
                     name="instructor_reference_phone"
-                    value={formData.instructor_reference_phone || '9961576993'}
+                    value={formData.instructor_reference_phone || '+91 95440 85442'}
                     onChange={handleChange}
                     required
                     placeholder="Reference Phone"
