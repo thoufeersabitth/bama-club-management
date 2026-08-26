@@ -13,12 +13,12 @@ export const NEXT_BELT_PROGRESSION_MAP = {
   'White Belt (10th Kyu)': 'Yellow Belt',
   'Yellow Belt': 'Orange Belt',
   'Yellow Belt (9th Kyu)': 'Orange Belt',
-  'Orange Belt': 'Blue Belt',
-  'Orange Belt (8th Kyu)': 'Blue Belt',
-  'Blue Belt': 'Green Belt',
-  'Blue Belt (7th Kyu)': 'Green Belt',
-  'Green Belt': 'Purple Belt',
-  'Green Belt (6th Kyu)': 'Purple Belt',
+  'Orange Belt': 'Green Belt',
+  'Orange Belt (8th Kyu)': 'Green Belt',
+  'Green Belt': 'Blue Belt',
+  'Green Belt (7th Kyu)': 'Blue Belt',
+  'Blue Belt': 'Purple Belt',
+  'Blue Belt (6th Kyu)': 'Purple Belt',
   'Purple Belt': 'Brown Belt (4th Kyu)',
   'Purple Belt (5th Kyu)': 'Brown Belt (4th Kyu)',
   'Brown Belt (4th Kyu)': 'Brown Belt (3rd Kyu)',
@@ -36,9 +36,9 @@ export const getNextTargetBelt = (currentBelt) => {
   const currLower = String(currentBelt).toLowerCase();
   if (currLower.includes('white')) return 'Yellow Belt';
   if (currLower.includes('yellow')) return 'Orange Belt';
-  if (currLower.includes('orange')) return 'Blue Belt';
-  if (currLower.includes('blue')) return 'Green Belt';
-  if (currLower.includes('green')) return 'Purple Belt';
+  if (currLower.includes('orange')) return 'Green Belt';
+  if (currLower.includes('green')) return 'Blue Belt';
+  if (currLower.includes('blue')) return 'Purple Belt';
   if (currLower.includes('purple')) return 'Brown Belt (4th Kyu)';
   if (currLower.includes('brown-4') || currLower.includes('4th kyu')) return 'Brown Belt (3rd Kyu)';
   if (currLower.includes('brown-3') || currLower.includes('3rd kyu')) return 'Brown Belt (2nd Kyu)';
@@ -657,9 +657,10 @@ export default function GradingRegistration() {
                   <option value="White Belt">White Belt (10th Kyu)</option>
                   <option value="Yellow Belt">Yellow Belt (9th Kyu)</option>
                   <option value="Orange Belt">Orange Belt (8th Kyu)</option>
-                  <option value="Blue Belt">Blue Belt (7th Kyu)</option>
-                  <option value="Green Belt">Green Belt (6th Kyu)</option>
+                  <option value="Green Belt">Green Belt (7th Kyu)</option>
+                  <option value="Blue Belt">Blue Belt (6th Kyu)</option>
                   <option value="Purple Belt">Purple Belt (5th Kyu)</option>
+                  <option value="Brown Belt (4th Kyu)">Brown Belt (4th Kyu)</option>
                   <option value="Brown Belt (3rd Kyu)">Brown Belt (3rd Kyu)</option>
                   <option value="Brown Belt (2nd Kyu)">Brown Belt (2nd Kyu)</option>
                   <option value="Brown Belt (1st Kyu)">Brown Belt (1st Kyu)</option>
@@ -678,8 +679,8 @@ export default function GradingRegistration() {
                     <>
                       <option value="Yellow Belt">Yellow Belt (9th Kyu - Fee: ₹{beltFeeMap['Yellow Belt'] || 500})</option>
                       <option value="Orange Belt">Orange Belt (8th Kyu - Fee: ₹{beltFeeMap['Orange Belt'] || 600})</option>
-                      <option value="Blue Belt">Blue Belt (7th Kyu - Fee: ₹{beltFeeMap['Blue Belt'] || 700})</option>
-                      <option value="Green Belt">Green Belt (6th Kyu - Fee: ₹{beltFeeMap['Green Belt'] || 800})</option>
+                      <option value="Green Belt">Green Belt (7th Kyu - Fee: ₹{beltFeeMap['Green Belt'] || 700})</option>
+                      <option value="Blue Belt">Blue Belt (6th Kyu - Fee: ₹{beltFeeMap['Blue Belt'] || 800})</option>
                       <option value="Purple Belt">Purple Belt (5th Kyu - Fee: ₹{beltFeeMap['Purple Belt'] || 900})</option>
                       <option value="Brown Belt (4th Kyu)">Brown Belt (4th Kyu - Fee: ₹{beltFeeMap['Brown Belt (4th Kyu)'] || 1000})</option>
                     </>

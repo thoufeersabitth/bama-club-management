@@ -11,8 +11,8 @@ import { useAuth } from '../../context/AuthContext';
 export const DEFAULT_BELT_FEE_MAP = {
   'Yellow Belt': 500,
   'Orange Belt': 600,
-  'Green Belt': 800,
-  'Blue Belt': 700,
+  'Green Belt': 700,
+  'Blue Belt': 800,
   'Purple Belt': 900,
   'Brown Belt (4th Kyu)': 1000,
   'Brown Belt (3rd Kyu)': 1000,
