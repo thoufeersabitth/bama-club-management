@@ -150,10 +150,13 @@ export const getStoredStudents = () => {
             const adm = st.admissionNo || st.admission_no || st.registration_no || '';
             const admFee = parseFloat(st.admissionFee ?? st.admission_fee ?? 1000);
             const admPaid = parseFloat(st.admissionFeePaidAmount ?? st.admission_fee_paid_amount ?? admFee);
-            const monthlyFee = parseFloat(st.feeAmount ?? st.fee_amount ?? 500);
+            let monthlyFee = parseFloat(st.feeAmount ?? st.fee_amount ?? 500);
+            if (isNaN(monthlyFee) || monthlyFee < 100) {
+              monthlyFee = 500;
+            }
             const monthlyPaid = parseFloat(st.initialPaidAmount ?? st.initial_paid_amount ?? 0);
-            const pendingDues = parseFloat(st.pendingAmount ?? st.pending_amount ?? Math.max(0, (admFee + monthlyFee) - (admPaid + monthlyPaid)));
-            const feeStat = st.feeStatus || st.fee_status || (pendingDues === 0 ? 'Paid' : (admPaid + monthlyPaid) > 0 ? 'Partial' : 'Pending');
+            const pendingDues = parseFloat(st.pendingAmount ?? st.pending_amount ?? Math.max(0, monthlyFee - monthlyPaid));
+            const feeStat = st.feeStatus || st.fee_status || (pendingDues === 0 ? 'Paid' : monthlyPaid > 0 ? 'Partial' : 'Pending');
 
             return {
               ...st,

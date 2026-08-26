@@ -1140,9 +1140,10 @@ export default function StudentManagement() {
                   </td>
                   <td className="py-4 px-5">
                     {(() => {
-                      const monthlyRate = std.feeAmount ?? std.fee_amount ?? 500;
-                      const admFee = std.admissionFee ?? std.admission_fee ?? 1000;
-                      const isAdmPending = std.admissionFeePaid === false || std.admission_fee_paid === false;
+                      const rawRate = parseFloat(std.feeAmount ?? std.fee_amount ?? globalFeeSettings?.defaultMonthlyFee ?? 500);
+                      const monthlyRate = (isNaN(rawRate) || rawRate < 100) 
+                        ? (parseFloat(globalFeeSettings?.defaultMonthlyFee) || 500) 
+                        : rawRate;
 
                       return (
                         <div className="space-y-0.5">
