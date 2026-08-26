@@ -8,6 +8,8 @@ import GradingFormPrint from '../../components/grading/GradingFormPrint';
 import { fetchStudents, saveStoredStudents, openWhatsApp } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
+const API_ROOT = 'https://bama-club-backend.fly.dev/api';
+
 export const DEFAULT_BELT_FEE_MAP = {
   'Yellow Belt': 500,
   'Orange Belt': 600,
@@ -334,7 +336,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         const stId = realStudent ? realStudent.id : (c.student_db_id || c.db_id);
 
         if (!String(c.id).startsWith('cadet-')) {
-          await fetch(`/api/grading-registrations/${c.id}/promote-belt/`, {
+          await fetch(`${API_ROOT}/grading-registrations/${c.id}/promote-belt/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -344,7 +346,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           });
 
           if (stId) {
-            await fetch(`/api/students/${stId}/`, {
+            await fetch(`${API_ROOT}/students/${stId}/`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ current_belt: c.target_belt })
@@ -352,14 +354,14 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           }
         } else {
           if (stId) {
-            await fetch(`/api/students/${stId}/`, {
+            await fetch(`${API_ROOT}/students/${stId}/`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ current_belt: c.target_belt })
             });
           }
 
-          await fetch('/api/grading-registrations/', {
+          await fetch(`${API_ROOT}/grading-registrations/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -402,7 +404,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     for (const c of selectedList) {
       try {
         if (!String(c.id).startsWith('cadet-')) {
-          await fetch(`/api/grading-registrations/${c.id}/`, {
+          await fetch(`${API_ROOT}/grading-registrations/${c.id}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ exam_status: 'Failed' })
@@ -426,7 +428,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
   const fetchRegistrations = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/grading-registrations/');
+      const res = await fetch(`${API_ROOT}/grading-registrations/`);
       if (res.ok) {
         const data = await res.json();
         setRegistrations(Array.isArray(data) ? data : (data.results || []));
@@ -579,7 +581,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
     try {
       if (!String(candidateId).startsWith('cadet-')) {
-        await fetch(`/api/grading-registrations/${candidateId}/`, {
+        await fetch(`${API_ROOT}/grading-registrations/${candidateId}/`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ exam_fee: newFee, applied_fee: newFee })
@@ -591,7 +593,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         );
         const stId = realStudent ? realStudent.id : (c.student_db_id || c.db_id);
 
-        const res = await fetch('/api/grading-registrations/', {
+        const res = await fetch(`${API_ROOT}/grading-registrations/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -635,7 +637,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
     try {
       if (!String(candidateId).startsWith('cadet-')) {
-        await fetch(`/api/grading-registrations/${candidateId}/`, {
+        await fetch(`${API_ROOT}/grading-registrations/${candidateId}/`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ payment_status: newStatus })
@@ -647,7 +649,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         );
         const stId = realStudent ? realStudent.id : (c.student_db_id || c.db_id);
 
-        const res = await fetch('/api/grading-registrations/', {
+        const res = await fetch(`${API_ROOT}/grading-registrations/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -694,7 +696,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     if (!String(r.id).startsWith('cadet-')) {
       try {
         if (newExamStatus === 'Passed') {
-          await fetch(`/api/grading-registrations/${r.id}/promote-belt/`, {
+          await fetch(`${API_ROOT}/grading-registrations/${r.id}/promote-belt/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -703,7 +705,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
             })
           });
         } else {
-          await fetch(`/api/grading-registrations/${r.id}/`, {
+          await fetch(`${API_ROOT}/grading-registrations/${r.id}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ exam_status: newExamStatus })
@@ -853,7 +855,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
       // 2. Django Backend Database REST API Sync
       if (!String(c.id).startsWith('cadet-')) {
-        await fetch(`/api/grading-registrations/${c.id}/promote-belt/`, {
+        await fetch(`${API_ROOT}/grading-registrations/${c.id}/promote-belt/`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -865,7 +867,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         });
 
         if (examStatus === 'Passed' && stId) {
-          await fetch(`/api/students/${stId}/`, {
+          await fetch(`${API_ROOT}/students/${stId}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ current_belt: c.target_belt })
@@ -874,14 +876,14 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       } else {
         if (examStatus === 'Passed') {
           if (stId) {
-            await fetch(`/api/students/${stId}/`, {
+            await fetch(`${API_ROOT}/students/${stId}/`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ current_belt: c.target_belt })
             });
           }
 
-          await fetch('/api/grading-registrations/', {
+          await fetch(`${API_ROOT}/grading-registrations/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
