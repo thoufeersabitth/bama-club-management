@@ -969,8 +969,8 @@ export default function StudentManagement() {
         </div>
       </div>
 
-      {/* Quick Metrics KPI Summary Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+      {/* Quick Metrics KPI Summary Row (Clean 4 Cards) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm flex items-center gap-3.5 hover:shadow-md hover:border-red-200 transition-all duration-200 group">
           <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-600 border border-red-200/80 flex items-center justify-center font-black text-lg shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform">
             <Users className="w-5 h-5" />
@@ -1011,30 +1011,6 @@ export default function StudentManagement() {
             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">MONTHLY DUES</span>
             <strong className="text-xl font-black text-rose-600 leading-none block mt-0.5">
               {filteredStudents.filter(s => (s.feeStatus || s.fee_status) !== 'Paid').length} Cadets
-            </strong>
-          </div>
-        </div>
-
-        {/* DEDICATED ADMISSION FEE PENDING CARD */}
-        <div
-          onClick={() => setSelectedTab(selectedTab === 'AdmissionFeePending' ? 'Active' : 'AdmissionFeePending')}
-          className={`p-4 rounded-2xl border shadow-sm flex items-center gap-3.5 hover:shadow-md transition-all duration-200 group cursor-pointer ${
-            selectedTab === 'AdmissionFeePending'
-              ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/40'
-              : 'bg-white border-gray-200/90 hover:border-amber-300'
-          }`}
-        >
-          <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center font-black text-lg shadow-sm flex-shrink-0 group-hover:scale-105 transition-transform">
-            <Award className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[10px] text-amber-900 font-extrabold uppercase tracking-wider block">ADM FEE PENDING</span>
-            <strong className="text-xl font-black text-amber-700 leading-none block mt-0.5">
-              {filteredStudents.filter(s => {
-                const total = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
-                const paid = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0);
-                return s.admissionFeePaid === false || s.admission_fee_paid === false || paid < total;
-              }).length} Cadets
             </strong>
           </div>
         </div>
@@ -1173,9 +1149,6 @@ export default function StudentManagement() {
                           <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300/80 text-[11px] font-black shadow-sm inline-flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-emerald-500" />
                             ₹{monthlyRate} / Month
-                          </span>
-                          <span className={`block text-[10px] font-bold ${isAdmPending ? 'text-red-600' : 'text-gray-500'}`}>
-                            Adm: ₹{admFee} {isAdmPending ? '(Pending ⚠️)' : '(Paid ✓)'}
                           </span>
                         </div>
                       );
