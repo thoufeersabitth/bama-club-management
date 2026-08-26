@@ -21,12 +21,40 @@ class StudentSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         data = data.copy() if hasattr(data, 'copy') else dict(data)
         
+        # Map camelCase to snake_case automatically
+        mappings = {
+            'student_name': 'name',
+            'guardianName': 'guardian_name',
+            'admissionNo': 'admission_no',
+            'bloodGroup': 'blood_group',
+            'currentBelt': 'current_belt',
+            'feeAmount': 'fee_amount',
+            'initialPaidAmount': 'initial_paid_amount',
+            'pendingAmount': 'pending_amount',
+            'feeStatus': 'fee_status',
+            'joiningDate': 'joining_date',
+            'medicalNotes': 'medical_notes'
+        }
+        for camel, snake in mappings.items():
+            if camel in data and snake not in data:
+                data[snake] = data[camel]
+
         # Strip non-UUID string IDs sent by local storage frontend
         if 'id' in data:
             try:
                 uuid.UUID(str(data['id']))
             except (ValueError, TypeError):
                 data.pop('id', None)
+
+        # Ensure admission_no is present and unique
+        import random
+        adm_no = data.get('admission_no')
+        if not adm_no:
+            data['admission_no'] = f"BAMA-2026-{random.randint(1000, 9999)}"
+        elif not self.instance:
+            # When creating, if admission_no is duplicate, generate unique
+            if Student.objects.filter(admission_no__iexact=str(adm_no).strip()).exists():
+                data['admission_no'] = f"BAMA-2026-{random.randint(1000, 9999)}"
 
         branch_val = data.get('branch') or data.get('branch_id') or data.get('branch_name')
         if branch_val:
@@ -69,6 +97,10 @@ class StudentSerializer(serializers.ModelSerializer):
                 head_office = Branch.objects.filter(is_head_office=True).first() or Branch.objects.first()
                 if head_office:
                     data['branch'] = str(head_office.id)
+        else:
+            head_office = Branch.objects.filter(is_head_office=True).first() or Branch.objects.first()
+            if head_office:
+                data['branch'] = str(head_office.id)
 
         return super().to_internal_value(data)
 
