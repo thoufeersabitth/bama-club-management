@@ -396,21 +396,21 @@ export default function StudentManagement() {
     // Robust & Bulletproof Branch Target Resolution
     const rawBranchInput = formData.branch_id || formData.branch || formData.branch_name || formData.branchName || user?.branch || 'Pulikkal Branch (Head Office)';
     let branchTargetName = 'Pulikkal Branch (Head Office)';
-    let branchTargetId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
+    let branchTargetId = '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
 
     const rawStr = String(rawBranchInput).toLowerCase().trim();
-    if (rawStr.includes('chungam') || rawStr.includes('cgm') || rawStr.includes('dojo-02') || rawStr.includes('20c924cd')) {
+    if (rawStr.includes('chungam') || rawStr.includes('cgm') || rawStr.includes('dojo-02') || rawStr.includes('20c924cd') || rawStr.includes('a9e9ccd7')) {
       branchTargetName = 'Chungam Branch Dojo';
-      branchTargetId = '20c924cd-2dc7-4f82-a459-5e86286748c5';
+      branchTargetId = 'a9e9ccd7-27c4-4fd5-bf69-5a487cbf2b9e';
     } else if (rawStr.includes('mongam') || rawStr.includes('dojo-03') || rawStr.includes('d4639193')) {
       branchTargetName = 'Mongam Branch Dojo';
       branchTargetId = 'd4639193-c693-46e2-a46e-5e25dcf427a1';
-    } else if (rawStr.includes('feroke') || rawStr.includes('dojo-04') || rawStr.includes('5f429f1f')) {
+    } else if (rawStr.includes('feroke') || rawStr.includes('dojo-04') || rawStr.includes('5f429f1f') || rawStr.includes('67b5ad14')) {
       branchTargetName = 'Feroke Branch';
-      branchTargetId = '5f429f1f-1a33-40af-a621-cae5ecbccb41';
-    } else if (rawStr.includes('pulikkal') || rawStr.includes('plk') || rawStr.includes('dojo-01') || rawStr.includes('283e0cc2')) {
+      branchTargetId = '67b5ad14-f63f-4be4-9df8-f541bff86b12';
+    } else if (rawStr.includes('pulikkal') || rawStr.includes('plk') || rawStr.includes('dojo-01') || rawStr.includes('283e0cc2') || rawStr.includes('4d04730d')) {
       branchTargetName = 'Pulikkal Branch (Head Office)';
-      branchTargetId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
+      branchTargetId = '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
     } else {
       const matchedB = branchesList.find(b => b.id === rawBranchInput || b.name === rawBranchInput || b.code === rawBranchInput);
       if (matchedB) {
