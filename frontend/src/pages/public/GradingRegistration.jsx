@@ -430,7 +430,7 @@ export default function GradingRegistration() {
                   formData.form_type === 'JKK_WHITE_TO_BROWN_4' ? 'bg-emerald-600 text-white border-emerald-400 font-black shadow-lg scale-[1.02]' : 'bg-black/60 text-gray-400 border-gray-800 hover:text-white'
                 }`}
               >
-                <span>🥋 JKK White to Brown-4 Form</span>
+                <span>🥋 JKA Kyu Form (White to Brown-4)</span>
               </button>
 
               <button
@@ -440,7 +440,7 @@ export default function GradingRegistration() {
                   formData.form_type === 'JKK_BROWN' ? 'bg-amber-600 text-white border-amber-400 font-black shadow-lg scale-[1.02]' : 'bg-black/60 text-gray-400 border-gray-800 hover:text-white'
                 }`}
               >
-                <span>📜 JKK Brown Form (Brown 3, 2, 1)</span>
+                <span>📜 JKA Kyu Form (Brown 3, 2, 1)</span>
               </button>
 
               <button
@@ -480,15 +480,15 @@ export default function GradingRegistration() {
                 {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
                   ? '🇯🇵 JAPAN DIRECT BLACK BELT & DAN EXAMINATION FORM'
                   : formData.form_type === 'JKK_BROWN'
-                  ? '📜 JKK KERALA BROWN KYU REGISTRATION FORM'
-                  : '🥋 JKK KERALA KYU EXAMINATION FORM'}
+                  ? '📜 JKA KYU REGISTRATION FORM (Brown Kyu)'
+                  : '🥋 JKA KYU EXAMINATION FORM'}
               </h3>
               <p className="text-[11px] text-gray-400 font-medium mt-0.5">
                 {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
                   ? 'Official JKA Japan Dan & Senior Black Belt Grading Application'
                   : formData.form_type === 'JKK_BROWN'
                   ? 'Official Kyu Registration for Brown 3, Brown 2 & Brown 1 Ranks'
-                  : 'Official Kyu Examination for White, Yellow, Orange, Blue, Green & Purple Belts'}
+                  : 'Official Kyu Examination for White, Yellow, Orange, Green, Blue & Purple Belts'}
               </p>
             </div>
           </div>

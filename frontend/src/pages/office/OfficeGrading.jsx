@@ -1035,7 +1035,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
         <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/90 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">JKK BROWN FORMS</span>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">JKA BROWN FORMS</span>
             <span className="text-xl sm:text-2xl font-black text-amber-700 font-mono mt-0.5 block">{combinedCandidates.filter(r => r.form_type === 'JKK_BROWN').length}</span>
           </div>
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-black text-sm">
@@ -1055,7 +1055,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
         <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-gray-200/90 shadow-sm flex items-center justify-between">
           <div>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">JKK WHITE-BROWN-4</span>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">JKA KYU (WHITE-BROWN-4)</span>
             <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono mt-0.5 block">{combinedCandidates.filter(r => r.form_type === 'JKK_WHITE_TO_BROWN_4').length}</span>
           </div>
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center font-black text-sm">
@@ -1145,7 +1145,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
             <span>📋 All ({combinedCandidates.length})</span>
           </button>
 
-          {/* Button 2: JKK Brown Form */}
+          {/* Button 2: JKA Brown Form */}
           <button
             onClick={() => setFilterFormType('JKK_BROWN')}
             className={`px-3.5 py-1.5 rounded-full text-xs font-black transition cursor-pointer flex items-center gap-1 whitespace-nowrap flex-shrink-0 ${
@@ -1154,10 +1154,10 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 : 'bg-amber-50 text-amber-800 border border-amber-200'
             }`}
           >
-            <span>📜 JKK Brown</span>
+            <span>📜 JKA Brown</span>
           </button>
 
-          {/* Button 3: JKK White to Brown-4 Form */}
+          {/* Button 3: JKA White to Brown-4 Form */}
           <button
             onClick={() => setFilterFormType('JKK_WHITE_TO_BROWN_4')}
             className={`px-3.5 py-1.5 rounded-full text-xs font-black transition cursor-pointer flex items-center gap-1 whitespace-nowrap flex-shrink-0 ${
@@ -1166,7 +1166,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
             }`}
           >
-            <span>🥋 White-Brown-4</span>
+            <span>🥋 JKA Kyu (White-Brown-4)</span>
           </button>
 
           {/* Button 4: Japan Direct Black Belt Form */}
@@ -1925,8 +1925,8 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         const targetLower = (c.target_belt || c.current_belt || '').toLowerCase();
         const fType = c.form_type || (['black', 'dan', 'shodan', 'nidan'].some(t => targetLower.includes(t)) ? 'JAPAN_DIRECT_BLACK_BELT' : ['brown-3', 'brown-2', 'brown-1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => targetLower.includes(t)) ? 'JKK_BROWN' : 'JKK_WHITE_TO_BROWN_4');
         
-        let formatTitle = '🥋 JKK KERALA KYU EXAMINATION FORM';
-        let formatSubtitle = 'Kyu 10 to Kyu 4 Level (White, Yellow, Orange, Blue, Green, Purple)';
+        let formatTitle = '🥋 JKA KYU EXAMINATION FORM';
+        let formatSubtitle = 'Kyu 10 to Kyu 4 Level (White, Yellow, Orange, Green, Blue, Purple)';
         let formatBadge = 'bg-emerald-600 text-white shadow-emerald-600/20';
 
         if (fType === 'JAPAN_DIRECT_BLACK_BELT' || fType === 'JKA_JAPAN') {
@@ -1934,7 +1934,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           formatSubtitle = 'Official JKA Japan Dan & Senior Black Belt Examiner Record';
           formatBadge = 'bg-red-700 text-white shadow-red-700/20';
         } else if (fType === 'JKK_BROWN') {
-          formatTitle = '📜 JKK KERALA BROWN KYU REGISTRATION FORM';
+          formatTitle = '📜 JKA KYU REGISTRATION FORM (Brown Kyu)';
           formatSubtitle = 'Official Kyu Registration for Brown 3, Brown 2 & Brown 1 Ranks';
           formatBadge = 'bg-amber-600 text-white shadow-amber-600/20';
         }
