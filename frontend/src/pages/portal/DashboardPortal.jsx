@@ -199,18 +199,9 @@ export default function DashboardPortal() {
         monthlyPaid = parseFloat(s.paid_amount);
       }
 
-      let sPending = 0;
-      if (isPaid) {
-        sPending = 0;
-      } else if (s.pendingAmount !== undefined && s.pendingAmount !== null && !isNaN(parseFloat(s.pendingAmount))) {
-        sPending = parseFloat(s.pendingAmount);
-      } else if (s.pending_amount !== undefined && s.pending_amount !== null && !isNaN(parseFloat(s.pending_amount))) {
-        sPending = parseFloat(s.pending_amount);
-      } else {
-        sPending = Math.max(0, monthlyTotal - monthlyPaid);
-      }
-
-      const sCollected = isPaid ? monthlyTotal : (monthlyPaid > 0 ? monthlyPaid : Math.max(0, monthlyTotal - sPending));
+      // Calculate strictly the monthly fee dues: (Monthly Fee - Monthly Paid)
+      const sPending = isPaid ? 0 : Math.max(0, monthlyTotal - monthlyPaid);
+      const sCollected = isPaid ? monthlyTotal : Math.min(monthlyTotal, monthlyPaid);
 
       collected += sCollected;
       pending += sPending;
