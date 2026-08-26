@@ -266,9 +266,13 @@ export default function StudentManagement() {
 
     window.addEventListener('bama_data_updated', loadRoster);
     window.addEventListener('bama_active_branch_changed', loadRoster);
+    window.addEventListener('focus', loadRoster);
+    document.addEventListener('visibilitychange', loadRoster);
     return () => {
       window.removeEventListener('bama_data_updated', loadRoster);
       window.removeEventListener('bama_active_branch_changed', loadRoster);
+      window.removeEventListener('focus', loadRoster);
+      document.removeEventListener('visibilitychange', loadRoster);
     };
   }, [user, activeBranch]);
 
@@ -973,6 +977,19 @@ export default function StudentManagement() {
             className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-red-600 via-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-red-600/20 transition transform hover:-translate-y-0.5 cursor-pointer flex-shrink-0"
           >
             <Plus className="w-4 h-4" /> <span className="whitespace-nowrap">New Cadet Admission</span>
+          </button>
+
+          <button
+            type="button"
+            title="Sync live from central database"
+            onClick={() => {
+              fetchStudents().then(data => {
+                setStudents(data || []);
+              });
+            }}
+            className="p-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl transition cursor-pointer shadow-xs flex items-center justify-center"
+          >
+            <RefreshCw className="w-4 h-4 text-gray-600" />
           </button>
         </div>
       </div>
