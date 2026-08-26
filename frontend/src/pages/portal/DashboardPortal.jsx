@@ -178,13 +178,12 @@ export default function DashboardPortal() {
   const totalStudentsCount = filteredStudents.length;
   const activeStudentsCount = filteredStudents.filter(s => s.status !== 'Inactive').length;
 
-  // Comprehensive Real-time Fee & Pending Dues Calculation from Students & Fees
+  // Comprehensive Real-time Fee & Pending Dues Calculation strictly from Students Roster (No Double Counting)
   const { totalCollectedAmount, totalPendingAmount, cadetsDueCount } = React.useMemo(() => {
     let collected = 0;
     let pending = 0;
     let dueCadets = 0;
 
-    // 1. Calculate strictly from Students Monthly Tuition Fees
     filteredStudents.forEach(s => {
       const monthlyTotal = parseFloat(s.feeAmount ?? s.fee_amount ?? s.monthlyFee ?? 500) || 500;
       const isPaid = (s.feeStatus === 'Paid' || s.fee_status === 'Paid');
@@ -220,25 +219,12 @@ export default function DashboardPortal() {
       }
     });
 
-    // 2. Also check any standalone monthly invoices
-    filteredFees.forEach(f => {
-      const feePaid = parseFloat(f.paid_amount ?? f.paidAmount ?? 0);
-      const feeTotal = parseFloat(f.amount ?? 500);
-      const feePending = parseFloat(f.pending_amount ?? f.pendingAmount ?? Math.max(0, feeTotal - feePaid));
-      const stdId = f.student || f.student_admission_no;
-      if (!filteredStudents.some(s => s.id === stdId || s.admissionNo === stdId)) {
-        collected += feePaid;
-        pending += feePending;
-        if (feePending > 0) dueCadets++;
-      }
-    });
-
     return {
       totalCollectedAmount: collected,
       totalPendingAmount: pending,
       cadetsDueCount: dueCadets
     };
-  }, [filteredStudents, filteredFees]);
+  }, [filteredStudents]);
 
   const totalFeeCombined = (totalCollectedAmount + totalPendingAmount) || 1;
   const collectedPct = totalFeeCombined > 0 ? Math.round((totalCollectedAmount / totalFeeCombined) * 100) : 100;
