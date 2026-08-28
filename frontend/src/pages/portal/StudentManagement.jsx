@@ -2427,10 +2427,8 @@ export default function StudentManagement() {
                     onChange={(e) => setFormData({ ...formData, feeFrequency: e.target.value })}
                     className="bg-white border-2 border-blue-400 rounded-xl px-3 py-1.5 text-blue-950 font-black text-xs focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
                   >
-                    <option value="QUARTERLY">⚡ Every 3 Months (Quarterly - ₹{formData.feeAmount} covers 3 Mos)</option>
-                    <option value="MONTHLY">🗓️ Monthly (₹{formData.feeAmount}/Month)</option>
-                    <option value="HALF_YEARLY">📦 Every 6 Months (Half-Yearly)</option>
-                    <option value="YEARLY">🏆 Yearly (Annual Fee)</option>
+                    <option value="QUARTERLY">🏫 School Batch (Every 3 Months - ₹{formData.feeAmount} for 3 Mos)</option>
+                    <option value="MONTHLY">🥋 Regular Dojo (Monthly - ₹{formData.feeAmount}/Month)</option>
                   </select>
                 </div>
 
@@ -2827,14 +2825,12 @@ export default function StudentManagement() {
                     ...editingStudent,
                     feeFrequency: e.target.value,
                     fee_frequency: e.target.value,
-                    feeCycleMonths: e.target.value === 'MONTHLY' ? 1 : e.target.value === 'HALF_YEARLY' ? 6 : e.target.value === 'YEARLY' ? 12 : 3
+                    feeCycleMonths: e.target.value === 'MONTHLY' ? 1 : 3
                   })}
                   className="w-full bg-white border border-blue-300 rounded-xl px-3.5 py-2.5 text-blue-950 font-bold text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
-                  <option value="QUARTERLY">⚡ Every 3 Months (Quarterly - ₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500} covers 3 Months)</option>
-                  <option value="MONTHLY">🗓️ Monthly (Every Month)</option>
-                  <option value="HALF_YEARLY">📦 Every 6 Months (Half-Yearly)</option>
-                  <option value="YEARLY">🏆 Yearly (Annual Fee)</option>
+                  <option value="QUARTERLY">🏫 School Batch (Every 3 Months - ₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500} covers 3 Mos)</option>
+                  <option value="MONTHLY">🥋 Regular Dojo (Monthly - ₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500}/Month)</option>
                 </select>
               </div>
 
@@ -3193,10 +3189,8 @@ export default function StudentManagement() {
                   onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultFeeFrequency: e.target.value })}
                   className="w-full bg-white border border-purple-300 rounded-xl px-3.5 py-2 text-gray-900 font-bold text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
                 >
-                  <option value="QUARTERLY">⚡ Every 3 Months (Quarterly - Default: ₹{globalFeeSettings.defaultMonthlyFee} for 3 Months)</option>
-                  <option value="MONTHLY">🗓️ Monthly (Every Month - Default: ₹{globalFeeSettings.defaultMonthlyFee}/Month)</option>
-                  <option value="HALF_YEARLY">📦 Every 6 Months (Half-Yearly)</option>
-                  <option value="YEARLY">🏆 Yearly (Annual Fee)</option>
+                  <option value="QUARTERLY">🏫 School Batch (Every 3 Months - Default: ₹{globalFeeSettings.defaultMonthlyFee} for 3 Months)</option>
+                  <option value="MONTHLY">🥋 Regular Dojo (Monthly - Default: ₹{globalFeeSettings.defaultMonthlyFee}/Month)</option>
                 </select>
               </div>
 
