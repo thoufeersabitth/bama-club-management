@@ -44,6 +44,33 @@ export const isMonthOnOrAfterEffective = (monthStr, yearVal, effMonthStr, effYea
   return mIdx >= effIdx;
 };
 
+// Calculate multi-month coverage based on billing frequency (Quarterly = 3 months, Monthly = 1 month)
+export const getCoveredMonthsFromDate = (joiningDateStr, frequency = 'QUARTERLY') => {
+  let startYear = 2026;
+  let startMonthIdx = new Date().getMonth();
+  try {
+    const d = new Date(joiningDateStr);
+    if (!isNaN(d.getTime())) {
+      startYear = d.getFullYear();
+      startMonthIdx = d.getMonth();
+    }
+  } catch (e) {}
+
+  let count = 1;
+  const freqUpper = String(frequency || 'QUARTERLY').toUpperCase();
+  if (freqUpper === 'QUARTERLY' || freqUpper === '3_MONTHS') count = 3;
+  else if (freqUpper === 'HALF_YEARLY' || freqUpper === '6_MONTHS') count = 6;
+  else if (freqUpper === 'YEARLY' || freqUpper === '12_MONTHS') count = 12;
+
+  const result = [];
+  for (let i = 0; i < count; i++) {
+    const curMonthIdx = (startMonthIdx + i) % 12;
+    const curYear = startYear + Math.floor((startMonthIdx + i) / 12);
+    result.push(`${MONTH_ORDER[curMonthIdx]} ${curYear}`);
+  }
+  return result;
+};
+
 export const getGlobalFeeSettings = () => {
   try {
     const stored = localStorage.getItem('bama_global_fee_settings');
@@ -54,6 +81,7 @@ export const getGlobalFeeSettings = () => {
         const monthly = parseInt(parsed.defaultMonthlyFee);
         if (adm === 1984 || isNaN(adm) || adm <= 0) parsed.defaultAdmissionFee = 1000;
         if (isNaN(monthly) || monthly <= 0) parsed.defaultMonthlyFee = 500;
+        if (!parsed.defaultFeeFrequency) parsed.defaultFeeFrequency = 'QUARTERLY';
         return parsed;
       }
     }
@@ -61,6 +89,8 @@ export const getGlobalFeeSettings = () => {
   return {
     defaultAdmissionFee: 1000,
     defaultMonthlyFee: 500,
+    defaultFeeFrequency: 'QUARTERLY',
+    defaultFeeFrequencyMonths: 3,
     effectiveMonth: 'August',
     effectiveYear: 2026,
     updateExistingStudents: true,

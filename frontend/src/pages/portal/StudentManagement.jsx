@@ -6,7 +6,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase
 } from 'lucide-react';
-import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
+import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -234,6 +234,7 @@ export default function StudentManagement() {
     joiningDate: new Date().toISOString().split('T')[0],
     admissionFee: 1000,
     admissionFeePaidAmount: 1000,
+    feeFrequency: 'QUARTERLY',
     feeAmount: 500,
     initialPaidAmount: 500,
     feeStatus: 'Paid',
@@ -465,6 +466,11 @@ export default function StudentManagement() {
       }
     }
 
+    const feeFreq = formData.feeFrequency || 'QUARTERLY';
+    const coveredPaidMonths = monthlyFeePaidAmt >= monthlyFeeAmt 
+      ? getCoveredMonthsFromDate(formData.joiningDate, feeFreq) 
+      : [];
+
     const newStudentData = {
       ...formData,
       name: trimmedName,
@@ -486,6 +492,11 @@ export default function StudentManagement() {
       admission_fee_paid_amount: admissionFeePaidAmt,
       admissionFeePaid: isAdmissionPaid,
       admission_fee_paid: isAdmissionPaid,
+      feeFrequency: feeFreq,
+      fee_frequency: feeFreq,
+      feeCycleMonths: feeFreq === 'MONTHLY' ? 1 : feeFreq === 'HALF_YEARLY' ? 6 : feeFreq === 'YEARLY' ? 12 : 3,
+      paid_months: coveredPaidMonths,
+      paidMonths: coveredPaidMonths,
       feeAmount: monthlyFeeAmt,
       fee_amount: monthlyFeeAmt,
       initialPaidAmount: monthlyFeePaidAmt,
@@ -511,6 +522,7 @@ export default function StudentManagement() {
       if (autoWhatsAppWelcome) {
         const cleanPhone = (formData.phone || '').replace(/[^0-9]/g, '');
         const waPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+        const feePlanLabel = feeFreq === 'QUARTERLY' ? `Every 3 Months (Quarterly - ₹${monthlyFeeAmt} for 3 Months)` : `Monthly (₹${monthlyFeeAmt}/Month)`;
         const rawText = 
           `🥋 *WELCOME TO BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
           `Dear Parent (${formData.guardianName}),\n\n` +
@@ -520,8 +532,10 @@ export default function StudentManagement() {
           `• Belt Rank: *${formData.currentBelt}*\n` +
           `• Branch Dojo: *${formData.branch}*\n` +
           `• Training Shift: *${formData.shift}*\n` +
-          `• Admission Fee Total: *₹${admissionFeeAmt}* (Paid Now: *₹${admissionFeePaidAmt}*)\n` +
-          `• Monthly Tuition Fee: *₹${monthlyFeeAmt}* (Paid Now: *₹${monthlyFeePaidAmt}*)\n` +
+          `• Fee Billing Plan: *${feePlanLabel}*\n` +
+          `• Admission Fee Total: *₹${admissionFeeAmt}* (Paid: *₹${admissionFeePaidAmt}*)\n` +
+          `• Tuition Fee: *₹${monthlyFeeAmt}* (Paid: *₹${monthlyFeePaidAmt}*)\n` +
+          (coveredPaidMonths.length > 0 ? `• Cleared Period: *${coveredPaidMonths.join(', ')}* [FULLY PAID]\n` : '') +
           `• Total Amount Collected Now: *₹${totalCollectedNow}*\n` +
           `• Remaining Dues Balance: *₹${totalPendingDues}* (${calculatedFeeStatus})\n` +
           `• Residential Address: *${formData.address || 'N/A'}*\n` +
@@ -809,6 +823,9 @@ export default function StudentManagement() {
       admission_fee: admissionFeeAmt,
       admissionFeePaid: isAdmissionPaid,
       admission_fee_paid: isAdmissionPaid,
+      feeFrequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'QUARTERLY',
+      fee_frequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'QUARTERLY',
+      feeCycleMonths: (editingStudent.feeFrequency || editingStudent.fee_frequency) === 'MONTHLY' ? 1 : 3,
       feeAmount: feeAmt,
       fee_amount: feeAmt,
       pendingAmount: pending,
@@ -1307,6 +1324,9 @@ export default function StudentManagement() {
                 'May 2026', 'June 2026', 'July 2026', 'August 2026'
               ];
 
+              const cadetFreq = String(std.fee_frequency || std.feeFrequency || 'QUARTERLY').toUpperCase();
+              const isQuarterly = cadetFreq === 'QUARTERLY' || cadetFreq === '3_MONTHS';
+
               const joiningStr = std.joiningDate || std.joining_date || std.created_at || '2026-01-01';
               let joiningMonthIdx = 0;
               try {
@@ -1326,7 +1346,7 @@ export default function StudentManagement() {
                 let isPaid = explicitlyPaid;
                 if (!explicitlyPaid && !isBeforeJoining && remainingCredits >= monthlyRate) {
                   isPaid = true;
-                  remainingCredits -= monthlyRate;
+                  remainingCredits -= (isQuarterly ? (monthlyRate / 3) : monthlyRate);
                 }
                 return {
                   month: mName,
@@ -1338,7 +1358,10 @@ export default function StudentManagement() {
               });
 
               const unpaidMonths = monthlyBreakdown.filter(m => !m.isBeforeJoining && !m.isPaid);
-              const selectedMonthsCost = selectedDuesMonths.length * monthlyRate;
+              
+              // Calculate cost based on billing plan
+              const termCyclesCount = isQuarterly ? Math.max(1, Math.ceil(selectedDuesMonths.length / 3)) : selectedDuesMonths.length;
+              const selectedMonthsCost = selectedDuesMonths.length === 0 ? 0 : (isQuarterly ? (termCyclesCount * monthlyRate) : (selectedDuesMonths.length * monthlyRate));
 
               const toggleSelectMonth = (mName) => {
                 if (selectedDuesMonths.includes(mName)) {
@@ -1346,6 +1369,11 @@ export default function StudentManagement() {
                 } else {
                   setSelectedDuesMonths([...selectedDuesMonths, mName]);
                 }
+              };
+
+              const selectNextTerm = () => {
+                const nextGroup = unpaidMonths.slice(0, 3).map(m => m.month);
+                setSelectedDuesMonths(nextGroup);
               };
 
               const selectAllUnpaid = () => {
@@ -1385,12 +1413,13 @@ export default function StudentManagement() {
                 
                 const receiptText = 
                   `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
-                  `🧾 *OFFICIAL MULTI-MONTH FEE PAYMENT RECEIPT*\n` +
+                  `🧾 *OFFICIAL FEE PAYMENT RECEIPT*\n` +
                   `Cadet Name: *${std.name}* (${std.admissionNo || std.admission_no})\n` +
                   `Branch Dojo: *${std.branch_name || std.branch || 'Head Office'}*\n` +
+                  `Billing Plan: *${isQuarterly ? 'Every 3 Months (Quarterly Term)' : 'Monthly'}*\n` +
                   `Payment Date: *${new Date().toLocaleDateString('en-GB')}*\n\n` +
                   `📋 *CLEARED MONTHS:* \n` +
-                  selectedDuesMonths.map(m => `• ${m}: *₹${monthlyRate}* [PAID]`).join('\n') + `\n\n` +
+                  selectedDuesMonths.map(m => `• ${m} [PAID]`).join('\n') + `\n\n` +
                   `💰 *TOTAL AMOUNT RECEIVED: ₹${selectedMonthsCost}*\n` +
                   `------------------------------------\n` +
                   `Dear Parent (${parentName}), fee payment for ${selectedDuesMonths.length} month(s) has been successfully recorded at BAMA Academy. Thank you! OSS 🥋`;
@@ -1406,22 +1435,36 @@ export default function StudentManagement() {
                 <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-3.5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
                     <div>
-                      <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4 text-amber-600" /> Month-by-Month Dues Ledger
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                          <Calendar className="w-4 h-4 text-amber-600" /> Month-by-Month Dues Ledger
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
+                          {isQuarterly ? '⚡ 3-Month Term Plan' : '🗓️ Monthly Plan'}
+                        </span>
+                      </div>
                       <p className="text-[11px] text-gray-500 font-medium mt-0.5">
                         Select unpaid months to settle dues and generate consolidated WhatsApp receipt.
                       </p>
                     </div>
 
                     {unpaidMonths.length > 0 && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {isQuarterly && (
+                          <button
+                            type="button"
+                            onClick={selectNextTerm}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
+                          >
+                            ⚡ Pay Next 3-Month Term (₹{monthlyRate})
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={selectAllUnpaid}
                           className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-black rounded-lg font-bold text-xs shadow-xs cursor-pointer"
                         >
-                          Select All ({unpaidMonths.length} Unpaid = ₹{unpaidMonths.length * monthlyRate})
+                          Select All ({unpaidMonths.length} Unpaid)
                         </button>
                         {selectedDuesMonths.length > 0 && (
                           <button
@@ -2369,14 +2412,54 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Monthly Tuition Fee & Custom Amount Paid Field */}
+              {/* Fee Billing Frequency / അടവ് രീതി Field */}
+              <div className="p-4 bg-blue-50/80 border-2 border-blue-200/90 rounded-2xl space-y-2.5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-blue-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                      <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Frequency / അടവ് രീതി *
+                    </label>
+                    <p className="text-[10px] text-blue-700/80">Select whether cadet pays once in 3 months (Quarterly) or every month.</p>
+                  </div>
+
+                  <select
+                    value={formData.feeFrequency || 'QUARTERLY'}
+                    onChange={(e) => setFormData({ ...formData, feeFrequency: e.target.value })}
+                    className="bg-white border-2 border-blue-400 rounded-xl px-3 py-1.5 text-blue-950 font-black text-xs focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+                  >
+                    <option value="QUARTERLY">⚡ Every 3 Months (Quarterly - ₹{formData.feeAmount} covers 3 Mos)</option>
+                    <option value="MONTHLY">🗓️ Monthly (₹{formData.feeAmount}/Month)</option>
+                    <option value="HALF_YEARLY">📦 Every 6 Months (Half-Yearly)</option>
+                    <option value="YEARLY">🏆 Yearly (Annual Fee)</option>
+                  </select>
+                </div>
+
+                {/* Live Multi-Month Coverage Notice */}
+                {(() => {
+                  const freq = formData.feeFrequency || 'QUARTERLY';
+                  const covered = getCoveredMonthsFromDate(formData.joiningDate, freq);
+                  return (
+                    <div className="px-3 py-2 bg-white/90 border border-blue-200 rounded-xl text-[11px] text-blue-900 font-semibold flex items-center justify-between gap-2 flex-wrap">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        <span>Covered Period upon Paying <strong>₹{formData.feeAmount}</strong>:</span>
+                      </span>
+                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md text-[10px]">
+                        {covered.join(' + ')} ({covered.length} Months Free of Dues)
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Monthly/Term Tuition Fee & Custom Amount Paid Field */}
               <div className="p-4 bg-emerald-50/80 border-2 border-emerald-200/90 rounded-2xl space-y-3 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <label className="text-emerald-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                      <CreditCard className="w-4 h-4 text-emerald-600" /> First Month Tuition Fee (Total: ₹{formData.feeAmount}) *
+                      <CreditCard className="w-4 h-4 text-emerald-600" /> Tuition Fee (Rate: ₹{formData.feeAmount} / {formData.feeFrequency === 'QUARTERLY' ? '3 Months' : formData.feeFrequency === 'MONTHLY' ? 'Month' : 'Cycle'}) *
                     </label>
-                    <p className="text-[10px] text-emerald-700/80">Enter monthly tuition fee collected from parent now.</p>
+                    <p className="text-[10px] text-emerald-700/80">Enter tuition fee collected from parent now.</p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -2733,11 +2816,33 @@ export default function StudentManagement() {
                 </select>
               </div>
 
+              {/* Row 4.5: Fee Billing Frequency Selector */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+                <label className="text-blue-900 font-bold text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                  <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Plan / അടവ് രീതി *
+                </label>
+                <select
+                  value={editingStudent.fee_frequency || editingStudent.feeFrequency || 'QUARTERLY'}
+                  onChange={(e) => setEditingStudent({
+                    ...editingStudent,
+                    feeFrequency: e.target.value,
+                    fee_frequency: e.target.value,
+                    feeCycleMonths: e.target.value === 'MONTHLY' ? 1 : e.target.value === 'HALF_YEARLY' ? 6 : e.target.value === 'YEARLY' ? 12 : 3
+                  })}
+                  className="w-full bg-white border border-blue-300 rounded-xl px-3.5 py-2.5 text-blue-950 font-bold text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value="QUARTERLY">⚡ Every 3 Months (Quarterly - ₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500} covers 3 Months)</option>
+                  <option value="MONTHLY">🗓️ Monthly (Every Month)</option>
+                  <option value="HALF_YEARLY">📦 Every 6 Months (Half-Yearly)</option>
+                  <option value="YEARLY">🏆 Yearly (Annual Fee)</option>
+                </select>
+              </div>
+
               {/* Row 5: Monthly Fee Field & Presets */}
               <div className="p-3.5 bg-emerald-50/80 border-2 border-emerald-200/90 rounded-2xl space-y-2 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-emerald-900 font-black text-xs flex items-center gap-1.5">
-                    <DollarSign className="w-4 h-4 text-emerald-600" /> Monthly Cadet Fee (₹)
+                    <DollarSign className="w-4 h-4 text-emerald-600" /> Tuition Fee Rate (₹)
                     {isInstructor && <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">🔒 Admin Only</span>}
                   </label>
                   <input
@@ -3073,6 +3178,26 @@ export default function StudentManagement() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Default Fee Billing Cycle */}
+              <div className="p-4 bg-purple-50/80 border-2 border-purple-200 rounded-2xl space-y-2">
+                <label className="text-purple-900 font-black text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-purple-600" /> Default Academy Billing Cycle / അടവ് രീതി</span>
+                  <span className="text-purple-700 text-xs font-black">
+                    {globalFeeSettings.defaultFeeFrequency === 'MONTHLY' ? '🗓️ Monthly' : '⚡ Every 3 Months (Quarterly)'}
+                  </span>
+                </label>
+                <select
+                  value={globalFeeSettings.defaultFeeFrequency || 'QUARTERLY'}
+                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultFeeFrequency: e.target.value })}
+                  className="w-full bg-white border border-purple-300 rounded-xl px-3.5 py-2 text-gray-900 font-bold text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
+                >
+                  <option value="QUARTERLY">⚡ Every 3 Months (Quarterly - Default: ₹{globalFeeSettings.defaultMonthlyFee} for 3 Months)</option>
+                  <option value="MONTHLY">🗓️ Monthly (Every Month - Default: ₹{globalFeeSettings.defaultMonthlyFee}/Month)</option>
+                  <option value="HALF_YEARLY">📦 Every 6 Months (Half-Yearly)</option>
+                  <option value="YEARLY">🏆 Yearly (Annual Fee)</option>
+                </select>
               </div>
 
               {/* Global Default Monthly Cadet Fee */}
