@@ -1226,102 +1226,127 @@ export default function StudentManagement() {
           <div className="lg:col-span-2 space-y-5">
             
             {/* Outstanding Balance Banner */}
-            <div className={`p-4 sm:p-5 rounded-2xl border ${
-              totalPending === 0 
-                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950' 
-                : 'bg-rose-50/80 border-rose-200 text-rose-950'
-            }`}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider block opacity-75">
-                    {totalPending === 0 ? '✓ Account Status' : '⚠️ Outstanding Balance Warning'}
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-2xl sm:text-3xl font-black font-mono">
-                      {totalPending === 0 ? '₹0 Dues' : `₹${totalPending.toLocaleString()} Dues Pending`}
-                    </span>
-                  </div>
-                  <p className="text-xs mt-1 font-medium opacity-90">
-                    Total Collected: <strong>₹{totalCollected.toLocaleString()}</strong> • Monthly Tuition: <strong>₹{monthlyRate}/mo</strong>
-                  </p>
-                </div>
+            {(() => {
+              const cadetFreq = String(std.fee_frequency || std.feeFrequency || 'QUARTERLY').toUpperCase();
+              const isQuarterly = cadetFreq === 'QUARTERLY' || cadetFreq === '3_MONTHS';
+              const isTuitionCleared = monthlyPaid >= monthlyRate || (Array.isArray(std.paid_months) && std.paid_months.length > 0) || (Array.isArray(std.paidMonths) && std.paidMonths.length > 0);
+              const effectiveTotalPending = admPending + (isTuitionCleared ? 0 : monthlyRate);
 
-                <button
-                  type="button"
-                  onClick={sendWhatsAppStatement}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer flex-shrink-0"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Send WhatsApp Notice</span>
-                </button>
-              </div>
-            </div>
+              return (
+                <div className={`p-4 sm:p-5 rounded-2xl border ${
+                  effectiveTotalPending === 0 
+                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950' 
+                    : 'bg-rose-50/80 border-rose-200 text-rose-950'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider block opacity-75">
+                        {effectiveTotalPending === 0 ? '✓ Account Status' : '⚠️ Outstanding Balance Warning'}
+                      </span>
+                      <div className="flex items-baseline gap-2 mt-1">
+                        <span className="text-2xl sm:text-3xl font-black font-mono">
+                          {effectiveTotalPending === 0 ? '✓ ₹0 Dues (Fully Cleared)' : `₹${effectiveTotalPending.toLocaleString()} Dues Pending`}
+                        </span>
+                      </div>
+                      <p className="text-xs mt-1 font-medium opacity-90">
+                        Total Collected: <strong>₹{totalCollected.toLocaleString()}</strong> • {isQuarterly ? '3-Month Term Fee' : 'Monthly Tuition'}: <strong>₹{monthlyRate} {isQuarterly ? '/ 3 Mos' : '/ mo'}</strong>
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={sendWhatsAppStatement}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer flex-shrink-0"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Send WhatsApp Notice</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Fee Breakdown Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              {/* Monthly Tuition Card */}
-              <div className="p-4 bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-2 text-xs">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                  <span className="font-black text-gray-900 flex items-center gap-1.5">
-                    <CreditCard className="w-4 h-4 text-emerald-600" /> Monthly Tuition Fee
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                    monthlyPending === 0 ? 'bg-emerald-100 text-emerald-800' : monthlyPaid > 0 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                  }`}>
-                    {monthlyPending === 0 ? 'Paid' : monthlyPaid > 0 ? 'Partial' : 'Pending'}
-                  </span>
-                </div>
-                <div className="space-y-1 font-medium">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Monthly Rate:</span>
-                    <span className="font-mono text-gray-900 font-bold">₹{monthlyRate} / Month</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Paid So Far:</span>
-                    <span className="font-mono text-emerald-700 font-bold">₹{monthlyPaid}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-100">
-                    <span>Pending Monthly:</span>
-                    <span className="font-mono font-black text-rose-600">₹{monthlyPending}</span>
-                  </div>
-                </div>
-              </div>
+            {(() => {
+              const cadetFreq = String(std.fee_frequency || std.feeFrequency || 'QUARTERLY').toUpperCase();
+              const isQuarterly = cadetFreq === 'QUARTERLY' || cadetFreq === '3_MONTHS';
+              const isTuitionCleared = monthlyPaid >= monthlyRate || (Array.isArray(std.paid_months) && std.paid_months.length > 0) || (Array.isArray(std.paidMonths) && std.paidMonths.length > 0);
+              const tuitionPendingAmt = isTuitionCleared ? 0 : monthlyRate;
 
-              {/* Admission Fee Card */}
-              <div className="p-4 bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-2 text-xs">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                  <span className="font-black text-gray-900 flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-amber-600" /> One-Time Admission Fee
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                    admFee === 0 ? 'bg-emerald-600 text-white' : admPending === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                  }`}>
-                    {admFee === 0 ? '🎁 Free / Waived' : admPending === 0 ? 'Paid' : 'Pending'}
-                  </span>
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  
+                  {/* Tuition Card */}
+                  <div className="p-4 bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-2 text-xs">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                      <span className="font-black text-gray-900 flex items-center gap-1.5">
+                        <CreditCard className="w-4 h-4 text-emerald-600" /> {isQuarterly ? 'School Batch (3-Month Term Fee)' : 'Monthly Tuition Fee'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        isTuitionCleared ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {isTuitionCleared ? '✓ Paid' : 'Pending'}
+                      </span>
+                    </div>
+                    <div className="space-y-1 font-medium">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Billing Plan:</span>
+                        <span className="font-bold text-blue-900">{isQuarterly ? '🏫 School Batch (Every 3 Mos)' : '🥋 Regular Dojo (Monthly)'}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Fee Rate:</span>
+                        <span className="font-mono text-gray-900 font-bold">₹{monthlyRate} {isQuarterly ? 'for 3 Months' : '/ Month'}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Paid So Far:</span>
+                        <span className="font-mono text-emerald-700 font-bold">₹{monthlyPaid}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-100">
+                        <span>Pending Balance:</span>
+                        <span className={`font-mono font-black ${tuitionPendingAmt === 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {tuitionPendingAmt === 0 ? '✓ ₹0 (Paid)' : `₹${tuitionPendingAmt}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Admission Fee Card */}
+                  <div className="p-4 bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-2 text-xs">
+                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                      <span className="font-black text-gray-900 flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-amber-600" /> One-Time Admission Fee
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        admFee === 0 ? 'bg-emerald-600 text-white' : admPending === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {admFee === 0 ? '🎁 Free / Waived' : admPending === 0 ? 'Paid' : 'Pending'}
+                      </span>
+                    </div>
+                    <div className="space-y-1 font-medium">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Total Admission:</span>
+                        <span className="font-mono text-gray-900 font-bold">{admFee === 0 ? '🎁 ₹0 (Waived)' : `₹${admFee}`}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Paid Amount:</span>
+                        <span className="font-mono text-emerald-700 font-bold">₹{admPaid}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-100">
+                        <span>Pending Admission:</span>
+                        <span className="font-mono font-black text-rose-600">₹{admPending}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1 font-medium">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Total Admission:</span>
-                    <span className="font-mono text-gray-900 font-bold">{admFee === 0 ? '🎁 ₹0 (Waived)' : `₹${admFee}`}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Paid Amount:</span>
-                    <span className="font-mono text-emerald-700 font-bold">₹{admPaid}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-100">
-                    <span>Pending Admission:</span>
-                    <span className="font-mono font-black text-rose-600">₹{admPending}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Month-by-Month Dues Ledger */}
             {(() => {
               const ALL_MONTHS = [
                 'January 2026', 'February 2026', 'March 2026', 'April 2026',
-                'May 2026', 'June 2026', 'July 2026', 'August 2026'
+                'May 2026', 'June 2026', 'July 2026', 'August 2026',
+                'September 2026', 'October 2026', 'November 2026', 'December 2026'
               ];
 
               const cadetFreq = String(std.fee_frequency || std.feeFrequency || 'QUARTERLY').toUpperCase();
@@ -1338,21 +1363,19 @@ export default function StudentManagement() {
 
               const paidMonthsList = Array.isArray(std.paid_months) ? std.paid_months : (Array.isArray(std.paidMonths) ? std.paidMonths : []);
               const totalPaidAmount = parseFloat(std.initialPaidAmount ?? std.initial_paid_amount ?? 0);
-              let remainingCredits = totalPaidAmount;
 
               const monthlyBreakdown = ALL_MONTHS.map((mName, idx) => {
                 const isBeforeJoining = idx < joiningMonthIdx;
                 const explicitlyPaid = paidMonthsList.includes(mName);
-                let isPaid = explicitlyPaid;
-                if (!explicitlyPaid && !isBeforeJoining && remainingCredits >= monthlyRate) {
-                  isPaid = true;
-                  remainingCredits -= (isQuarterly ? (monthlyRate / 3) : monthlyRate);
-                }
+                // If quarterly and initial paid amount covers the term (>= monthlyRate), mark the 3 months starting from joining date as paid
+                const coveredByTermPayment = isQuarterly && totalPaidAmount >= monthlyRate && idx >= joiningMonthIdx && idx < joiningMonthIdx + 3;
+                const isPaid = isBeforeJoining ? true : (explicitlyPaid || coveredByTermPayment);
+
                 return {
                   month: mName,
                   rate: monthlyRate,
                   isBeforeJoining,
-                  isPaid: isBeforeJoining ? true : isPaid,
+                  isPaid,
                   status: isBeforeJoining ? 'Before Joining' : isPaid ? 'Paid' : 'Unpaid'
                 };
               });
@@ -1409,14 +1432,14 @@ export default function StudentManagement() {
                   });
                 } catch (e) {}
 
-                setSettleSuccessMsg(`✓ Successfully collected ₹${selectedMonthsCost} for ${selectedDuesMonths.length} months!`);
+                setSettleSuccessMsg(`✓ Successfully collected ₹${selectedMonthsCost} for ${selectedDuesMonths.length} month(s)!`);
                 
                 const receiptText = 
                   `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
                   `🧾 *OFFICIAL FEE PAYMENT RECEIPT*\n` +
                   `Cadet Name: *${std.name}* (${std.admissionNo || std.admission_no})\n` +
                   `Branch Dojo: *${std.branch_name || std.branch || 'Head Office'}*\n` +
-                  `Billing Plan: *${isQuarterly ? 'Every 3 Months (Quarterly Term)' : 'Monthly'}*\n` +
+                  `Billing Plan: *${isQuarterly ? 'School Batch (Every 3 Months - Term Fee)' : 'Monthly'}*\n` +
                   `Payment Date: *${new Date().toLocaleDateString('en-GB')}*\n\n` +
                   `📋 *CLEARED MONTHS:* \n` +
                   selectedDuesMonths.map(m => `• ${m} [PAID]`).join('\n') + `\n\n` +
@@ -1440,11 +1463,13 @@ export default function StudentManagement() {
                           <Calendar className="w-4 h-4 text-amber-600" /> Month-by-Month Dues Ledger
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
-                          {isQuarterly ? '⚡ 3-Month Term Plan' : '🗓️ Monthly Plan'}
+                          {isQuarterly ? '🏫 School Batch (3-Month Term Plan)' : '🥋 Regular Dojo (Monthly)'}
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                        Select unpaid months to settle dues and generate consolidated WhatsApp receipt.
+                        {isQuarterly 
+                          ? `School Term Plan: ₹${monthlyRate} covers 3 consecutive months (e.g. Term 1: Aug, Sep, Oct).` 
+                          : `Monthly Plan: ₹${monthlyRate} due each month.`}
                       </p>
                     </div>
 
@@ -1503,7 +1528,9 @@ export default function StudentManagement() {
                         return (
                           <div key={idx} className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs font-bold text-emerald-800 shadow-xs">
                             <span>{m.month}</span>
-                            <span className="block text-[10px] font-black text-emerald-700 mt-0.5">✓ Paid (₹{m.rate})</span>
+                            <span className="block text-[10px] font-black text-emerald-700 mt-0.5">
+                              ✓ Paid {isQuarterly ? '(School Term)' : `(₹${m.rate})`}
+                            </span>
                           </div>
                         );
                       }
@@ -1528,7 +1555,7 @@ export default function StudentManagement() {
                             <span>{m.month}</span>
                           </div>
                           <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'text-black' : 'text-rose-600'}`}>
-                            ❌ Due: ₹{m.rate}
+                            {isQuarterly ? '❌ Term Due' : `❌ Due: ₹${m.rate}`}
                           </span>
                         </div>
                       );
@@ -1541,24 +1568,23 @@ export default function StudentManagement() {
                       <div>
                         <span className="text-[10px] text-gray-300 font-bold uppercase tracking-wider block">Ready to Settle:</span>
                         <span className="font-black text-sm">
-                          {selectedDuesMonths.length} Month(s) Selected • Total: ₹{selectedMonthsCost}
+                          {selectedDuesMonths.length} Month(s) Selected • Total: ₹{selectedMonthsCost} {isQuarterly ? '(Term Fee)' : ''}
                         </span>
                       </div>
 
                       <button
                         type="button"
                         onClick={handleCollectSelectedMonths}
-                        className="w-full sm:w-auto px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition cursor-pointer"
+                        className="w-full sm:w-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl shadow transition cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <CreditCard className="w-4 h-4" />
-                        <span>✓ Receive ₹{selectedMonthsCost} & Settle Dues</span>
+                        <Check className="w-4 h-4 text-black" />
+                        <span>Receive ₹{selectedMonthsCost} & Settle Dues</span>
                       </button>
                     </div>
                   )}
                 </div>
               );
             })()}
-
           </div>
         </div>
       </div>
