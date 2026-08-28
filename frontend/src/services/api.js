@@ -363,7 +363,17 @@ export const fetchStudents = async (params = {}) => {
       const serverData = data.results || data;
 
       if (Array.isArray(serverData)) {
-        const filteredServer = filterOutDummyCadets(serverData);
+        let deletedIds = [];
+        try {
+          deletedIds = JSON.parse(localStorage.getItem('bama_deleted_student_ids') || '[]');
+        } catch (e) {}
+
+        const filteredServer = filterOutDummyCadets(serverData).filter(s => {
+          const sId = String(s.id || '').trim();
+          const sAdm = String(s.admission_no || s.admissionNo || '').trim();
+          return !deletedIds.includes(sId) && !deletedIds.includes(sAdm);
+        });
+
         const normalizedServer = filteredServer.map(s => {
           const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
           const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
@@ -529,10 +539,21 @@ export const updateStudent = async (id, data) => {
     admissionFee: updatedAdmissionFee
   };
 
-  try {
-    await api.patch(`/students/${targetIdStr}/`, payload);
-  } catch (err) {
-    console.warn('API update failed, local copy saved:', err);
+  const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);
+  for (const ident of identifiers) {
+    try {
+      const res = await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(ident)}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) break;
+    } catch (err) {
+      console.warn('API update failed for identifier:', ident, err);
+    }
   }
 
   const updatedRoster = currentList.map(s => (isMatch(s) ? { ...s, ...payload } : s));
@@ -558,46 +579,76 @@ export const promoteStudent = async (studentId, { target_belt, exam_date, examin
   window.dispatchEvent(new Event('bama_data_updated'));
 
   try {
-    const res = await api.post(`/students/${targetIdStr}/promote/`, {
-      target_belt,
-      exam_date,
-      examiner,
-      certificate_no,
-      remarks
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(targetIdStr)}/promote/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        target_belt,
+        exam_date,
+        examiner,
+        certificate_no,
+        remarks
+      })
     });
-    return res.data;
+    if (res.ok) {
+      return await res.json();
+    }
   } catch (err) {
     try {
-      await api.patch(`/students/${targetIdStr}/`, { current_belt: target_belt });
+      await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(targetIdStr)}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_belt: target_belt })
+      });
     } catch (e) {}
-    return { success: true, target_belt };
   }
+  return { success: true, target_belt };
 };
 
 export const deleteStudent = async (id, admissionNo) => {
-  try {
-    if (id) {
-      await api.delete(`/students/${id}/`);
-    } else if (admissionNo) {
-      await api.delete(`/students/${admissionNo}/`);
-    }
-  } catch (err) {
-    if (admissionNo && admissionNo !== id) {
-      try {
-        await api.delete(`/students/${admissionNo}/`);
-      } catch (e) {}
+  const stdIdStr = String(id || '').trim();
+  const admNoStr = String(admissionNo || '').trim();
+
+  // 1. Permanently delete from live PostgreSQL database on Fly.io
+  const idsToDelete = [stdIdStr, admNoStr].filter(Boolean);
+  for (const identifier of idsToDelete) {
+    try {
+      await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(identifier)}/`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+    } catch (err) {
+      console.warn(`Failed to delete student ${identifier} on server:`, err);
     }
   }
+
+  // 2. Track deleted ID in persistent tombstone blacklist so stale cache can never restore it
+  try {
+    const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_student_ids') || '[]');
+    if (stdIdStr && !deletedIds.includes(stdIdStr)) deletedIds.push(stdIdStr);
+    if (admNoStr && !deletedIds.includes(admNoStr)) deletedIds.push(admNoStr);
+    localStorage.setItem('bama_deleted_student_ids', JSON.stringify(deletedIds));
+  } catch (e) {}
+
+  // 3. Remove student from all localStorage caches
   const currentList = getStoredStudents();
-  const filtered = currentList.filter(s => 
-    String(s.id).trim() !== String(id).trim() && 
-    String(s.admissionNo || '').trim() !== String(id).trim() && 
-    String(s.admission_no || '').trim() !== String(id).trim() &&
-    (!admissionNo || (String(s.admissionNo || '').trim() !== String(admissionNo).trim() && String(s.admission_no || '').trim() !== String(admissionNo).trim()))
-  );
+  const filtered = currentList.filter(s => {
+    const sId = String(s.id || '').trim();
+    const sAdm = String(s.admissionNo || s.admission_no || '').trim();
+    if (stdIdStr && (sId === stdIdStr || sAdm === stdIdStr)) return false;
+    if (admNoStr && (sId === admNoStr || sAdm === admNoStr)) return false;
+    return true;
+  });
+
   saveStoredStudents(filtered);
   window.dispatchEvent(new Event('bama_data_updated'));
-  return { success: true, id };
+  return { success: true, id: stdIdStr };
 };
 
 export const sanitizeBranches = (list) => {

@@ -829,10 +829,7 @@ export default function StudentManagement() {
     const stdId = deletingStudent.id;
     const admNo = deletingStudent.admissionNo || deletingStudent.admission_no;
     
-    try {
-      await deleteStudent(stdId, admNo);
-    } catch (err) {}
-
+    // 1. Instantly remove from local React UI state & localStorage
     const updatedList = students.filter(s => 
       String(s.id).trim() !== String(stdId).trim() && 
       String(s.admissionNo || '').trim() !== String(stdId).trim() && 
@@ -842,7 +839,16 @@ export default function StudentManagement() {
     setStudents(updatedList);
     saveStoredStudents(updatedList);
     setDeletingStudent(null);
-    window.dispatchEvent(new Event('bama_data_updated'));
+    if (inspectorStudent && (String(inspectorStudent.id) === String(stdId) || String(inspectorStudent.admissionNo || inspectorStudent.admission_no) === String(admNo))) {
+      setInspectorStudent(updatedList.length > 0 ? updatedList[0] : null);
+    }
+
+    // 2. Permanently delete from live database
+    try {
+      await deleteStudent(stdId, admNo);
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
   };
 
   // Filter cadets based on Search, Belt, Branch, Shift Batch, Category, and Selected Tab
