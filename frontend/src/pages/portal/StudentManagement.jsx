@@ -984,9 +984,16 @@ export default function StudentManagement() {
 
     return (
       <div className="space-y-6 animate-in fade-in duration-200">
-        {/* Top Navigation & Profile Header */}
-        <div className="bg-white p-4 sm:p-6 rounded-3xl border border-gray-200/90 shadow-sm space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
+        
+        {/* 1. EXECUTIVE DOJO HERO HEADER (LUXURY DARK OBSIDIAN & GOLD) */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-slate-900 to-amber-950 text-white rounded-3xl p-5 sm:p-7 shadow-2xl border-2 border-amber-500/40">
+          
+          {/* Ambient Glow Orbs */}
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-1/3 -mb-12 w-64 h-64 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Top Floating Command Bar */}
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-5 mb-5">
             <button
               type="button"
               onClick={() => {
@@ -994,189 +1001,314 @@ export default function StudentManagement() {
                 setSelectedDuesMonths([]);
                 setSettleSuccessMsg('');
               }}
-              className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-2xl font-black text-xs flex items-center gap-2 transition cursor-pointer shadow-md"
+              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black text-xs flex items-center gap-2 border border-white/20 backdrop-blur-md transition transform hover:-translate-x-0.5 cursor-pointer shadow-lg"
             >
-              <span>←</span>
-              <span>Back to All Cadets (Roster List)</span>
+              <span className="text-base font-black">←</span>
+              <span>Back to Cadets Roster</span>
             </button>
 
+            {/* Quick Action Toolbar */}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => openWhatsApp({ phone: cleanPhone || contactPhone, message: `OSS Parent of Cadet ${std.name} (${std.admissionNo || std.admission_no}) - Greetings from B.A.M.A. Academy!` })}
-                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                onClick={() => openWhatsApp({ 
+                  phone: cleanPhone || contactPhone, 
+                  message: `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\nOSS Parent of Cadet *${std.name}* (${std.admissionNo || std.admission_no}).\nRank: *${std.currentBelt || std.current_belt || 'White Belt'}*\nBranch: *${std.branch_name || std.branch || 'Head Office'}*\n\nGreetings from BAMA Academy office! How can we assist you today? OSS 🥋` 
+                })}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-950/60 transition transform hover:-translate-y-0.5 cursor-pointer"
               >
-                <MessageSquare className="w-4 h-4" /> WhatsApp Parent
+                <MessageSquare className="w-4 h-4" />
+                <span>WhatsApp Parent</span>
               </button>
+
               <a
                 href={`tel:${contactPhone}`}
-                className="px-3.5 py-2 bg-white text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold text-xs border border-emerald-300 flex items-center gap-1.5 shadow-sm transition"
+                className="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-emerald-300 rounded-2xl font-bold text-xs border border-emerald-500/40 backdrop-blur-md flex items-center gap-1.5 transition cursor-pointer"
               >
-                <Phone className="w-4 h-4" /> Call Parent
+                <Phone className="w-4 h-4" />
+                <span>Call Parent</span>
               </a>
+
               <button
                 type="button"
                 onClick={() => handleOpenPromoteModal(std)}
-                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-yellow-400 text-black rounded-2xl font-black text-xs flex items-center gap-1.5 shadow-lg shadow-amber-950/60 transition transform hover:-translate-y-0.5 cursor-pointer"
               >
-                <Award className="w-4 h-4" /> Promote Belt
+                <Award className="w-4 h-4" />
+                <span>Promote Belt</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => setActiveCardStudent(std)}
-                className="px-3.5 py-2 bg-white text-amber-800 hover:bg-amber-50 rounded-xl font-bold text-xs border border-gray-200 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                className="px-3.5 py-2.5 bg-white text-gray-900 hover:bg-gray-100 rounded-2xl font-black text-xs shadow-md flex items-center gap-1.5 transition cursor-pointer"
               >
-                <QrCode className="w-4 h-4" /> Print ID Card
+                <QrCode className="w-4 h-4 text-amber-600" />
+                <span>Digital ID Card</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => handleOpenEditModal(std)}
-                className="px-3.5 py-2 bg-white text-blue-700 hover:bg-blue-50 rounded-xl font-bold text-xs border border-gray-200 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                className="px-3.5 py-2.5 bg-blue-600/80 hover:bg-blue-500 text-white rounded-2xl font-bold text-xs border border-blue-400/30 backdrop-blur-md flex items-center gap-1.5 transition cursor-pointer"
               >
-                <Edit className="w-4 h-4" /> Edit Profile
+                <Edit className="w-4 h-4" />
+                <span>Edit Bio</span>
               </button>
+
               <button
                 type="button"
                 onClick={() => setDeletingStudent(std)}
-                className="px-3.5 py-2 bg-white text-red-600 hover:bg-red-50 rounded-xl font-bold text-xs border border-gray-200 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                className="px-3 py-2.5 bg-red-950/60 hover:bg-red-900 text-red-300 rounded-2xl font-bold text-xs border border-red-500/40 transition cursor-pointer"
               >
-                <Trash2 className="w-4 h-4" /> Delete
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Profile Identity Card */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 pt-2">
-            <div className="flex items-center gap-4 sm:gap-5">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-br from-red-600 via-amber-600 to-yellow-500 p-1 shadow-lg flex-shrink-0">
-                {std.photo ? (
-                  <img src={std.photo} alt={std.name} className="w-full h-full object-cover rounded-[20px]" />
-                ) : (
-                  <div className="w-full h-full bg-gray-900 rounded-[20px] flex items-center justify-center font-black text-amber-400 text-3xl">
-                    {std.name ? std.name.charAt(0).toUpperCase() : 'C'}
-                  </div>
-                )}
+          {/* Hero Cadet Identity Block */}
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex items-center gap-5 sm:gap-6">
+              
+              {/* Avatar with Multi-layer Belt Halo */}
+              <div className="relative flex-shrink-0">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl p-1.5 bg-gradient-to-tr from-amber-500 via-yellow-400 to-red-600 shadow-2xl ring-4 ring-amber-500/30">
+                  {std.photo ? (
+                    <img src={std.photo} alt={std.name} className="w-full h-full object-cover rounded-2xl" />
+                  ) : (
+                    <div className="w-full h-full bg-gray-950 rounded-2xl flex items-center justify-center font-black text-amber-400 text-3xl shadow-inner">
+                      {std.name ? std.name.charAt(0).toUpperCase() : 'C'}
+                    </div>
+                  )}
+                </div>
+                <div className="absolute -bottom-2 -right-2 px-2.5 py-0.5 bg-black/90 border border-amber-500/60 text-amber-400 text-[10px] font-black rounded-full shadow-md">
+                  🥋 OSS
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 leading-tight capitalize">{std.name}</h1>
-                  <span className="px-3 py-1 rounded-full bg-amber-500 text-black text-xs font-black uppercase shadow-xs">
+
+              {/* Cadet Name & Badges */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight capitalize drop-shadow-md">
+                    {std.name}
+                  </h1>
+                  <span className="px-3 py-1 rounded-xl bg-amber-500 text-black text-xs font-black uppercase shadow-md flex items-center gap-1.5">
                     🥋 {std.currentBelt || std.current_belt || 'White Belt'}
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
-                    Active Cadet
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[11px] font-black">
+                    ● Active Cadet
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 font-bold">
-                  <span className="font-mono text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-lg">
+
+                <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                  <span className="font-mono bg-black/60 text-amber-400 border border-amber-500/40 px-3 py-1 rounded-xl shadow-inner">
                     {std.admissionNo || std.admission_no}
                   </span>
-                  <span>•</span>
-                  <span className="text-gray-800">{std.branch_name || std.branch || 'Head Office'}</span>
-                  <span>•</span>
-                  <span className="text-amber-800">⏰ {std.shift || 'Evening Batch'}</span>
-                  <span>•</span>
-                  <span className="text-purple-800">👦 {std.category || (std.age <= 13 ? 'Kids' : std.age <= 17 ? 'Teens' : 'Adults')}</span>
+                  <span className="bg-red-950/80 text-red-200 border border-red-500/40 px-3 py-1 rounded-xl">
+                    📍 {std.branch_name || std.branch || 'Pulikkal Head Office'}
+                  </span>
+                  <span className="bg-amber-950/80 text-amber-200 border border-amber-500/40 px-3 py-1 rounded-xl">
+                    ⏰ {std.shift || 'Evening Batch'}
+                  </span>
+                  <span className="bg-purple-950/80 text-purple-200 border border-purple-500/40 px-3 py-1 rounded-xl">
+                    👦 {std.category || (std.age <= 13 ? 'Kids Division' : std.age <= 17 ? 'Teens Division' : 'Adults Division')}
+                  </span>
                 </div>
               </div>
             </div>
+
+            {/* Quick Status Pill (Top Right on Large Screens) */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-3 sm:p-4 text-right backdrop-blur-md hidden lg:block">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Financial Balance</span>
+              <span className={`text-xl font-black font-mono ${totalPending === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {totalPending === 0 ? '✓ Zero Balance (Cleared)' : `₹${totalPending.toLocaleString()} Pending`}
+              </span>
+              <span className="text-[11px] text-gray-300 block font-medium mt-0.5">Rate: ₹{monthlyRate}/month</span>
+            </div>
+
           </div>
         </div>
 
-        {/* 2-Column Responsive Dashboard */}
+        {/* 2. RESPONSIVE TWO-COLUMN WORKSPACE */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Left Column: Full Bio & Address (1 Col) */}
+          {/* LEFT COLUMN: CADET DOSSIER, GUARDIAN BIO & ADDRESS */}
           <div className="space-y-6">
             
-            {/* Complete Personal & Family Bio Card */}
-            <div className="bg-white p-5 rounded-3xl border border-gray-200/90 shadow-sm space-y-4 text-xs">
-              <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
-                <Users className="w-4 h-4 text-blue-600" /> Personal & Guardian Details
-              </h3>
+            {/* Complete Bio & Identity Card */}
+            <div className="bg-white p-5 sm:p-6 rounded-3xl border border-gray-200/90 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2">
+                  <Users className="w-4 h-4 text-blue-600" /> Cadet Dossier & Bio
+                </h3>
+                <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg border border-blue-200">
+                  Verified Record
+                </span>
+              </div>
 
-              <div className="space-y-3 font-bold">
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Parent / Guardian:</span>
-                  <span className="text-gray-900 font-black">{std.guardianName || std.guardian_name || 'N/A'}</span>
+              {/* Bio Details Grid */}
+              <div className="space-y-2.5 text-xs font-bold">
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>👨‍👦</span> Parent / Guardian:
+                  </span>
+                  <strong className="text-gray-950 font-black">{std.guardianName || std.guardian_name || 'N/A'}</strong>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Relationship:</span>
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>🤝</span> Relationship:
+                  </span>
                   <span className="text-gray-900">{std.relationship || 'Father'}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Guardian Occupation:</span>
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>💼</span> Guardian Occupation:
+                  </span>
                   <span className="text-gray-900">{std.occupation || std.guardian_occupation || 'N/A'}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Contact Phone:</span>
-                  <a href={`tel:${std.phone}`} className="text-emerald-700 font-mono font-black hover:underline flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5" /> {std.phone || 'N/A'}
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>📞</span> Contact Phone:
+                  </span>
+                  <a 
+                    href={`tel:${std.phone}`} 
+                    className="text-emerald-700 font-mono font-black bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-xl border border-emerald-200 flex items-center gap-1 transition"
+                  >
+                    <Phone className="w-3 h-3" /> {std.phone || 'N/A'}
                   </a>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">WhatsApp:</span>
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>💬</span> WhatsApp:
+                  </span>
                   <span className="text-emerald-700 font-mono font-black">{std.whatsapp || std.phone || 'N/A'}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Age & Gender:</span>
-                  <span className="text-gray-900">{std.age || 12} Years • {std.gender || 'Male'}</span>
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>🎂</span> Age & Gender:
+                  </span>
+                  <span className="text-gray-950 font-black">{std.age || 12} Years • {std.gender || 'Male'}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Date of Birth:</span>
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>📅</span> Date of Birth:
+                  </span>
                   <span className="text-gray-900 font-mono">{std.dob || 'N/A'}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Blood Group:</span>
-                  <span className="px-2.5 py-0.5 bg-red-100 text-red-800 rounded-lg font-black">{std.bloodGroup || std.blood_group || 'O+'}</span>
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>🩸</span> Blood Group:
+                  </span>
+                  <span className="px-3 py-0.5 bg-red-600 text-white rounded-lg font-black text-[11px] shadow-sm">
+                    {std.bloodGroup || std.blood_group || 'O+'}
+                  </span>
                 </div>
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Date Joined / Enrolled:</span>
-                  <span className="text-gray-900 font-mono">{std.joiningDate || std.joining_date || '01-01-2026'}</span>
+
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-gray-50/80 border border-gray-100">
+                  <span className="text-gray-500 flex items-center gap-1.5">
+                    <span>🥋</span> Date Joined:
+                  </span>
+                  <span className="text-gray-900 font-mono">{std.joiningDate || std.joining_date || '2026-01-01'}</span>
                 </div>
               </div>
 
-              {/* Full Address Block */}
-              <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-1">
-                <span className="text-gray-500 font-black text-[11px] uppercase tracking-wider flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-red-600" /> Residential Address:
-                </span>
-                <p className="text-gray-900 font-bold text-xs leading-relaxed">
+              {/* 🏠 Complete Residential Address Card */}
+              <div className="p-4 bg-gradient-to-br from-amber-50/90 via-orange-50/60 to-yellow-50/90 rounded-2xl border-2 border-amber-200/90 shadow-sm space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-amber-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-red-600" /> Residential Address:
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-2 py-0.5 rounded-md">
+                    Home Location
+                  </span>
+                </div>
+                <p className="text-gray-900 font-black text-xs leading-relaxed pt-0.5">
                   {std.address || std.residential_address || std.location || `${std.branch_name || 'Pulikkal'}, Malappuram, Kerala`}
                 </p>
+              </div>
+
+            </div>
+
+            {/* 🥋 Martial Arts Belt Progression Journey Track */}
+            <div className="bg-white p-5 rounded-3xl border border-gray-200/90 shadow-xl space-y-3">
+              <h4 className="font-black text-gray-900 text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                <Award className="w-4 h-4 text-amber-600" /> Martial Arts Belt Journey
+              </h4>
+              <div className="flex items-center justify-between gap-1 overflow-x-auto py-1">
+                {[
+                  { name: 'White', color: 'bg-gray-100 text-gray-900 border-gray-300' },
+                  { name: 'Yellow', color: 'bg-yellow-400 text-black border-yellow-500' },
+                  { name: 'Orange', color: 'bg-orange-500 text-white border-orange-600' },
+                  { name: 'Green', color: 'bg-emerald-600 text-white border-emerald-700' },
+                  { name: 'Blue', color: 'bg-blue-600 text-white border-blue-700' },
+                  { name: 'Purple', color: 'bg-purple-600 text-white border-purple-700' },
+                  { name: 'Brown', color: 'bg-amber-800 text-white border-amber-900' },
+                  { name: 'Black', color: 'bg-black text-amber-400 border-black ring-2 ring-amber-500' }
+                ].map((b, bIdx) => {
+                  const isCurrent = (std.currentBelt || std.current_belt || 'White Belt').toLowerCase().includes(b.name.toLowerCase());
+                  return (
+                    <div 
+                      key={bIdx}
+                      className={`px-2 py-1 rounded-xl text-[10px] font-black border text-center flex-shrink-0 transition ${b.color} ${
+                        isCurrent ? 'ring-2 ring-red-500 scale-110 shadow-md' : 'opacity-60'
+                      }`}
+                    >
+                      {b.name}
+                      {isCurrent && <span className="block text-[8px] text-red-600">● Current</span>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
           </div>
 
-          {/* Right Column: Financial Hub & Multi-Month Dues (2 Cols) */}
+          {/* RIGHT COLUMN: FINANCIAL COMMAND CENTER (PRO MAX) */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Financial Status Warning & Overview Banner */}
-            <div className={`p-5 rounded-3xl border-2 shadow-sm ${
+            {/* 💰 FINANCIAL OUTSTANDING STATUS WARNING HERO BANNER */}
+            <div className={`p-5 sm:p-6 rounded-3xl border-2 shadow-xl relative overflow-hidden ${
               totalPending === 0 
-                ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950' 
-                : 'bg-rose-50/90 border-rose-300 text-rose-950'
+                ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-600/15 to-teal-500/10 border-emerald-400 text-emerald-950' 
+                : 'bg-gradient-to-br from-rose-500/15 via-red-600/15 to-orange-500/10 border-rose-400 text-rose-950'
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <span className="text-xs font-black uppercase tracking-wider block opacity-80">
-                    {totalPending === 0 ? '✓ Financial Account Status' : '⚠️ Outstanding Balance Warning'}
-                  </span>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-2xl sm:text-3xl font-black font-mono">
-                      {totalPending === 0 ? '₹0 (All Clear)' : `₹${totalPending.toLocaleString()} Dues Pending`}
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      totalPending === 0 ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+                    }`}>
+                      {totalPending === 0 ? '✓ Account Clear' : '⚠️ Outstanding Balance Warning'}
                     </span>
                   </div>
-                  <p className="text-xs mt-1 opacity-90 font-bold">
-                    Total Fees Collected: <strong>₹{totalCollected.toLocaleString()}</strong> • Monthly Tuition Rate: <strong>₹{monthlyRate}/month</strong>
+
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl sm:text-4xl font-black font-mono tracking-tight">
+                      {totalPending === 0 ? '₹0' : `₹${totalPending.toLocaleString()}`}
+                    </span>
+                    <span className="text-base font-black">
+                      {totalPending === 0 ? 'All Dues 100% Cleared!' : 'Dues Pending'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs mt-1.5 font-bold opacity-90 flex flex-wrap items-center gap-2">
+                    <span>Total Fees Collected: <strong className="text-emerald-700">₹{totalCollected.toLocaleString()}</strong></span>
+                    <span>•</span>
+                    <span>Monthly Tuition Rate: <strong className="text-gray-900">₹{monthlyRate}/mo</strong></span>
                   </p>
                 </div>
 
                 <button
                   type="button"
                   onClick={sendWhatsAppStatement}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+                  className="w-full sm:w-auto px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 transition transform hover:-translate-y-0.5 cursor-pointer flex-shrink-0"
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span>Send WhatsApp Dues Statement</span>
@@ -1184,11 +1316,13 @@ export default function StudentManagement() {
               </div>
             </div>
 
-            {/* Quick Fee Summary Cards */}
+            {/* QUICK FEE SUMMARY CARDS (MONTHLY & ADMISSION) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 bg-white rounded-3xl border border-gray-200/90 shadow-sm space-y-2 text-xs">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                  <span className="font-black text-gray-900 flex items-center gap-1.5">
+              
+              {/* Monthly Tuition Fee Card */}
+              <div className="p-5 bg-white rounded-3xl border border-gray-200/90 shadow-lg space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                  <span className="font-black text-gray-900 flex items-center gap-2 text-sm">
                     <CreditCard className="w-4 h-4 text-emerald-600" /> Monthly Tuition Fee
                   </span>
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -1197,25 +1331,26 @@ export default function StudentManagement() {
                     {monthlyPending === 0 ? 'Paid' : monthlyPaid > 0 ? 'Partial' : 'Pending'}
                   </span>
                 </div>
-                <div className="space-y-1.5 font-bold">
+                <div className="space-y-2 font-bold">
                   <div className="flex justify-between text-gray-600">
                     <span>Monthly Rate:</span>
-                    <span className="font-mono text-gray-900">₹{monthlyRate} / Month</span>
+                    <span className="font-mono text-gray-950 font-black">₹{monthlyRate} / Month</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Paid Amount:</span>
-                    <span className="font-mono text-emerald-700">₹{monthlyPaid}</span>
+                    <span className="font-mono text-emerald-700 font-black">₹{monthlyPaid}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-100">
+                  <div className="flex justify-between text-gray-600 pt-2 border-t border-gray-100">
                     <span>Pending Monthly Dues:</span>
-                    <span className="font-mono font-black text-rose-600">₹{monthlyPending}</span>
+                    <span className="font-mono font-black text-rose-600 text-sm">₹{monthlyPending}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 bg-white rounded-3xl border border-gray-200/90 shadow-sm space-y-2 text-xs">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                  <span className="font-black text-gray-900 flex items-center gap-1.5">
+              {/* One-Time Admission Fee Card */}
+              <div className="p-5 bg-white rounded-3xl border border-gray-200/90 shadow-lg space-y-3 text-xs">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                  <span className="font-black text-gray-900 flex items-center gap-2 text-sm">
                     <Award className="w-4 h-4 text-amber-600" /> One-Time Admission Fee
                   </span>
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
@@ -1224,24 +1359,24 @@ export default function StudentManagement() {
                     {admFee === 0 ? '🎁 Free / Waived' : admPending === 0 ? 'Paid' : 'Pending'}
                   </span>
                 </div>
-                <div className="space-y-1.5 font-bold">
+                <div className="space-y-2 font-bold">
                   <div className="flex justify-between text-gray-600">
                     <span>Total Admission Fee:</span>
-                    <span className="font-mono text-gray-900">{admFee === 0 ? '🎁 ₹0 (Waived)' : `₹${admFee}`}</span>
+                    <span className="font-mono text-gray-950 font-black">{admFee === 0 ? '🎁 ₹0 (Waived)' : `₹${admFee}`}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Paid Amount:</span>
-                    <span className="font-mono text-emerald-700">₹{admPaid}</span>
+                    <span className="font-mono text-emerald-700 font-black">₹{admPaid}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-100">
+                  <div className="flex justify-between text-gray-600 pt-2 border-t border-gray-100">
                     <span>Pending Admission Dues:</span>
-                    <span className="font-mono font-black text-rose-600">₹{admPending}</span>
+                    <span className="font-mono font-black text-rose-600 text-sm">₹{admPending}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* INTERACTIVE MONTH-BY-MONTH DUES SETTLEMENT LEDGER */}
+            {/* 🗓️ INTERACTIVE MONTH-BY-MONTH DUES SETTLEMENT LEDGER */}
             {(() => {
               const ALL_MONTHS = [
                 'January 2026', 'February 2026', 'March 2026', 'April 2026',
@@ -1344,7 +1479,7 @@ export default function StudentManagement() {
               };
 
               return (
-                <div className="bg-white p-5 rounded-3xl border border-gray-200/90 shadow-sm space-y-4">
+                <div className="bg-white p-5 sm:p-6 rounded-3xl border border-gray-200/90 shadow-xl space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                     <div>
                       <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2">
@@ -1360,7 +1495,7 @@ export default function StudentManagement() {
                         <button
                           type="button"
                           onClick={selectAllUnpaid}
-                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-sm cursor-pointer"
+                          className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md transition cursor-pointer"
                         >
                           Select All ({unpaidMonths.length} Unpaid = ₹{unpaidMonths.length * monthlyRate})
                         </button>
@@ -1385,23 +1520,23 @@ export default function StudentManagement() {
                   )}
 
                   {/* Month Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {monthlyBreakdown.map((m, idx) => {
                       const isSelected = selectedDuesMonths.includes(m.month);
                       if (m.isBeforeJoining) {
                         return (
-                          <div key={idx} className="p-3 rounded-2xl bg-gray-100/60 border border-gray-200 opacity-60 text-center text-xs text-gray-400 font-bold">
-                            {m.month}
-                            <span className="block text-[10px] text-gray-400 font-normal">Before Joining</span>
+                          <div key={idx} className="p-3 rounded-2xl bg-gray-100/70 border border-gray-200 opacity-60 text-center text-xs text-gray-400 font-bold">
+                            <span>{m.month}</span>
+                            <span className="block text-[10px] text-gray-400 font-normal">🔒 Before Joining</span>
                           </div>
                         );
                       }
 
                       if (m.isPaid) {
                         return (
-                          <div key={idx} className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-center text-xs font-bold text-emerald-800 shadow-xs">
+                          <div key={idx} className="p-3 rounded-2xl bg-emerald-50/90 border-2 border-emerald-200 text-center text-xs font-bold text-emerald-900 shadow-xs">
                             <span>{m.month}</span>
-                            <span className="block text-[11px] font-black text-emerald-700">✓ Paid (₹{m.rate})</span>
+                            <span className="block text-[11px] font-black text-emerald-700 mt-0.5">✓ Paid (₹{m.rate})</span>
                           </div>
                         );
                       }
@@ -1410,10 +1545,10 @@ export default function StudentManagement() {
                         <div 
                           key={idx} 
                           onClick={() => toggleSelectMonth(m.month)}
-                          className={`p-3 rounded-2xl border-2 text-center text-xs font-black cursor-pointer transition select-none shadow-xs ${
+                          className={`p-3 rounded-2xl border-2 text-center text-xs font-black cursor-pointer transition select-none shadow-sm ${
                             isSelected 
-                              ? 'bg-amber-600 text-white border-amber-700 shadow-md transform scale-102 ring-2 ring-amber-400' 
-                              : 'bg-white text-rose-700 border-rose-200 hover:border-amber-400 hover:bg-amber-50/50'
+                              ? 'bg-amber-600 text-white border-amber-700 shadow-lg transform scale-102 ring-2 ring-amber-400' 
+                              : 'bg-rose-50/50 text-rose-800 border-rose-300 hover:border-amber-500 hover:bg-amber-50/80'
                           }`}
                         >
                           <div className="flex items-center justify-center gap-1.5">
@@ -1425,7 +1560,7 @@ export default function StudentManagement() {
                             />
                             <span>{m.month}</span>
                           </div>
-                          <span className={`block text-[11px] mt-0.5 ${isSelected ? 'text-amber-100' : 'text-rose-600'}`}>
+                          <span className={`block text-[11px] mt-1 font-black ${isSelected ? 'text-amber-100' : 'text-rose-600'}`}>
                             ❌ Due: ₹{m.rate}
                           </span>
                         </div>
@@ -1435,7 +1570,7 @@ export default function StudentManagement() {
 
                   {/* Action Bar when months are selected */}
                   {selectedDuesMonths.length > 0 && (
-                    <div className="p-4 bg-gradient-to-r from-amber-600 via-amber-700 to-yellow-600 rounded-2xl text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+                    <div className="p-4 bg-gradient-to-r from-amber-600 via-amber-700 to-yellow-600 rounded-2xl text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xl">
                       <div className="text-center sm:text-left">
                         <span className="text-xs font-bold uppercase tracking-wider block opacity-90">Ready to Collect:</span>
                         <span className="font-black text-base">
@@ -1446,7 +1581,7 @@ export default function StudentManagement() {
                       <button
                         type="button"
                         onClick={handleCollectSelectedMonths}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
+                        className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-lg flex items-center justify-center gap-2 transition cursor-pointer"
                       >
                         <CreditCard className="w-4 h-4" />
                         <span>✓ Receive ₹{selectedMonthsCost} & Settle Dues</span>
