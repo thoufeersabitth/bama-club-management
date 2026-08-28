@@ -63,8 +63,36 @@ export default function ReportsAnalytics() {
   useEffect(() => {
     Promise.all([fetchStudents(), fetchFees()])
       .then(([stdData, feeData]) => {
-        setStudents(stdData || []);
-        setFees(feeData || []);
+        const cadets = stdData || getStoredStudents();
+        setStudents(cadets || []);
+
+        const dynamicFees = (cadets || []).map(s => {
+          const matchedFee = Array.isArray(feeData) ? feeData.find(f => f.student === s.id || f.student_detail?.id === s.id || f.student_detail?.admissionNo === s.admissionNo) : null;
+          const monthlyFee = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
+          const initialPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
+          const pending = Math.max(0, monthlyFee - initialPaid);
+          const feeStatus = pending === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
+
+          const creationDate = s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : '2026-08-01';
+          const paymentDate = initialPaid > 0 ? (s.payment_date || s.last_payment_date || creationDate) : null;
+
+          return {
+            id: matchedFee?.id || `fee-${s.id || s.admissionNo || s.admission_no}`,
+            student: s.id,
+            student_detail: s,
+            receipt_no: matchedFee?.receipt_no || `REC-${s.admissionNo || s.admission_no || '001'}`,
+            payment_date: paymentDate,
+            created_at: creationDate,
+            month: matchedFee?.month || 'August',
+            year: matchedFee?.year || 2026,
+            amount: monthlyFee,
+            paid_amount: initialPaid,
+            pending_amount: pending,
+            status: feeStatus
+          };
+        });
+
+        setFees(dynamicFees);
 
         // Aggregate attendance records from localStorage
         const aggregatedAttendance = {};
@@ -201,8 +229,9 @@ export default function ReportsAnalytics() {
       }
     }
 
-    const feeDate = f.payment_date || f.created_at || f.date || f.due_date;
-    if (feeDate && !isDateInRange(feeDate)) {
+    // Precise Date Range Checking
+    const recordDate = f.payment_date || f.created_at || (std.created_at ? new Date(std.created_at).toISOString().split('T')[0] : '2026-08-01');
+    if (recordDate && !isDateInRange(recordDate)) {
       return false;
     }
 
@@ -951,17 +980,41 @@ export default function ReportsAnalytics() {
 
                   return (
                     <tr key={f.id || idx} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4 font-mono font-bold text-gray-800">{f.receipt_no || `REC-${std.admissionNo || idx}`}</td>
-                      <td className="py-3 px-4 font-bold text-gray-900">{std.name || 'Cadet'}</td>
-                      <td className="py-3 px-4 font-mono text-gray-600">{f.payment_date || f.created_at || 'August 2026'}</td>
-                      <td className="py-3 px-4 font-bold text-gray-700">{f.month || 'August 2026'}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-gray-800">{f.receipt_no || `REC-${std.admissionNo || std.admission_no || idx + 1}`}</td>
+                      <td className="py-3 px-4">
+                        <strong className="text-gray-900 font-bold block">{std.name || 'Cadet'}</strong>
+                        <span className="text-[10px] text-gray-500">{std.admissionNo || std.admission_no} • {std.shift || 'Evening'}</span>
+                      </td>
+                      <td className="py-3 px-4 font-mono text-gray-700">
+                        {f.payment_date ? (
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold inline-flex items-center gap-1">
+                            <span>📅</span>
+                            {(() => {
+                              try {
+                                const parts = f.payment_date.split('-');
+                                if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                              } catch (e) {}
+                              return f.payment_date;
+                            })()}
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-500 border border-gray-200 text-[10px] font-bold inline-block">
+                            Due / Unpaid
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-gray-700">{f.month ? `${f.month} ${f.year || 2026}` : 'August 2026'}</td>
                       <td className="py-3 px-4 text-right font-black text-emerald-700">₹{parseFloat(paid).toLocaleString()}</td>
                       <td className="py-3 px-4 text-right font-black text-rose-600">₹{pending.toLocaleString()}</td>
                       <td className="py-3 px-4 text-center">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          pending === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          pending === 0 
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                            : paid > 0 
+                            ? 'bg-amber-50 text-amber-800 border border-amber-200' 
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}>
-                          {pending === 0 ? 'Fully Paid' : 'Pending Dues'}
+                          {pending === 0 ? '✓ Fully Paid' : paid > 0 ? 'Partial Paid' : 'Pending Dues'}
                         </span>
                       </td>
                     </tr>
