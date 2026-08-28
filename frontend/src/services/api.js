@@ -661,42 +661,87 @@ export const sanitizeBranches = (list) => {
 };
 
 export const fetchBranches = async () => {
+  const branchMap = new Map();
+
+  // 1. Base default branches
+  INITIAL_BRANCHES.forEach(b => {
+    const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+    if (key) branchMap.set(key, b);
+  });
+
+  // 2. Check local storage cache keys
   try {
     const saved = localStorage.getItem('bama_custom_branches');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = sanitizeBranches(parsed);
-        localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
-        return cleaned;
+      if (Array.isArray(parsed)) {
+        parsed.forEach(b => {
+          const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+          if (key) branchMap.set(key, { ...(branchMap.get(key) || {}), ...b });
+        });
       }
     }
   } catch (e) {}
 
-  let serverBranches = [];
+  try {
+    const saved2 = localStorage.getItem('bama_branches');
+    if (saved2) {
+      const parsed2 = JSON.parse(saved2);
+      if (Array.isArray(parsed2)) {
+        parsed2.forEach(b => {
+          const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+          if (key) branchMap.set(key, { ...(branchMap.get(key) || {}), ...b });
+        });
+      }
+    }
+  } catch (e) {}
+
+  // 3. Scan existing cadet records for any active branches
+  try {
+    const stds = getStoredStudents();
+    stds.forEach(s => {
+      const bName = s.branch_name || s.branch || (typeof s.branch_detail === 'object' ? s.branch_detail?.name : '');
+      if (bName && typeof bName === 'string') {
+        const key = bName.toLowerCase().trim();
+        if (key && !branchMap.has(key) && !key.includes('all')) {
+          branchMap.set(key, {
+            id: s.branch_id || `branch-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            name: bName,
+            code: `BAMA-${key.slice(0, 4).toUpperCase()}`,
+            address: s.address || 'Kerala, India',
+            phone: '+91 95440 85442',
+            whatsapp: '+91 95440 85442',
+            email: '',
+            branch_head: 'Sensei Abdul Rahman (5th Dan)',
+            is_head_office: false,
+            timings: 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
+            facilities: ['🥋 Tatami Safety Mats', '🥊 Heavy Bags', '❄️ AC Hall'],
+            status: 'Active'
+          });
+        }
+      }
+    });
+  } catch (e) {}
+
+  // 4. Fetch from Fly.io live server
   try {
     const res = await api.get('/branches/');
-    serverBranches = res.data.results || res.data || [];
-    if (!Array.isArray(serverBranches)) serverBranches = [];
-  } catch (err) {
-    serverBranches = [];
-  }
+    const serverBranches = res.data.results || res.data || [];
+    if (Array.isArray(serverBranches) && serverBranches.length > 0) {
+      serverBranches.forEach(b => {
+        const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+        if (key) branchMap.set(key, { ...(branchMap.get(key) || {}), ...b });
+      });
+    }
+  } catch (err) {}
 
-  if (serverBranches.length > 0) {
-    const branchMap = new Map();
-    INITIAL_BRANCHES.forEach(b => {
-      const key = String(b.name || b.code || '').toLowerCase().trim();
-      if (key) branchMap.set(key, b);
-    });
-    serverBranches.forEach(b => {
-      const key = String(b.name || b.code || '').toLowerCase().trim();
-      if (key) branchMap.set(key, b);
-    });
-    const cleaned = sanitizeBranches(Array.from(branchMap.values()));
-    return cleaned;
-  }
+  const cleaned = sanitizeBranches(Array.from(branchMap.values()));
+  try {
+    localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
+    localStorage.setItem('bama_branches', JSON.stringify(cleaned));
+  } catch (e) {}
 
-  return INITIAL_BRANCHES;
+  return cleaned;
 };
 
 export const createBranchBackend = async (branchData) => {
