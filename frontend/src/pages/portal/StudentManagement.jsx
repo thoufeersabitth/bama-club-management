@@ -140,6 +140,7 @@ export default function StudentManagement() {
   const [deletingStudent, setDeletingStudent] = useState(null);
   const [activeCardStudent, setActiveCardStudent] = useState(null);
   const [detailStudent, setDetailStudent] = useState(null);
+  const [activeProfileTab, setActiveProfileTab] = useState('overview');
   const [selectedDuesMonths, setSelectedDuesMonths] = useState([]);
   const [settleSuccessMsg, setSettleSuccessMsg] = useState('');
   const [globalFeeSettings, setGlobalFeeSettings] = useState(getGlobalFeeSettings());
@@ -996,6 +997,7 @@ export default function StudentManagement() {
                 setDetailStudent(null);
                 setSelectedDuesMonths([]);
                 setSettleSuccessMsg('');
+                setActiveProfileTab('overview');
               }}
               className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-bold text-xs flex items-center gap-2 transition cursor-pointer"
             >
@@ -1110,18 +1112,144 @@ export default function StudentManagement() {
             </div>
           </div>
 
+          {/* 2. COMPREHENSIVE STEP-BY-STEP TAB NAVIGATION */}
+          <div className="flex items-center gap-2 overflow-x-auto border-t border-gray-100 pt-3 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('overview')}
+              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeProfileTab === 'overview'
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>1. 360° Cadet Bio</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('fees')}
+              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeProfileTab === 'fees'
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>2. Financial Ledger & Dues</span>
+              {totalPending > 0 && (
+                <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-black">
+                  Due
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('martial_arts')}
+              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeProfileTab === 'martial_arts'
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5 text-amber-500" />
+              <span>3. Martial Arts & Belts</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('attendance')}
+              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeProfileTab === 'attendance'
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>4. Training Schedule</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('documents')}
+              className={`px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                activeProfileTab === 'documents'
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>5. Digital ID & Dossier</span>
+            </button>
+          </div>
+
         </div>
 
-        {/* 2. MAIN TWO-COLUMN DASHBOARD */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          
-          {/* LEFT COLUMN: CADET & GUARDIAN BIO */}
-          <div className="space-y-5">
-            
-            {/* Bio Card */}
+        {/* 3. TAB 1: 360° CADET DOSSIER & BIO */}
+        {activeProfileTab === 'overview' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-in fade-in duration-150">
+            {/* Personal Dossier */}
             <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-3.5 text-xs">
               <h3 className="font-black text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
-                <Users className="w-4 h-4 text-blue-600" /> Cadet & Guardian Bio
+                <Users className="w-4 h-4 text-blue-600" /> Personal Identity & Cadet Bio
+              </h3>
+
+              <div className="space-y-2.5 font-medium">
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Full Name:</span>
+                  <strong className="text-gray-900 font-black">{std.name}</strong>
+                </div>
+
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Admission Number:</span>
+                  <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">{std.admissionNo || std.admission_no}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Date of Birth:</span>
+                  <span className="text-gray-800 font-mono">{std.dob || 'N/A'}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Age & Gender:</span>
+                  <span className="text-gray-800">{std.age || 12} Years • {std.gender || 'Male'}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Blood Group:</span>
+                  <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-black text-[11px] inline-block">
+                    {std.bloodGroup || std.blood_group || 'O+'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Category Division:</span>
+                  <span className="text-gray-800 font-bold">{std.category || (std.age <= 13 ? 'Kids Division' : std.age <= 17 ? 'Teens Division' : 'Adults Division')}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Date Joined / Enrolled:</span>
+                  <span className="text-gray-800 font-mono">{std.joiningDate || std.joining_date || '2026-01-01'}</span>
+                </div>
+              </div>
+
+              {/* Residential Address Block */}
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1 mt-3">
+                <span className="text-gray-500 font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-red-500" /> Residential Address:
+                </span>
+                <p className="text-gray-900 font-bold text-xs leading-relaxed">
+                  {std.address || std.residential_address || std.location || `${std.branch_name || 'Pulikkal'}, Malappuram, Kerala`}
+                </p>
+              </div>
+            </div>
+
+            {/* Guardian & Emergency Dossier */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-3.5 text-xs">
+              <h3 className="font-black text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b border-gray-100 pb-2">
+                <Shield className="w-4 h-4 text-emerald-600" /> Guardian & Emergency Contacts
               </h3>
 
               <div className="space-y-2.5 font-medium">
@@ -1141,56 +1269,46 @@ export default function StudentManagement() {
                 </div>
 
                 <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Contact Phone:</span>
+                  <span className="text-gray-500">Primary Phone:</span>
                   <a href={`tel:${std.phone}`} className="text-emerald-700 font-mono font-bold hover:underline flex items-center gap-1">
                     <Phone className="w-3 h-3" /> {std.phone || 'N/A'}
                   </a>
                 </div>
 
                 <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">WhatsApp:</span>
+                  <span className="text-gray-500">WhatsApp Notification:</span>
                   <span className="text-gray-900 font-mono font-bold">{std.whatsapp || std.phone || 'N/A'}</span>
                 </div>
 
                 <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Age & Gender:</span>
-                  <span className="text-gray-800">{std.age || 12} Yrs • {std.gender || 'Male'}</span>
+                  <span className="text-gray-500">Branch Dojo:</span>
+                  <span className="text-gray-900 font-bold">{std.branch_name || std.branch || 'Head Office'}</span>
                 </div>
 
                 <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Date of Birth:</span>
-                  <span className="text-gray-800 font-mono">{std.dob || 'N/A'}</span>
-                </div>
-
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Blood Group:</span>
-                  <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-black text-[11px] inline-block">
-                    {std.bloodGroup || std.blood_group || 'O+'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Date Joined:</span>
-                  <span className="text-gray-800 font-mono">{std.joiningDate || std.joining_date || '2026-01-01'}</span>
+                  <span className="text-gray-500">Training Batch:</span>
+                  <span className="text-gray-900 font-bold">{std.shift || 'Evening Batch'}</span>
                 </div>
               </div>
 
-              {/* Residential Address Block */}
-              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
-                <span className="text-gray-500 font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-red-500" /> Residential Address:
-                </span>
-                <p className="text-gray-900 font-bold text-xs leading-relaxed">
-                  {std.address || std.residential_address || std.location || `${std.branch_name || 'Pulikkal'}, Malappuram, Kerala`}
-                </p>
+              {/* Quick Summary Highlights */}
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                  <span className="text-[10px] text-emerald-800 font-bold block">Total Collected</span>
+                  <span className="text-base font-black font-mono text-emerald-700">₹{totalCollected.toLocaleString()}</span>
+                </div>
+                <div className="p-3 bg-rose-50 rounded-xl border border-rose-200">
+                  <span className="text-[10px] text-rose-800 font-bold block">Outstanding Balance</span>
+                  <span className="text-base font-black font-mono text-rose-700">₹{totalPending.toLocaleString()}</span>
+                </div>
               </div>
-
             </div>
-
           </div>
+        )}
 
-          {/* RIGHT COLUMN: FINANCIAL HUB & DUES LEDGER */}
-          <div className="lg:col-span-2 space-y-5">
+        {/* 4. TAB 2: FINANCIAL LEDGER & MULTI-MONTH DUES */}
+        {activeProfileTab === 'fees' && (
+          <div className="space-y-5 animate-in fade-in duration-150">
             
             {/* Outstanding Balance Banner */}
             <div className={`p-4 sm:p-5 rounded-2xl border ${
@@ -1501,7 +1619,218 @@ export default function StudentManagement() {
             })()}
 
           </div>
-        </div>
+        )}
+
+        {/* 5. TAB 3: MARTIAL ARTS & BELT PROGRESSION */}
+        {activeProfileTab === 'martial_arts' && (
+          <div className="space-y-5 animate-in fade-in duration-150">
+            {/* Belt Rank Overview */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-500" /> Belt Rank & Martial Arts Progression
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Track grading exams, syllabus mastery, and martial arts journey.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenPromoteModal(std)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                >
+                  <Award className="w-4 h-4" />
+                  <span>Promote Belt Rank</span>
+                </button>
+              </div>
+
+              {/* Belt Progression Timeline (8 Belts) */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-gray-600 block">Dojo Belt Pathway:</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                  {[
+                    { name: 'White', kyu: '10th Kyu', color: 'bg-gray-100 text-gray-900 border-gray-300' },
+                    { name: 'Yellow', kyu: '9th Kyu', color: 'bg-yellow-400 text-black border-yellow-500' },
+                    { name: 'Orange', kyu: '8th Kyu', color: 'bg-orange-500 text-white border-orange-600' },
+                    { name: 'Green', kyu: '7th Kyu', color: 'bg-emerald-600 text-white border-emerald-700' },
+                    { name: 'Blue', kyu: '6th Kyu', color: 'bg-blue-600 text-white border-blue-700' },
+                    { name: 'Purple', kyu: '5th Kyu', color: 'bg-purple-600 text-white border-purple-700' },
+                    { name: 'Brown', kyu: '3rd-1st Kyu', color: 'bg-amber-800 text-white border-amber-900' },
+                    { name: 'Black', kyu: '1st Dan', color: 'bg-black text-amber-400 border-black ring-2 ring-amber-500' }
+                  ].map((b, bIdx) => {
+                    const currentBeltStr = (std.currentBelt || std.current_belt || 'White Belt').toLowerCase();
+                    const isCurrent = currentBeltStr.includes(b.name.toLowerCase());
+                    return (
+                      <div 
+                        key={bIdx}
+                        className={`p-3 rounded-xl border text-center transition ${b.color} ${
+                          isCurrent ? 'ring-2 ring-red-500 shadow-md transform scale-102 font-black' : 'opacity-70'
+                        }`}
+                      >
+                        <span className="block font-black text-xs">{b.name}</span>
+                        <span className="block text-[10px] opacity-80 mt-0.5">{b.kyu}</span>
+                        {isCurrent && (
+                          <span className="inline-block mt-1 px-1.5 py-0.2 bg-red-600 text-white rounded text-[8px] font-black uppercase">
+                            Current
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Martial Arts Syllabus Focus Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
+                  <span className="font-black text-gray-900 text-xs flex items-center gap-1.5">
+                    🥋 Kihon (Fundamentals)
+                  </span>
+                  <p className="text-[11px] text-gray-600">
+                    Basic stances (Zenkutsu-dachi), punches (Oi-tsuki), and blocks (Age-uke, Gedan-barai).
+                  </p>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
+                  <span className="font-black text-gray-900 text-xs flex items-center gap-1.5">
+                    📜 Kata (Forms)
+                  </span>
+                  <p className="text-[11px] text-gray-600">
+                    Traditional karate sequences focusing on rhythm, breath control, balance, and focus.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1">
+                  <span className="font-black text-gray-900 text-xs flex items-center gap-1.5">
+                    🥊 Kumite & Discipline
+                  </span>
+                  <p className="text-[11px] text-gray-600">
+                    Controlled sparring techniques, dojo etiquette (Reigi), and martial arts sportsmanship.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 6. TAB 4: TRAINING SCHEDULE & ATTENDANCE */}
+        {activeProfileTab === 'attendance' && (
+          <div className="space-y-5 animate-in fade-in duration-150">
+            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-4">
+              <div className="border-b border-gray-100 pb-3">
+                <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-emerald-600" /> Training Branch & Shift Schedule
+                </h3>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">
+                  Assigned dojo location and weekly training batches.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider block">Assigned Dojo Branch</span>
+                  <strong className="text-gray-900 text-sm block font-black">{std.branch_name || std.branch || 'Pulikkal Head Office'}</strong>
+                  <p className="text-gray-600 text-[11px]">Primary martial arts center for daily training and grading exams.</p>
+                </div>
+
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+                  <span className="text-gray-500 font-bold uppercase tracking-wider block">Training Shift & Timings</span>
+                  <strong className="text-gray-900 text-sm block font-black">{std.shift || 'Evening Batch (5:00 PM - 7:00 PM)'}</strong>
+                  <p className="text-gray-600 text-[11px]">Regular classes held Monday, Wednesday, Friday, and Saturday.</p>
+                </div>
+              </div>
+
+              {/* Attendance Commitment Guidelines */}
+              <div className="p-4 bg-blue-50/70 rounded-xl border border-blue-200 space-y-1.5 text-xs text-blue-950">
+                <span className="font-black flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-blue-700" /> Dojo Punctuality & Attendance Policy:
+                </span>
+                <ul className="list-disc list-inside text-[11px] space-y-1 text-blue-900">
+                  <li>Cadets must arrive at least 10 minutes prior to shift time in clean training uniform (Dogi).</li>
+                  <li>A minimum of 80% class attendance is required to qualify for upcoming Belt Grading Examinations.</li>
+                  <li>In case of absence, parents are requested to notify the instructor via WhatsApp.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 7. TAB 5: DIGITAL ID & OFFICIAL DOSSIER */}
+        {activeProfileTab === 'documents' && (
+          <div className="space-y-5 animate-in fade-in duration-150">
+            <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="font-black text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2">
+                    <QrCode className="w-4 h-4 text-amber-600" /> Official Cadet ID Card & Documents
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Generate printable digital membership cards and academy admission records.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCardStudent(std)}
+                    className="px-3.5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Open Digital ID Card</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-xs border border-gray-200 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Print Dossier</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ID Card Mini Preview */}
+              <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="w-20 h-20 rounded-2xl bg-gray-900 p-1 flex-shrink-0 flex items-center justify-center text-amber-400 font-black text-2xl shadow-sm">
+                  {std.photo ? (
+                    <img src={std.photo} alt={std.name} className="w-full h-full object-cover rounded-xl" />
+                  ) : (
+                    <span>{std.name ? std.name.charAt(0).toUpperCase() : 'C'}</span>
+                  )}
+                </div>
+
+                <div className="space-y-1 text-xs text-center sm:text-left flex-1">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <strong className="text-gray-950 text-sm font-black">{std.name}</strong>
+                    <span className="font-mono bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded text-[11px] font-bold">
+                      {std.admissionNo || std.admission_no}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-[11px]">
+                    🥋 Rank: <strong>{std.currentBelt || std.current_belt || 'White Belt'}</strong> • Branch: <strong>{std.branch_name || std.branch || 'Head Office'}</strong>
+                  </p>
+                  <p className="text-gray-500 text-[11px]">
+                    Emergency Contact: <strong>{std.phone || 'N/A'}</strong> • Blood Group: <strong>{std.bloodGroup || std.blood_group || 'O+'}</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Medical & Guardian Verification Declaration */}
+              <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-1 text-xs text-emerald-950">
+                <span className="font-black flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Academy Admission & Safety Clearance:
+                </span>
+                <p className="text-[11px] text-emerald-900">
+                  Cadet record is verified and active in B.A.M.A. central registry. Guardian contact and medical blood group consent are on official file.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   }
