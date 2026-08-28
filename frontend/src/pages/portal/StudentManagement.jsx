@@ -140,6 +140,8 @@ export default function StudentManagement() {
   const [deletingStudent, setDeletingStudent] = useState(null);
   const [activeCardStudent, setActiveCardStudent] = useState(null);
   const [detailStudent, setDetailStudent] = useState(null);
+  const [selectedDuesMonths, setSelectedDuesMonths] = useState([]);
+  const [settleSuccessMsg, setSettleSuccessMsg] = useState('');
   const [globalFeeSettings, setGlobalFeeSettings] = useState(getGlobalFeeSettings());
   const [showGlobalFeeModal, setShowGlobalFeeModal] = useState(false);
   const [showInquiriesModal, setShowInquiriesModal] = useState(false);
@@ -2449,7 +2451,223 @@ export default function StudentManagement() {
                   </div>
                 </div>
 
-                {/* 3. PERSONAL, GUARDIAN & CONTACT DETAILS */}
+                {/* 3. INTERACTIVE MULTI-MONTH DUES SETTLEMENT & MONTH-BY-MONTH LEDGER */}
+                {(() => {
+                  const ALL_MONTHS = [
+                    'January 2026', 'February 2026', 'March 2026', 'April 2026',
+                    'May 2026', 'June 2026', 'July 2026', 'August 2026'
+                  ];
+
+                  const joiningStr = std.joiningDate || std.joining_date || std.created_at || '2026-01-01';
+                  let joiningMonthIdx = 0;
+                  try {
+                    const jDate = new Date(joiningStr);
+                    if (!isNaN(jDate.getTime()) && jDate.getFullYear() === 2026) {
+                      joiningMonthIdx = jDate.getMonth();
+                    }
+                  } catch (e) {}
+
+                  const paidMonthsList = Array.isArray(std.paid_months) ? std.paid_months : (Array.isArray(std.paidMonths) ? std.paidMonths : []);
+                  const totalPaidAmount = parseFloat(std.initialPaidAmount ?? std.initial_paid_amount ?? 0);
+                  let remainingCredits = totalPaidAmount;
+
+                  const monthlyBreakdown = ALL_MONTHS.map((mName, idx) => {
+                    const isBeforeJoining = idx < joiningMonthIdx;
+                    const explicitlyPaid = paidMonthsList.includes(mName);
+                    let isPaid = explicitlyPaid;
+                    if (!explicitlyPaid && !isBeforeJoining && remainingCredits >= monthlyRate) {
+                      isPaid = true;
+                      remainingCredits -= monthlyRate;
+                    }
+                    return {
+                      month: mName,
+                      rate: monthlyRate,
+                      isBeforeJoining,
+                      isPaid: isBeforeJoining ? true : isPaid,
+                      status: isBeforeJoining ? 'Before Joining' : isPaid ? 'Paid' : 'Unpaid'
+                    };
+                  });
+
+                  const unpaidMonths = monthlyBreakdown.filter(m => !m.isBeforeJoining && !m.isPaid);
+                  const selectedMonthsCost = selectedDuesMonths.length * monthlyRate;
+
+                  const toggleSelectMonth = (mName) => {
+                    if (selectedDuesMonths.includes(mName)) {
+                      setSelectedDuesMonths(selectedDuesMonths.filter(m => m !== mName));
+                    } else {
+                      setSelectedDuesMonths([...selectedDuesMonths, mName]);
+                    }
+                  };
+
+                  const selectAllUnpaid = () => {
+                    setSelectedDuesMonths(unpaidMonths.map(m => m.month));
+                  };
+
+                  const handleCollectSelectedMonths = async () => {
+                    if (selectedDuesMonths.length === 0) return;
+                    const newPaidMonths = Array.from(new Set([...paidMonthsList, ...selectedDuesMonths]));
+                    const newTotalPaid = totalPaidAmount + selectedMonthsCost;
+
+                    const updatedStudentObj = {
+                      ...std,
+                      paid_months: newPaidMonths,
+                      paidMonths: newPaidMonths,
+                      initialPaidAmount: newTotalPaid,
+                      initial_paid_amount: newTotalPaid
+                    };
+
+                    setDetailStudent(updatedStudentObj);
+
+                    const currentStudents = getStoredStudents();
+                    const updatedRoster = currentStudents.map(s => 
+                      (s.id === std.id || s.admissionNo === std.admissionNo) ? updatedStudentObj : s
+                    );
+                    saveStoredStudents(updatedRoster);
+                    setStudents(updatedRoster);
+
+                    try {
+                      await updateStudent(std.id, {
+                        paid_months: newPaidMonths,
+                        initial_paid_amount: newTotalPaid
+                      });
+                    } catch (e) {}
+
+                    setSettleSuccessMsg(`✓ Successfully collected ₹${selectedMonthsCost} for ${selectedDuesMonths.length} months!`);
+                    
+                    const receiptText = 
+                      `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
+                      `🧾 *OFFICIAL MULTI-MONTH FEE PAYMENT RECEIPT*\n` +
+                      `Cadet Name: *${std.name}* (${std.admissionNo || std.admission_no})\n` +
+                      `Branch Dojo: *${std.branch_name || std.branch || 'Head Office'}*\n` +
+                      `Payment Date: *${new Date().toLocaleDateString('en-GB')}*\n\n` +
+                      `📋 *CLEARED MONTHS:* \n` +
+                      selectedDuesMonths.map(m => `• ${m}: *₹${monthlyRate}* [PAID]`).join('\n') + `\n\n` +
+                      `💰 *TOTAL AMOUNT RECEIVED: ₹${selectedMonthsCost}*\n` +
+                      `------------------------------------\n` +
+                      `Dear Parent (${parentName}), fee payment for ${selectedDuesMonths.length} month(s) has been successfully recorded at BAMA Academy. Thank you! OSS 🥋`;
+
+                    setSelectedDuesMonths([]);
+                    openWhatsApp({
+                      phone: cleanPhone || contactPhone,
+                      message: receiptText
+                    });
+                  };
+
+                  return (
+                    <div className="p-4 bg-amber-50/80 rounded-2xl border-2 border-amber-300/80 space-y-3 shadow-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200 pb-2">
+                        <div>
+                          <h4 className="font-black text-amber-950 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4 text-amber-700" /> Month-by-Month Dues Ledger (Since Joining)
+                          </h4>
+                          <p className="text-[10px] text-amber-800">
+                            Select unpaid months below to collect cash and generate multi-month WhatsApp receipt.
+                          </p>
+                        </div>
+
+                        {unpaidMonths.length > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={selectAllUnpaid}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-[10px] shadow-xs cursor-pointer"
+                            >
+                              Select All ({unpaidMonths.length} Unpaid = ₹{unpaidMonths.length * monthlyRate})
+                            </button>
+                            {selectedDuesMonths.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDuesMonths([])}
+                                className="px-2.5 py-1 bg-white text-gray-700 border border-gray-300 rounded-lg font-bold text-[10px] hover:bg-gray-100 cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {settleSuccessMsg && (
+                        <div className="p-2.5 bg-emerald-100 border border-emerald-300 rounded-xl text-emerald-900 font-black text-xs flex items-center justify-between">
+                          <span>{settleSuccessMsg}</span>
+                          <button onClick={() => setSettleSuccessMsg('')} className="text-emerald-700 hover:text-emerald-900 cursor-pointer"><X className="w-4 h-4" /></button>
+                        </div>
+                      )}
+
+                      {/* Month Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {monthlyBreakdown.map((m, idx) => {
+                          const isSelected = selectedDuesMonths.includes(m.month);
+                          if (m.isBeforeJoining) {
+                            return (
+                              <div key={idx} className="p-2 rounded-xl bg-gray-100/60 border border-gray-200 opacity-60 text-center text-[10px] text-gray-400 font-bold">
+                                {m.month}
+                                <span className="block text-[9px] text-gray-400">Before Join</span>
+                              </div>
+                            );
+                          }
+
+                          if (m.isPaid) {
+                            return (
+                              <div key={idx} className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-[11px] font-bold text-emerald-800 shadow-xs">
+                                <span>{m.month}</span>
+                                <span className="block text-[10px] font-black text-emerald-700">✓ Paid (₹{m.rate})</span>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div 
+                              key={idx} 
+                              onClick={() => toggleSelectMonth(m.month)}
+                              className={`p-2 rounded-xl border-2 text-center text-[11px] font-black cursor-pointer transition select-none shadow-xs ${
+                                isSelected 
+                                  ? 'bg-amber-600 text-white border-amber-700 shadow-md transform scale-102 ring-2 ring-amber-400' 
+                                  : 'bg-white text-rose-700 border-rose-200 hover:border-amber-400 hover:bg-amber-50/50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-center gap-1">
+                                <input 
+                                  type="checkbox" 
+                                  checked={isSelected} 
+                                  onChange={() => {}} 
+                                  className="w-3.5 h-3.5 rounded text-amber-600 cursor-pointer"
+                                />
+                                <span>{m.month}</span>
+                              </div>
+                              <span className={`block text-[10px] ${isSelected ? 'text-amber-100' : 'text-rose-600'}`}>
+                                ❌ Due: ₹{m.rate}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Action Bar when months are selected */}
+                      {selectedDuesMonths.length > 0 && (
+                        <div className="p-3 bg-gradient-to-r from-amber-600 via-amber-700 to-yellow-600 rounded-xl text-white flex flex-col sm:flex-row items-center justify-between gap-2 shadow-md">
+                          <div className="text-center sm:text-left">
+                            <span className="text-[10px] font-bold uppercase tracking-wider block opacity-90">Ready to Collect:</span>
+                            <span className="font-black text-sm">
+                              {selectedDuesMonths.length} Month(s) Selected • Total: ₹{selectedMonthsCost}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleCollectSelectedMonths}
+                            className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                            <span>✓ Receive ₹{selectedMonthsCost} & Settle Dues</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 4. PERSONAL, GUARDIAN & CONTACT DETAILS */}
                 <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-2.5">
                   <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
                     <Users className="w-4 h-4 text-blue-600" /> Cadet & Guardian Information
