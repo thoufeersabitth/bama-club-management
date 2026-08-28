@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Search, DollarSign, Printer, CheckCircle2, FileText, X, AlertCircle, MessageSquare, Calendar, Filter, CheckSquare, Square, Send, Check, Zap, ExternalLink, Clock, Settings } from 'lucide-react';
-import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
-import { ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
+import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
+import { ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions, INITIAL_BRANCHES } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 export default function FeeManagement() {
@@ -9,6 +9,32 @@ export default function FeeManagement() {
   const isInstructor = user?.role === 'INSTRUCTOR';
 
   const [fees, setFees] = useState([]);
+  const [branchesList, setBranchesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_custom_branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_BRANCHES;
+  });
+
+  useEffect(() => {
+    const loadBranches = () => {
+      fetchBranches().then(data => {
+        if (data && data.length > 0) setBranchesList(data);
+      });
+    };
+    loadBranches();
+    window.addEventListener('bama_branches_updated', loadBranches);
+    window.addEventListener('storage', loadBranches);
+    return () => {
+      window.removeEventListener('bama_branches_updated', loadBranches);
+      window.removeEventListener('storage', loadBranches);
+    };
+  }, []);
+
   const [search, setSearch] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedMonth, setSelectedMonth] = useState('All');
@@ -334,23 +360,27 @@ export default function FeeManagement() {
   const filteredFees = fees.filter(f => {
     const std = f.student_detail || {};
     const getCadetBranchKey = (cadet) => {
-      const bStr = (String(cadet.branch_name || cadet.branch_detail?.name || cadet.branchName || (typeof cadet.branch === 'object' ? cadet.branch?.name : cadet.branch) || '') + ' ' + String(cadet.branch_id || '')).toLowerCase();
+      const rawBranch = cadet.branch_name || cadet.branch_detail?.name || cadet.branchName || (typeof cadet.branch === 'object' ? cadet.branch?.name : cadet.branch) || '';
+      const bStr = (String(rawBranch) + ' ' + String(cadet.branch_id || '')).toLowerCase();
       if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02') || bStr.includes('20c924cd')) return 'chungam';
       if (bStr.includes('mongam') || bStr.includes('dojo-03') || bStr.includes('d4639193')) return 'mongam';
       if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
       if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('dojo-01') || bStr.includes('283e0cc2')) return 'pulikkal';
-      return 'pulikkal';
+      return rawBranch ? String(rawBranch).toLowerCase().trim() : '';
     };
 
     const cadetBranchKey = getCadetBranchKey(std);
     let matchesBranch = selectedBranch === 'All';
     if (!matchesBranch) {
-      const selStr = String(selectedBranch).toLowerCase();
+      const selStr = String(selectedBranch).toLowerCase().trim();
       if (selStr.includes('pulikkal') || selStr.includes('plk') || selStr.includes('dojo-01') || selStr.includes('283e0cc2')) matchesBranch = (cadetBranchKey === 'pulikkal');
       else if (selStr.includes('chungam') || selStr.includes('cgm') || selStr.includes('dojo-02') || selStr.includes('20c924cd')) matchesBranch = (cadetBranchKey === 'chungam');
       else if (selStr.includes('mongam') || selStr.includes('dojo-03') || selStr.includes('d4639193')) matchesBranch = (cadetBranchKey === 'mongam');
       else if (selStr.includes('feroke') || selStr.includes('dojo-04') || selStr.includes('5f429f1f')) matchesBranch = (cadetBranchKey === 'feroke');
-      else matchesBranch = (cadetBranchKey === selStr || String(std.branch_id) === String(selectedBranch));
+      else {
+        const cadetBranchName = String(std.branch_name || std.branch || std.branch_id || '').toLowerCase().trim();
+        matchesBranch = (cadetBranchKey === selStr || cadetBranchName.includes(selStr) || selStr.includes(cadetBranchName) || String(std.branch_id) === String(selectedBranch));
+      }
     }
 
     if (isInstructor && selectedBranch === 'All') {
@@ -534,9 +564,9 @@ export default function FeeManagement() {
                 className="w-full bg-transparent text-xs text-gray-900 font-bold focus:outline-none cursor-pointer truncate"
               >
                 <option value="All">All Branches</option>
-                <option value="Pulikkal Branch (Head Office)">Pulikkal Branch</option>
-                <option value="Chungam Branch Dojo">Chungam Branch</option>
-                <option value="Mongam Branch Dojo">Mongam Branch</option>
+                {branchesList.map(b => (
+                  <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                ))}
               </select>
             </div>
 
