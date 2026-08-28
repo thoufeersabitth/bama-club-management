@@ -2412,12 +2412,12 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Fee Billing Frequency / അടവ് രീതി Field */}
+              {/* Fee Billing Frequency Field */}
               <div className="p-4 bg-blue-50/80 border-2 border-blue-200/90 rounded-2xl space-y-2.5 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <label className="text-blue-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                      <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Frequency / അടവ് രീതി *
+                      <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Frequency *
                     </label>
                     <p className="text-[10px] text-blue-700/80">Select whether cadet pays once in 3 months (Quarterly) or every month.</p>
                   </div>
@@ -2817,7 +2817,7 @@ export default function StudentManagement() {
               {/* Row 4.5: Fee Billing Frequency Selector */}
               <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
                 <label className="text-blue-900 font-bold text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                  <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Plan / അടവ് രീതി *
+                  <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Plan *
                 </label>
                 <select
                   value={editingStudent.fee_frequency || editingStudent.feeFrequency || 'QUARTERLY'}
@@ -3179,9 +3179,9 @@ export default function StudentManagement() {
               {/* Default Fee Billing Cycle */}
               <div className="p-4 bg-purple-50/80 border-2 border-purple-200 rounded-2xl space-y-2">
                 <label className="text-purple-900 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-purple-600" /> Default Academy Billing Cycle / അടവ് രീതി</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-purple-600" /> Default Academy Billing Cycle</span>
                   <span className="text-purple-700 text-xs font-black">
-                    {globalFeeSettings.defaultFeeFrequency === 'MONTHLY' ? '🗓️ Monthly' : '⚡ Every 3 Months (Quarterly)'}
+                    {globalFeeSettings.defaultFeeFrequency === 'MONTHLY' ? '🥋 Monthly' : '🏫 School Batch (3 Months)'}
                   </span>
                 </label>
                 <select
