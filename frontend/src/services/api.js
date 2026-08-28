@@ -44,8 +44,8 @@ export const isMonthOnOrAfterEffective = (monthStr, yearVal, effMonthStr, effYea
   return mIdx >= effIdx;
 };
 
-// Calculate multi-month coverage based on billing frequency (Quarterly = 3 months, Monthly = 1 month)
-export const getCoveredMonthsFromDate = (joiningDateStr, frequency = 'QUARTERLY') => {
+// Calculate multi-month coverage based on billing frequency (Monthly = 1 month, Quarterly = 3 months)
+export const getCoveredMonthsFromDate = (joiningDateStr, frequency = 'MONTHLY') => {
   let startYear = 2026;
   let startMonthIdx = new Date().getMonth();
   try {
@@ -57,8 +57,8 @@ export const getCoveredMonthsFromDate = (joiningDateStr, frequency = 'QUARTERLY'
   } catch (e) {}
 
   let count = 1;
-  const freqUpper = String(frequency || 'QUARTERLY').toUpperCase();
-  if (freqUpper === 'QUARTERLY' || freqUpper === '3_MONTHS') count = 3;
+  const freqUpper = String(frequency || 'MONTHLY').toUpperCase();
+  if (freqUpper === 'QUARTERLY' || freqUpper === '3_MONTHS' || freqUpper === 'SCHOOL_BATCH') count = 3;
   else if (freqUpper === 'HALF_YEARLY' || freqUpper === '6_MONTHS') count = 6;
   else if (freqUpper === 'YEARLY' || freqUpper === '12_MONTHS') count = 12;
 
@@ -81,7 +81,7 @@ export const getGlobalFeeSettings = () => {
         const monthly = parseInt(parsed.defaultMonthlyFee);
         if (adm === 1984 || isNaN(adm) || adm <= 0) parsed.defaultAdmissionFee = 1000;
         if (isNaN(monthly) || monthly <= 0) parsed.defaultMonthlyFee = 500;
-        if (!parsed.defaultFeeFrequency) parsed.defaultFeeFrequency = 'QUARTERLY';
+        if (!parsed.defaultFeeFrequency) parsed.defaultFeeFrequency = 'MONTHLY';
         return parsed;
       }
     }
@@ -89,8 +89,8 @@ export const getGlobalFeeSettings = () => {
   return {
     defaultAdmissionFee: 1000,
     defaultMonthlyFee: 500,
-    defaultFeeFrequency: 'QUARTERLY',
-    defaultFeeFrequencyMonths: 3,
+    defaultFeeFrequency: 'MONTHLY',
+    defaultFeeFrequencyMonths: 1,
     effectiveMonth: 'August',
     effectiveYear: 2026,
     updateExistingStudents: true,
