@@ -3,7 +3,7 @@ import {
   BarChart3, Download, FileSpreadsheet, FileText, Calendar, Filter,
   Users, CreditCard, CalendarCheck, Award, Building2, TrendingUp, CheckCircle2, DollarSign, AlertCircle, Clock, Check, RefreshCw, Briefcase, BookOpen, Trash2
 } from 'lucide-react';
-import { fetchStudents, fetchFees, getStoredStaff } from '../../services/api';
+import { fetchStudents, fetchFees, getStoredStaff, fetchBranches } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -16,6 +16,32 @@ export default function ReportsAnalytics() {
 
   const [students, setStudents] = useState([]);
   const [fees, setFees] = useState([]);
+  const [branchesList, setBranchesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_custom_branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_BRANCHES;
+  });
+
+  useEffect(() => {
+    const loadBranches = () => {
+      fetchBranches().then(data => {
+        if (data && data.length > 0) setBranchesList(data);
+      });
+    };
+    loadBranches();
+    window.addEventListener('bama_branches_updated', loadBranches);
+    window.addEventListener('storage', loadBranches);
+    return () => {
+      window.removeEventListener('bama_branches_updated', loadBranches);
+      window.removeEventListener('storage', loadBranches);
+    };
+  }, []);
+
   const [activeTab, setActiveTab] = useState('ATTENDANCE'); // 'ATTENDANCE' | 'FEE' | 'BELT' | 'STAFF'
   const [feeSubFilter, setFeeSubFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'PAID'
   const [selectedBranch, setSelectedBranch] = useState('All');
@@ -737,8 +763,8 @@ export default function ReportsAnalytics() {
                     className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-red-500 cursor-pointer shadow-sm"
                   >
                     <option value="All">All Branches</option>
-                    {INITIAL_BRANCHES.map(b => (
-                      <option key={b.id} value={b.name}>{b.name}</option>
+                    {branchesList.map(b => (
+                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
                     ))}
                   </select>
                 </div>
@@ -950,8 +976,8 @@ export default function ReportsAnalytics() {
                     className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-sm"
                   >
                     <option value="All">All Branches</option>
-                    {INITIAL_BRANCHES.map(b => (
-                      <option key={b.id} value={b.name}>{b.name}</option>
+                    {branchesList.map(b => (
+                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
                     ))}
                   </select>
                 </div>
@@ -1152,8 +1178,8 @@ export default function ReportsAnalytics() {
                     className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
                   >
                     <option value="All">All Branches</option>
-                    {INITIAL_BRANCHES.map(b => (
-                      <option key={b.id} value={b.name}>{b.name}</option>
+                    {branchesList.map(b => (
+                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
                     ))}
                   </select>
                 </div>

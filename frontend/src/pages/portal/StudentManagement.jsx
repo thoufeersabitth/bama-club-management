@@ -242,7 +242,16 @@ export default function StudentManagement() {
     address: ''
   });
 
-  const [branchesList, setBranchesList] = useState(INITIAL_BRANCHES);
+  const [branchesList, setBranchesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_custom_branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_BRANCHES;
+  });
 
   const loadBranchesList = () => {
     fetchBranches().then(data => {
@@ -253,7 +262,11 @@ export default function StudentManagement() {
   useEffect(() => {
     loadBranchesList();
     window.addEventListener('bama_branches_updated', loadBranchesList);
-    return () => window.removeEventListener('bama_branches_updated', loadBranchesList);
+    window.addEventListener('storage', loadBranchesList);
+    return () => {
+      window.removeEventListener('bama_branches_updated', loadBranchesList);
+      window.removeEventListener('storage', loadBranchesList);
+    };
   }, []);
 
   useEffect(() => {
@@ -864,7 +877,7 @@ export default function StudentManagement() {
     
     // Strict & Bulletproof Branch Filtering (Supports Active Branch Scope system-wide)
     const getCadetBranchKey = (cadet) => {
-      if (!cadet) return 'pulikkal';
+      if (!cadet) return '';
       const bObj = cadet.branch_detail || (typeof cadet.branch === 'object' ? cadet.branch : null);
       const bObjName = bObj ? (bObj.name || bObj.title || '') : '';
       const bId = cadet.branch_id || (typeof cadet.branch === 'object' ? cadet.branch?.id : '');
@@ -876,7 +889,7 @@ export default function StudentManagement() {
       if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
       if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('dojo-01') || bStr.includes('283e0cc2')) return 'pulikkal';
       
-      return 'pulikkal';
+      return rawBranch ? String(rawBranch).toLowerCase().trim() : '';
     };
 
     const cadetBranchKey = getCadetBranchKey(s);
@@ -907,7 +920,8 @@ export default function StudentManagement() {
       } else if (scopeLower.includes('pulikkal') || scopeLower.includes('plk') || scopeLower.includes('dojo-01') || scopeLower.includes('283e0cc2')) {
         matchesBranch = (cadetBranchKey === 'pulikkal');
       } else {
-        matchesBranch = (cadetBranchKey === scopeLower || String(s.branch_id) === String(activeScope) || String(s.branch) === String(activeScope));
+        const cadetBranchName = String(s.branch_name || s.branch || s.branch_id || '').toLowerCase().trim();
+        matchesBranch = (cadetBranchKey === scopeLower || cadetBranchName.includes(scopeLower) || scopeLower.includes(cadetBranchName) || String(s.branch_id) === String(activeScope));
       }
     }
 
@@ -1712,8 +1726,8 @@ export default function StudentManagement() {
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition shadow-sm truncate"
               >
                 <option value="ALL">All Branches</option>
-                {INITIAL_BRANCHES.map(b => (
-                  <option key={b.id} value={b.name}>{b.name}</option>
+                {branchesList.map(b => (
+                  <option key={b.id || b.name} value={b.name}>{b.name}</option>
                 ))}
               </select>
             </div>

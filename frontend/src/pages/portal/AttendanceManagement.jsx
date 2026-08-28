@@ -1,11 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings } from 'lucide-react';
-import { fetchStudents, saveAttendanceToBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
+import { fetchStudents, saveAttendanceToBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AttendanceManagement() {
   const [students, setStudents] = useState([]);
+  const [branchesList, setBranchesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_custom_branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_BRANCHES;
+  });
+
+  useEffect(() => {
+    const loadBranches = () => {
+      fetchBranches().then(data => {
+        if (data && data.length > 0) setBranchesList(data);
+      });
+    };
+    loadBranches();
+    window.addEventListener('bama_branches_updated', loadBranches);
+    window.addEventListener('storage', loadBranches);
+    return () => {
+      window.removeEventListener('bama_branches_updated', loadBranches);
+      window.removeEventListener('storage', loadBranches);
+    };
+  }, []);
+
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -519,8 +545,8 @@ export default function AttendanceManagement() {
               className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate"
             >
               <option value="All">All Branches</option>
-              {INITIAL_BRANCHES.map(b => (
-                <option key={b.id} value={b.name}>{b.name}</option>
+              {branchesList.map(b => (
+                <option key={b.id || b.name} value={b.name}>{b.name}</option>
               ))}
             </select>
           )}

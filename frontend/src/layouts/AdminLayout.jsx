@@ -7,11 +7,38 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { INITIAL_BRANCHES } from '../services/initialData';
+import { fetchBranches } from '../services/api';
 
 export default function AdminLayout({ children }) {
   const { user, logout, activeBranch, setActiveBranch, hasPermission } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [branchesList, setBranchesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_custom_branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_BRANCHES;
+  });
+
+  React.useEffect(() => {
+    const loadBranches = () => {
+      fetchBranches().then(data => {
+        if (data && data.length > 0) setBranchesList(data);
+      });
+    };
+    loadBranches();
+    window.addEventListener('bama_branches_updated', loadBranches);
+    window.addEventListener('storage', loadBranches);
+    return () => {
+      window.removeEventListener('bama_branches_updated', loadBranches);
+      window.removeEventListener('storage', loadBranches);
+    };
+  }, []);
+
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('bama_admin_notifications');
@@ -223,8 +250,8 @@ export default function AdminLayout({ children }) {
                   className="bg-transparent text-gray-900 font-black focus:outline-none cursor-pointer truncate max-w-full text-[11px] sm:text-xs"
                 >
                   <option value="ALL">All Branches</option>
-                  {INITIAL_BRANCHES.map(b => (
-                    <option key={b.id} value={b.name}>{b.name}</option>
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
                   ))}
                 </select>
               )}
