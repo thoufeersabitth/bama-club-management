@@ -1027,15 +1027,6 @@ export default function StudentManagement() {
 
               <button
                 type="button"
-                onClick={() => handleOpenPromoteModal(std)}
-                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-              >
-                <Award className="w-3.5 h-3.5" />
-                <span>Promote Belt</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setActiveCardStudent(std)}
                 className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-xl font-bold text-xs border border-gray-200 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
               >
