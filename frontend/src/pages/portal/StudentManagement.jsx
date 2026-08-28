@@ -1341,22 +1341,18 @@ export default function StudentManagement() {
               );
             })()}
 
-            {/* Month-by-Month Dues Ledger */}
+            {/* Dues Ledger Studio: Dedicated School Batch Term Cards vs Regular Dojo Monthly Ledger */}
             {(() => {
-              const ALL_MONTHS = [
-                'January 2026', 'February 2026', 'March 2026', 'April 2026',
-                'May 2026', 'June 2026', 'July 2026', 'August 2026',
-                'September 2026', 'October 2026', 'November 2026', 'December 2026'
-              ];
-
               const cadetFreq = String(std.fee_frequency || std.feeFrequency || 'QUARTERLY').toUpperCase();
               const isQuarterly = cadetFreq === 'QUARTERLY' || cadetFreq === '3_MONTHS';
 
               const joiningStr = std.joiningDate || std.joining_date || std.created_at || '2026-01-01';
               let joiningMonthIdx = 0;
+              let startYear = 2026;
               try {
                 const jDate = new Date(joiningStr);
-                if (!isNaN(jDate.getTime()) && jDate.getFullYear() === 2026) {
+                if (!isNaN(jDate.getTime())) {
+                  startYear = jDate.getFullYear();
                   joiningMonthIdx = jDate.getMonth();
                 }
               } catch (e) {}
@@ -1364,12 +1360,189 @@ export default function StudentManagement() {
               const paidMonthsList = Array.isArray(std.paid_months) ? std.paid_months : (Array.isArray(std.paidMonths) ? std.paidMonths : []);
               const totalPaidAmount = parseFloat(std.initialPaidAmount ?? std.initial_paid_amount ?? 0);
 
+              // ----------------------------------------------------
+              // A. SCHOOL BATCH: 3-MONTH TERM BLOCKS (TERM 1, TERM 2, ETC.)
+              // ----------------------------------------------------
+              if (isQuarterly) {
+                const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                const schoolTerms = [];
+                for (let t = 0; t < 4; t++) {
+                  const termMonths = [];
+                  for (let i = 0; i < 3; i++) {
+                    const globalIdx = joiningMonthIdx + (t * 3) + i;
+                    const mIdx = globalIdx % 12;
+                    const yr = startYear + Math.floor(globalIdx / 12);
+                    termMonths.push(`${MONTH_NAMES[mIdx]} ${yr}`);
+                  }
+                  const startM = termMonths[0].split(' ')[0];
+                  const endM = termMonths[2].split(' ')[0];
+                  const yr1 = termMonths[0].split(' ')[1];
+                  const yr2 = termMonths[2].split(' ')[1];
+                  const yrLabel = yr1 === yr2 ? yr1 : `${yr1}–${yr2}`;
+
+                  const allInList = termMonths.every(m => paidMonthsList.includes(m));
+                  const coveredByTotal = totalPaidAmount >= (t + 1) * monthlyRate;
+                  const isPaid = allInList || coveredByTotal;
+
+                  schoolTerms.push({
+                    termIndex: t,
+                    title: `Term ${t + 1}`,
+                    period: `${startM} – ${endM} ${yrLabel}`,
+                    months: termMonths,
+                    rate: monthlyRate,
+                    isPaid
+                  });
+                }
+
+                const handleSettleTerm = async (term) => {
+                  const newPaidMonths = Array.from(new Set([...paidMonthsList, ...term.months]));
+                  const newTotalPaid = Math.max(totalPaidAmount + term.rate, (term.termIndex + 1) * term.rate);
+
+                  const updatedStudentObj = {
+                    ...std,
+                    paid_months: newPaidMonths,
+                    paidMonths: newPaidMonths,
+                    initialPaidAmount: newTotalPaid,
+                    initial_paid_amount: newTotalPaid
+                  };
+
+                  setDetailStudent(updatedStudentObj);
+
+                  const currentStudents = getStoredStudents();
+                  const updatedRoster = currentStudents.map(s => 
+                    (s.id === std.id || s.admissionNo === std.admissionNo) ? updatedStudentObj : s
+                  );
+                  saveStoredStudents(updatedRoster);
+                  setStudents(updatedRoster);
+
+                  try {
+                    await updateStudent(std.id, {
+                      paid_months: newPaidMonths,
+                      initial_paid_amount: newTotalPaid
+                    });
+                  } catch (e) {}
+
+                  setSettleSuccessMsg(`✓ Successfully cleared ${term.title} (${term.period}) for ₹${term.rate}!`);
+                  
+                  const receiptText = 
+                    `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
+                    `🧾 *OFFICIAL SCHOOL BATCH TERM FEE RECEIPT*\n` +
+                    `Cadet Name: *${std.name}* (${std.admissionNo || std.admission_no})\n` +
+                    `Branch Dojo: *${std.branch_name || std.branch || 'Head Office'}*\n` +
+                    `Billing Plan: *School Batch (3-Month Term Plan)*\n` +
+                    `Payment Date: *${new Date().toLocaleDateString('en-GB')}*\n\n` +
+                    `📋 *CLEARED TERM DETAILS:* \n` +
+                    `• Term: *${term.title} (${term.period})*\n` +
+                    `• Included Months: *${term.months.join(', ')}* [FULLY PAID]\n` +
+                    `• Term Amount Received: *₹${term.rate}*\n` +
+                    `------------------------------------\n` +
+                    `Dear Parent (${parentName}), fee payment for ${term.title} has been successfully recorded. Thank you! OSS 🥋`;
+
+                  openWhatsApp({
+                    phone: cleanPhone || contactPhone,
+                    message: receiptText
+                  });
+                };
+
+                return (
+                  <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4 text-blue-600" /> School Batch 3-Month Term Ledger
+                          </h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-800 border border-blue-200">
+                            🏫 3-Month Term Plan (₹{monthlyRate}/Term)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+                          School students pay in 3-month blocks (Terms). Paying ₹{monthlyRate} fully clears all 3 consecutive months.
+                        </p>
+                      </div>
+                    </div>
+
+                    {settleSuccessMsg && (
+                      <div className="p-2.5 bg-emerald-100 border border-emerald-300 rounded-xl text-emerald-900 font-black text-xs flex items-center justify-between">
+                        <span>{settleSuccessMsg}</span>
+                        <button onClick={() => setSettleSuccessMsg('')} className="text-emerald-700 hover:text-emerald-900 cursor-pointer"><X className="w-4 h-4" /></button>
+                      </div>
+                    )}
+
+                    {/* 4 Clean Term Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {schoolTerms.map((term, tIdx) => {
+                        return (
+                          <div 
+                            key={tIdx} 
+                            className={`p-4 rounded-2xl border-2 transition ${
+                              term.isPaid 
+                                ? 'bg-emerald-50/70 border-emerald-300 shadow-xs' 
+                                : 'bg-rose-50/60 border-rose-300 shadow-sm'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-black text-gray-900 text-xs">{term.title}:</span>
+                                <span className="font-bold text-gray-700 text-xs">{term.period}</span>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                term.isPaid ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                              }`}>
+                                {term.isPaid ? '✓ Paid' : '❌ Due'}
+                              </span>
+                            </div>
+
+                            <div className="py-2.5 space-y-1">
+                              <div className="text-[11px] text-gray-600 font-medium flex items-center justify-between">
+                                <span>Covered Months:</span>
+                                <span className="font-mono text-gray-900 font-bold">{term.months.map(m => m.split(' ')[0]).join(' + ')}</span>
+                              </div>
+                              <div className="text-[11px] text-gray-600 font-medium flex items-center justify-between">
+                                <span>Term Fee:</span>
+                                <span className="font-mono text-gray-900 font-black">₹{term.rate}</span>
+                              </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-gray-200/60">
+                              {term.isPaid ? (
+                                <div className="py-1.5 text-center bg-emerald-100 text-emerald-800 rounded-xl font-black text-xs flex items-center justify-center gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Fully Cleared (₹{term.rate} Paid)</span>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSettleTerm(term)}
+                                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer"
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  <span>Collect ₹{term.rate} & Settle {term.title}</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // ----------------------------------------------------
+              // B. REGULAR DOJO: STRICT 1-MONTH MONTHLY LEDGER
+              // ----------------------------------------------------
+              const ALL_MONTHS = [
+                'January 2026', 'February 2026', 'March 2026', 'April 2026',
+                'May 2026', 'June 2026', 'July 2026', 'August 2026',
+                'September 2026', 'October 2026', 'November 2026', 'December 2026'
+              ];
+
               const monthlyBreakdown = ALL_MONTHS.map((mName, idx) => {
                 const isBeforeJoining = idx < joiningMonthIdx;
                 const explicitlyPaid = paidMonthsList.includes(mName);
-                // If quarterly and initial paid amount covers the term (>= monthlyRate), mark the 3 months starting from joining date as paid
-                const coveredByTermPayment = isQuarterly && totalPaidAmount >= monthlyRate && idx >= joiningMonthIdx && idx < joiningMonthIdx + 3;
-                const isPaid = isBeforeJoining ? true : (explicitlyPaid || coveredByTermPayment);
+                const isPaid = isBeforeJoining ? true : explicitlyPaid;
 
                 return {
                   month: mName,
@@ -1381,10 +1554,7 @@ export default function StudentManagement() {
               });
 
               const unpaidMonths = monthlyBreakdown.filter(m => !m.isBeforeJoining && !m.isPaid);
-              
-              // Calculate cost based on billing plan
-              const termCyclesCount = isQuarterly ? Math.max(1, Math.ceil(selectedDuesMonths.length / 3)) : selectedDuesMonths.length;
-              const selectedMonthsCost = selectedDuesMonths.length === 0 ? 0 : (isQuarterly ? (termCyclesCount * monthlyRate) : (selectedDuesMonths.length * monthlyRate));
+              const selectedMonthsCost = selectedDuesMonths.length * monthlyRate;
 
               const toggleSelectMonth = (mName) => {
                 if (selectedDuesMonths.includes(mName)) {
@@ -1392,11 +1562,6 @@ export default function StudentManagement() {
                 } else {
                   setSelectedDuesMonths([...selectedDuesMonths, mName]);
                 }
-              };
-
-              const selectNextTerm = () => {
-                const nextGroup = unpaidMonths.slice(0, 3).map(m => m.month);
-                setSelectedDuesMonths(nextGroup);
               };
 
               const selectAllUnpaid = () => {
@@ -1436,16 +1601,16 @@ export default function StudentManagement() {
                 
                 const receiptText = 
                   `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
-                  `🧾 *OFFICIAL FEE PAYMENT RECEIPT*\n` +
+                  `🧾 *OFFICIAL MONTHLY FEE PAYMENT RECEIPT*\n` +
                   `Cadet Name: *${std.name}* (${std.admissionNo || std.admission_no})\n` +
                   `Branch Dojo: *${std.branch_name || std.branch || 'Head Office'}*\n` +
-                  `Billing Plan: *${isQuarterly ? 'School Batch (Every 3 Months - Term Fee)' : 'Monthly'}*\n` +
+                  `Billing Plan: *Regular Dojo (Monthly Plan)*\n` +
                   `Payment Date: *${new Date().toLocaleDateString('en-GB')}*\n\n` +
                   `📋 *CLEARED MONTHS:* \n` +
-                  selectedDuesMonths.map(m => `• ${m} [PAID]`).join('\n') + `\n\n` +
+                  selectedDuesMonths.map(m => `• ${m}: *₹${monthlyRate}* [PAID]`).join('\n') + `\n\n` +
                   `💰 *TOTAL AMOUNT RECEIVED: ₹${selectedMonthsCost}*\n` +
                   `------------------------------------\n` +
-                  `Dear Parent (${parentName}), fee payment for ${selectedDuesMonths.length} month(s) has been successfully recorded at BAMA Academy. Thank you! OSS 🥋`;
+                  `Dear Parent (${parentName}), fee payment for ${selectedDuesMonths.length} month(s) has been successfully recorded. Thank you! OSS 🥋`;
 
                 setSelectedDuesMonths([]);
                 openWhatsApp({
@@ -1460,36 +1625,25 @@ export default function StudentManagement() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-black text-gray-900 text-xs uppercase tracking-wider flex items-center gap-1.5">
-                          <Calendar className="w-4 h-4 text-amber-600" /> Month-by-Month Dues Ledger
+                          <Calendar className="w-4 h-4 text-amber-600" /> Regular Dojo Month-by-Month Ledger
                         </h3>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
-                          {isQuarterly ? '🏫 School Batch (3-Month Term Plan)' : '🥋 Regular Dojo (Monthly)'}
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          🥋 Monthly Plan (₹{monthlyRate}/Month)
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                        {isQuarterly 
-                          ? `School Term Plan: ₹${monthlyRate} covers 3 consecutive months (e.g. Term 1: Aug, Sep, Oct).` 
-                          : `Monthly Plan: ₹${monthlyRate} due each month.`}
+                        Select unpaid months to settle dues (₹{monthlyRate} per month) and send WhatsApp receipt.
                       </p>
                     </div>
 
                     {unpaidMonths.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5">
-                        {isQuarterly && (
-                          <button
-                            type="button"
-                            onClick={selectNextTerm}
-                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
-                          >
-                            ⚡ Pay Next 3-Month Term (₹{monthlyRate})
-                          </button>
-                        )}
                         <button
                           type="button"
                           onClick={selectAllUnpaid}
                           className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-black rounded-lg font-bold text-xs shadow-xs cursor-pointer"
                         >
-                          Select All ({unpaidMonths.length} Unpaid)
+                          Select All ({unpaidMonths.length} Unpaid = ₹{unpaidMonths.length * monthlyRate})
                         </button>
                         {selectedDuesMonths.length > 0 && (
                           <button
@@ -1528,9 +1682,7 @@ export default function StudentManagement() {
                         return (
                           <div key={idx} className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center text-xs font-bold text-emerald-800 shadow-xs">
                             <span>{m.month}</span>
-                            <span className="block text-[10px] font-black text-emerald-700 mt-0.5">
-                              ✓ Paid {isQuarterly ? '(School Term)' : `(₹${m.rate})`}
-                            </span>
+                            <span className="block text-[10px] font-black text-emerald-700 mt-0.5">✓ Paid (₹{m.rate})</span>
                           </div>
                         );
                       }
@@ -1555,7 +1707,7 @@ export default function StudentManagement() {
                             <span>{m.month}</span>
                           </div>
                           <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'text-black' : 'text-rose-600'}`}>
-                            {isQuarterly ? '❌ Term Due' : `❌ Due: ₹${m.rate}`}
+                            ❌ Due: ₹{m.rate}
                           </span>
                         </div>
                       );
@@ -1568,7 +1720,7 @@ export default function StudentManagement() {
                       <div>
                         <span className="text-[10px] text-gray-300 font-bold uppercase tracking-wider block">Ready to Settle:</span>
                         <span className="font-black text-sm">
-                          {selectedDuesMonths.length} Month(s) Selected • Total: ₹{selectedMonthsCost} {isQuarterly ? '(Term Fee)' : ''}
+                          {selectedDuesMonths.length} Month(s) Selected • Total: ₹{selectedMonthsCost}
                         </span>
                       </div>
 
