@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Award, Shield, Search, Filter, Printer, CheckCircle2, AlertCircle,
   Check, X, RefreshCw, UserCheck, CreditCard, FileText, ExternalLink,
-  Share2, Copy, Send, QrCode
+  Share2, Copy, Send, QrCode, Trash2
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
 import { fetchStudents, saveStoredStudents, openWhatsApp } from '../../services/api';
@@ -424,14 +424,82 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
   const [selectedPrintReg, setSelectedPrintReg] = useState(null);
 
+  // Delete Candidate / Submitted Exam Form Record
+  const handleDeleteSubmission = async (candidate) => {
+    if (!candidate) return;
+    const name = candidate.student_name || candidate.name || 'Candidate';
+    const candId = String(candidate.id || '').trim();
+    const regNo = String(candidate.registration_no || candidate.admission_no || '').trim();
+
+    if (!window.confirm(`⚠️ Are you sure you want to permanently DELETE the submitted exam form for ${name}?`)) {
+      return;
+    }
+
+    try {
+      // 1. Delete from Fly.io server if it has a real DB ID
+      if (candId && !candId.startsWith('cadet-') && !candId.startsWith('temp-')) {
+        await fetch(`${API_ROOT}/grading-registrations/${candId}/`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        }).catch(() => {});
+      }
+
+      // 2. Track deleted ID in persistent tombstone blacklist
+      try {
+        const deleted = JSON.parse(localStorage.getItem('bama_deleted_grading_ids') || '[]');
+        if (candId && !deleted.includes(candId)) deleted.push(candId);
+        if (regNo && !deleted.includes(regNo)) deleted.push(regNo);
+        localStorage.setItem('bama_deleted_grading_ids', JSON.stringify(deleted));
+      } catch (e) {}
+
+      // 3. Remove from state
+      setRegistrations(prev => prev.filter(r => {
+        const rId = String(r.id || '').trim();
+        const rReg = String(r.registration_no || r.admission_no || '').trim();
+        if (candId && (rId === candId || rReg === candId)) return false;
+        if (regNo && (rId === regNo || rReg === regNo)) return false;
+        return true;
+      }));
+
+      // 4. Update local storage cache
+      try {
+        const saved = JSON.parse(localStorage.getItem('bama_grading_registrations') || '[]');
+        const updated = saved.filter(r => {
+          const rId = String(r.id || '').trim();
+          const rReg = String(r.registration_no || r.admission_no || '').trim();
+          if (candId && (rId === candId || rReg === candId)) return false;
+          if (regNo && (rId === regNo || rReg === regNo)) return false;
+          return true;
+        });
+        localStorage.setItem('bama_grading_registrations', JSON.stringify(updated));
+      } catch (e) {}
+
+      if (viewFormCandidate && (viewFormCandidate.id === candidate.id || viewFormCandidate.registration_no === candidate.registration_no)) {
+        setViewFormCandidate(null);
+      }
+
+      alert(`✓ Submitted form for ${name} deleted successfully.`);
+    } catch (err) {
+      console.error('Failed to delete grading submission:', err);
+      setRegistrations(prev => prev.filter(r => r.id !== candidate.id));
+    }
+  };
+
   // Fetch all exam registrations
   const fetchRegistrations = async () => {
     setIsLoading(true);
     try {
+      const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_grading_ids') || '[]');
       const res = await fetch(`${API_ROOT}/grading-registrations/`);
       if (res.ok) {
         const data = await res.json();
-        setRegistrations(Array.isArray(data) ? data : (data.results || []));
+        const rawList = Array.isArray(data) ? data : (data.results || []);
+        const filtered = rawList.filter(r => {
+          const rId = String(r.id || '').trim();
+          const rReg = String(r.registration_no || r.admission_no || '').trim();
+          return !deletedIds.includes(rId) && !deletedIds.includes(rReg);
+        });
+        setRegistrations(filtered);
       }
     } catch (err) {
       console.error('Failed to fetch grading registrations:', err);
@@ -1563,6 +1631,14 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                             <span>PROMOTE</span>
                           </button>
                         )}
+
+                        <button
+                          onClick={() => handleDeleteSubmission(r)}
+                          className="p-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl font-bold text-xs border border-red-200 transition cursor-pointer shadow-2xs"
+                          title="Delete Submitted Exam Form Record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -2025,18 +2101,33 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
               {/* Action Buttons */}
               <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = viewFormCandidate;
-                    setViewFormCandidate(null);
-                    triggerPrintForm(target);
-                  }}
-                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-2 shadow-xs"
-                >
-                  <Printer className="w-4 h-4 text-gray-700" />
-                  <span>🖨️ Print Official Paper Form</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = viewFormCandidate;
+                      handleDeleteSubmission(target);
+                    }}
+                    className="px-3.5 py-2.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white font-bold text-xs rounded-xl border border-red-200 transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    title="Permanently Delete This Submitted Exam Form"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Form</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = viewFormCandidate;
+                      setViewFormCandidate(null);
+                      triggerPrintForm(target);
+                    }}
+                    className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-2 shadow-xs"
+                  >
+                    <Printer className="w-4 h-4 text-gray-700" />
+                    <span>🖨️ Print Form</span>
+                  </button>
+                </div>
 
                 <div className="flex items-center gap-2">
                   <button
