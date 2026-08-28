@@ -139,6 +139,7 @@ export default function StudentManagement() {
   const [editingStudent, setEditingStudent] = useState(null);
   const [deletingStudent, setDeletingStudent] = useState(null);
   const [activeCardStudent, setActiveCardStudent] = useState(null);
+  const [detailStudent, setDetailStudent] = useState(null);
   const [globalFeeSettings, setGlobalFeeSettings] = useState(getGlobalFeeSettings());
   const [showGlobalFeeModal, setShowGlobalFeeModal] = useState(false);
   const [showInquiriesModal, setShowInquiriesModal] = useState(false);
@@ -1162,9 +1163,13 @@ export default function StudentManagement() {
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
               {currentPaginatedStudents.map((std) => (
-                <tr key={std.id} className="hover:bg-gradient-to-r hover:from-red-50/40 hover:to-white transition-all duration-150 group">
+                <tr 
+                  key={std.id} 
+                  onClick={() => setDetailStudent(std)}
+                  className="hover:bg-gradient-to-r hover:from-amber-50/50 hover:to-white transition-all duration-150 group cursor-pointer"
+                >
                   <td className="py-4 px-5">
-                    <span className="font-mono font-black text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-xl inline-block shadow-sm">
+                    <span className="font-mono font-black text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-xl inline-block shadow-sm group-hover:border-red-400">
                       {std.admissionNo || std.admission_no}
                     </span>
                   </td>
@@ -1178,8 +1183,9 @@ export default function StudentManagement() {
                         </div>
                       )}
                       <div className="space-y-0.5">
-                        <strong className="text-gray-900 font-black text-sm block leading-tight group-hover:text-red-600 transition-colors">
-                          {std.name}
+                        <strong className="text-gray-900 font-black text-sm block leading-tight group-hover:text-red-600 transition-colors flex items-center gap-1.5">
+                          <span>{std.name}</span>
+                          <span className="text-[9px] px-1.5 py-0.2 bg-gray-100 text-gray-500 rounded font-normal group-hover:bg-red-100 group-hover:text-red-700">360° Profile</span>
                         </strong>
                         <span className="text-[11px] text-gray-500 font-medium block">
                           Parent: {std.guardianName || std.guardian_name} ({std.phone})
@@ -1210,44 +1216,69 @@ export default function StudentManagement() {
                         ? (parseFloat(globalFeeSettings?.defaultMonthlyFee) || 500) 
                         : rawRate;
 
+                      const admFee = parseFloat(std.admissionFee ?? std.admission_fee ?? 1000);
+                      const admPaid = parseFloat(std.admissionFeePaidAmount ?? std.admission_fee_paid_amount ?? (std.admissionFeePaid ? admFee : 0));
+                      const admPending = (admFee === 0 || std.admissionFeePaid === true || std.admission_fee_paid === true) ? 0 : Math.max(0, admFee - admPaid);
+                      const monthlyPaid = parseFloat(std.initialPaidAmount ?? std.initial_paid_amount ?? 0);
+                      const monthlyPending = Math.max(0, monthlyRate - monthlyPaid);
+                      const totalPending = admPending + monthlyPending;
+
                       return (
-                        <div className="space-y-0.5">
-                          <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300/80 text-[11px] font-black shadow-sm inline-flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                            ₹{monthlyRate} / Month
+                        <div className="space-y-1">
+                          <span className="px-2.5 py-0.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300/80 text-[11px] font-black shadow-xs inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            ₹{monthlyRate}/mo
                           </span>
+                          <div>
+                            {totalPending > 0 ? (
+                              <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black inline-block">
+                                Dues: ₹{totalPending}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold inline-block">
+                                ✓ All Clear
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })()}
                   </td>
                   <td className="py-4 px-5 text-right">
-                    <div className="bg-gray-100/80 p-1 rounded-2xl border border-gray-200/80 inline-flex items-center gap-1 shadow-sm">
+                    <div className="bg-gray-100/80 p-1 rounded-2xl border border-gray-200/80 inline-flex items-center gap-1 shadow-sm" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setDetailStudent(std)}
+                        title="Inspect 360° Cadet Profile & Full Fee Breakdown"
+                        className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl border border-indigo-200 transition shadow-xs cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>360°</span>
+                      </button>
                       <button
                         onClick={() => handleOpenPromoteModal(std)}
                         title="Promote Cadet Belt Rank & Issue Certificate"
-                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl border border-emerald-300/80 transition shadow-sm cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
+                        className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl border border-emerald-300/80 transition shadow-xs cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
                       >
                         <Award className="w-3.5 h-3.5" />
-                        <span>Promote</span>
                       </button>
                       <button
                         onClick={() => setActiveCardStudent(std)}
                         title="View Digital QR Profile Card"
-                        className="p-2 bg-white text-amber-600 hover:bg-amber-500 hover:text-white rounded-xl border border-gray-200 transition shadow-sm cursor-pointer"
+                        className="p-1.5 bg-white text-amber-600 hover:bg-amber-500 hover:text-white rounded-xl border border-gray-200 transition shadow-xs cursor-pointer"
                       >
                         <QrCode className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleOpenEditModal(std)}
                         title="Edit Cadet Details & Photo"
-                        className="p-2 bg-white text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl border border-gray-200 transition shadow-sm cursor-pointer"
+                        className="p-1.5 bg-white text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl border border-gray-200 transition shadow-xs cursor-pointer"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setDeletingStudent(std)}
                         title="Remove Cadet from Academy"
-                        className="p-2 bg-white text-red-600 hover:bg-red-600 hover:text-white rounded-xl border border-gray-200 transition shadow-sm cursor-pointer"
+                        className="p-1.5 bg-white text-red-600 hover:bg-red-600 hover:text-white rounded-xl border border-gray-200 transition shadow-xs cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -2234,6 +2265,289 @@ export default function StudentManagement() {
           </div>
         </div>
       )}
+
+      {/* MODAL: Comprehensive Cadet 360° Profile & Financial Dues Statement (PRO MAX) */}
+      {detailStudent && (() => {
+        const std = detailStudent;
+        const rawMonthlyRate = parseFloat(std.feeAmount ?? std.fee_amount ?? globalFeeSettings?.defaultMonthlyFee ?? 500);
+        const monthlyRate = (isNaN(rawMonthlyRate) || rawMonthlyRate < 100) 
+          ? (parseFloat(globalFeeSettings?.defaultMonthlyFee) || 500) 
+          : rawMonthlyRate;
+
+        const admFee = parseFloat(std.admissionFee ?? std.admission_fee ?? 1000);
+        const admPaid = parseFloat(std.admissionFeePaidAmount ?? std.admission_fee_paid_amount ?? (std.admissionFeePaid ? admFee : 0));
+        const admPending = (admFee === 0 || std.admissionFeePaid === true || std.admission_fee_paid === true) ? 0 : Math.max(0, admFee - admPaid);
+
+        const monthlyPaid = parseFloat(std.initialPaidAmount ?? std.initial_paid_amount ?? 0);
+        const monthlyPending = Math.max(0, monthlyRate - monthlyPaid);
+        const totalPending = admPending + monthlyPending;
+        const totalCollected = admPaid + monthlyPaid;
+
+        const parentName = std.guardianName || std.guardian_name || 'Parent';
+        const contactPhone = std.phone || 'N/A';
+        const cleanPhone = (std.whatsapp || std.phone || '').replace(/[^0-9]/g, '');
+
+        const sendWhatsAppStatement = () => {
+          const text = 
+            `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
+            `📌 *OFFICIAL CADET 360° STATEMENT & FEE SUMMARY*\n` +
+            `Cadet Name: *${std.name}*\n` +
+            `Admission No: *${std.admissionNo || std.admission_no}*\n` +
+            `Rank: *${std.currentBelt || std.current_belt || 'White Belt'}*\n` +
+            `Branch Dojo: *${std.branch_name || std.branch || 'Pulikkal Head Office'}*\n` +
+            `Shift: *${std.shift || 'Evening Batch'}*\n\n` +
+            `📋 *FINANCIAL DUES BREAKDOWN:*\n` +
+            (admFee === 0 
+              ? `• Admission Fee: *🎁 FREE / WAIVED (₹0)*\n` 
+              : `• Admission Fee: *₹${admFee}* (Paid: *₹${admPaid}*, Pending: *₹${admPending}*)\n`) +
+            `• Monthly Tuition Fee: *₹${monthlyRate}* (Paid: *₹${monthlyPaid}*, Pending: *₹${monthlyPending}*)\n` +
+            `-----------------------------------\n` +
+            `💰 *TOTAL OUTSTANDING BALANCE: ₹${totalPending}*\n\n` +
+            (totalPending === 0 
+              ? `✅ All dues are 100% cleared! Thank you. OSS 🥋` 
+              : `Dear Parent (${parentName}), kindly clear the pending dues of ₹${totalPending} at the academy office or via GooglePay to +91 95440 85442. OSS 🥋`);
+
+          openWhatsApp({
+            phone: cleanPhone || contactPhone,
+            message: text
+          });
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border-2 border-amber-500/40 overflow-hidden animate-in fade-in zoom-in duration-200 my-auto max-h-[92vh] flex flex-col">
+              
+              {/* Modal Top Banner */}
+              <div className="bg-gradient-to-r from-gray-950 via-gray-900 to-red-950 p-4 sm:p-5 text-white flex items-center justify-between border-b border-amber-500/40 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 via-amber-600 to-yellow-500 p-0.5 shadow-md flex-shrink-0">
+                    {std.photo ? (
+                      <img src={std.photo} alt={std.name} className="w-full h-full object-cover rounded-[14px]" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-900 rounded-[14px] flex items-center justify-center font-black text-amber-400 text-lg">
+                        {std.name ? std.name.charAt(0).toUpperCase() : 'C'}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-black text-white leading-tight capitalize">{std.name}</h2>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500 text-black text-[10px] font-black uppercase shadow-xs">
+                        🥋 {std.currentBelt || std.current_belt || 'White Belt'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-300 font-mono font-bold mt-0.5 flex items-center gap-2">
+                      <span className="text-amber-400 font-black">{std.admissionNo || std.admission_no}</span>
+                      <span>•</span>
+                      <span className="text-gray-300">{std.branch_name || std.branch || 'Head Office'}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setDetailStudent(null)}
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Scrollable Modal Content */}
+              <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+                
+                {/* 1. FINANCIAL 360° SUMMARY & DUES BANNER */}
+                <div className={`p-4 rounded-2xl border-2 shadow-sm ${
+                  totalPending === 0 
+                    ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900' 
+                    : 'bg-rose-50/90 border-rose-300 text-rose-950'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider block opacity-75">
+                        {totalPending === 0 ? '✓ Financial Account Status' : '⚠️ Outstanding Balance Warning'}
+                      </span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xl sm:text-2xl font-black font-mono">
+                          {totalPending === 0 ? '₹0 (All Clear)' : `₹${totalPending.toLocaleString()} Dues Pending`}
+                        </span>
+                      </div>
+                      <p className="text-[11px] mt-1 opacity-90">
+                        Total Collected: <strong>₹{totalCollected.toLocaleString()}</strong> • Monthly Tuition: <strong>₹{monthlyRate}/mo</strong>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={sendWhatsAppStatement}
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Send WhatsApp Notice</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. ITEMIZED FINANCIAL LEDGER (ADMISSION & MONTHLY FEES) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  
+                  {/* Monthly Tuition Fee Card */}
+                  <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
+                    <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+                      <span className="font-black text-gray-900 text-xs flex items-center gap-1.5">
+                        <CreditCard className="w-4 h-4 text-emerald-600" /> Monthly Tuition Fee
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        monthlyPending === 0 ? 'bg-emerald-100 text-emerald-800' : monthlyPaid > 0 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {monthlyPending === 0 ? 'Paid' : monthlyPaid > 0 ? 'Partial' : 'Pending'}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-[11px] font-bold">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Rate:</span>
+                        <span className="font-mono text-gray-900">₹{monthlyRate} / Month</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Paid So Far:</span>
+                        <span className="font-mono text-emerald-700">₹{monthlyPaid}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-200">
+                        <span>Pending Monthly:</span>
+                        <span className="font-mono font-black text-rose-600">₹{monthlyPending}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* One-Time Admission Fee Card */}
+                  <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2">
+                    <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
+                      <span className="font-black text-gray-900 text-xs flex items-center gap-1.5">
+                        <Award className="w-4 h-4 text-amber-600" /> One-Time Admission Fee
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                        admFee === 0 ? 'bg-emerald-600 text-white' : admPending === 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        {admFee === 0 ? '🎁 Free / Waived' : admPending === 0 ? 'Paid' : 'Pending'}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-[11px] font-bold">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Total Admission:</span>
+                        <span className="font-mono text-gray-900">{admFee === 0 ? '🎁 ₹0 (Waived)' : `₹${admFee}`}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600">
+                        <span>Paid Amount:</span>
+                        <span className="font-mono text-emerald-700">₹{admPaid}</span>
+                      </div>
+                      <div className="flex justify-between text-gray-600 pt-1 border-t border-gray-200">
+                        <span>Pending Admission:</span>
+                        <span className="font-mono font-black text-rose-600">₹{admPending}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. PERSONAL, GUARDIAN & CONTACT DETAILS */}
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200 space-y-2.5">
+                  <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-200 pb-1.5">
+                    <Users className="w-4 h-4 text-blue-600" /> Cadet & Guardian Information
+                  </h4>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Parent / Guardian:</span>
+                        <strong className="text-gray-900 font-black">{std.guardianName || std.guardian_name || 'N/A'}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Relationship:</span>
+                        <span className="text-gray-900 font-bold">{std.relationship || 'Father'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Occupation:</span>
+                        <span className="text-gray-900 font-bold">{std.occupation || std.guardian_occupation || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Contact Phone:</span>
+                        <a href={`tel:${std.phone}`} className="text-emerald-700 font-black font-mono hover:underline flex items-center gap-1">
+                          <Phone className="w-3 h-3" /> {std.phone || 'N/A'}
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Age & Gender:</span>
+                        <span className="text-gray-900 font-black">{std.age || 12} Yrs • {std.gender || 'Male'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Date of Birth:</span>
+                        <span className="text-gray-900 font-mono font-bold">{std.dob || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Blood Group:</span>
+                        <span className="px-2 py-0.5 bg-red-100 text-red-800 rounded font-black text-[10px] inline-block">{std.bloodGroup || std.blood_group || 'O+'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-bold">Shift Batch:</span>
+                        <span className="text-amber-800 font-bold">{std.shift || 'Evening Batch'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Modal Bottom Action Bar */}
+              <div className="bg-gray-100/90 px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetailStudent(null);
+                      handleOpenPromoteModal(std);
+                    }}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  >
+                    <Award className="w-3.5 h-3.5" /> Promote Belt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetailStudent(null);
+                      setActiveCardStudent(std);
+                    }}
+                    className="px-3 py-1.5 bg-white text-amber-700 hover:bg-amber-50 rounded-xl font-bold text-xs border border-gray-200 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5" /> ID Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetailStudent(null);
+                      handleOpenEditModal(std);
+                    }}
+                    className="px-3 py-1.5 bg-white text-blue-700 hover:bg-blue-50 rounded-xl font-bold text-xs border border-gray-200 flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  >
+                    <Edit className="w-3.5 h-3.5" /> Edit Profile
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setDetailStudent(null)}
+                  className="px-4 py-1.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold transition cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL: Official Cadet Digital Profile & ID Card - EXECUTIVE LIGHT WHITE PRO MAX */}
       {activeCardStudent && (
