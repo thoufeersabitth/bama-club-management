@@ -44,8 +44,8 @@ export default function FeeManagement() {
   const getAdmissionPendingAmount = (f) => {
     const std = f.student_detail || {};
     const admFee = parseFloat(std.admissionFee ?? std.admission_fee ?? 1000);
+    if (admFee === 0 || std.admissionFeePaid === true || std.admission_fee_paid === true) return 0;
     const admPaid = parseFloat(std.admissionFeePaidAmount ?? std.admission_fee_paid_amount ?? (std.admissionFeePaid || std.admission_fee_paid ? admFee : 0));
-    if (std.admissionFeePaid === true || std.admission_fee_paid === true) return 0;
     return Math.max(0, admFee - admPaid);
   };
 
@@ -77,9 +77,9 @@ export default function FeeManagement() {
           const pendingAmt = Math.max(0, feeAmt - initialPaid);
           const calculatedStatus = pendingAmt === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
 
-          const admFee = parseInt(s.admissionFee ?? s.admission_fee ?? 1000);
-          const admPaid = parseInt(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? (s.admissionFeePaid || s.admission_fee_paid ? admFee : 0));
-          const admPending = (s.admissionFeePaid === true || s.admission_fee_paid === true) ? 0 : Math.max(0, admFee - admPaid);
+          const admFee = parseInt(s.admissionFee !== undefined ? s.admissionFee : (s.admission_fee !== undefined ? s.admission_fee : 1000));
+          const admPaid = parseInt(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? (admFee === 0 || s.admissionFeePaid || s.admission_fee_paid ? admFee : 0));
+          const admPending = (admFee === 0 || s.admissionFeePaid === true || s.admission_fee_paid === true) ? 0 : Math.max(0, admFee - admPaid);
 
           return {
             id: `fee-${s.id || s.admissionNo || s.admission_no}`,

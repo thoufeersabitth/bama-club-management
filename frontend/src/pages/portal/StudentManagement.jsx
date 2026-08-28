@@ -409,7 +409,7 @@ export default function StudentManagement() {
     }
 
     const finalPhoto = addPhotoState.rawSrc ? getCanvasDataUrl(addCanvasRef, formData.photo) : formData.photo;
-    const admissionFeeAmt = parseInt(formData.admissionFee) || 1000;
+    const admissionFeeAmt = formData.admissionFee !== undefined && formData.admissionFee !== '' ? Math.max(0, parseInt(formData.admissionFee) || 0) : 1000;
     const admissionFeePaidAmt = parseInt(formData.admissionFeePaidAmount) || 0;
     const monthlyFeeAmt = parseInt(formData.feeAmount) || 500;
     const monthlyFeePaidAmt = parseInt(formData.initialPaidAmount) || 0;
@@ -417,7 +417,7 @@ export default function StudentManagement() {
     const totalRequired = admissionFeeAmt + monthlyFeeAmt;
     const totalCollectedNow = admissionFeePaidAmt + monthlyFeePaidAmt;
     const totalPendingDues = Math.max(0, totalRequired - totalCollectedNow);
-    const isAdmissionPaid = admissionFeePaidAmt >= admissionFeeAmt;
+    const isAdmissionPaid = admissionFeeAmt === 0 || admissionFeePaidAmt >= admissionFeeAmt;
     const calculatedFeeStatus = totalPendingDues === 0 ? 'Paid' : totalCollectedNow > 0 ? 'Partial' : 'Pending';
 
     const admNoGenerated = `BAMA-2026-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -741,8 +741,8 @@ export default function StudentManagement() {
     const finalPhoto = editPhotoState.rawSrc ? getCanvasDataUrl(editCanvasRef, editingStudent.photo) : editingStudent.photo;
     const initialPaid = parseInt(editingStudent.initialPaidAmount || editingStudent.initial_paid_amount || 0);
     const feeAmt = parseInt(editingStudent.feeAmount || editingStudent.fee_amount || 500);
-    const admissionFeeAmt = parseInt(editingStudent.admissionFee || editingStudent.admission_fee || 1000);
-    const isAdmissionPaid = !!(editingStudent.admissionFeePaid ?? editingStudent.admission_fee_paid ?? true);
+    const admissionFeeAmt = editingStudent.admissionFee !== undefined ? Math.max(0, parseInt(editingStudent.admissionFee) || 0) : (editingStudent.admission_fee !== undefined ? Math.max(0, parseInt(editingStudent.admission_fee) || 0) : 1000);
+    const isAdmissionPaid = admissionFeeAmt === 0 || !!(editingStudent.admissionFeePaid ?? editingStudent.admission_fee_paid ?? true);
     const pending = Math.max(0, feeAmt - initialPaid);
     const calculatedFeeStatus = pending === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
 
@@ -917,7 +917,7 @@ export default function StudentManagement() {
     const isInactive = s.status === 'Inactive';
     const totalAdmFee = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
     const paidAdmFee = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0);
-    const isAdmissionFeePending = s.admissionFeePaid === false || s.admission_fee_paid === false || paidAdmFee < totalAdmFee;
+    const isAdmissionFeePending = totalAdmFee > 0 && (s.admissionFeePaid === false || s.admission_fee_paid === false || paidAdmFee < totalAdmFee);
     let matchesTab = true;
     if (selectedTab === 'Active') matchesTab = !isInactive;
     if (selectedTab === 'Inactive') matchesTab = isInactive;
@@ -1645,8 +1645,17 @@ export default function StudentManagement() {
                   <div>
                     <label className="text-amber-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
                       <Award className="w-4 h-4 text-amber-600" /> One-Time Admission Fee (Total: ₹{formData.admissionFee}) *
+                      {formData.admissionFee === 0 && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider ml-1">
+                          🎁 FREE / WAIVED
+                        </span>
+                      )}
                     </label>
-                    <p className="text-[10px] text-amber-700/80">Enter exact admission fee collected from parent now.</p>
+                    <p className="text-[10px] text-amber-700/80">
+                      {formData.admissionFee === 0 
+                        ? 'Admission Fee is waived (₹0 Free). Cadet will not have admission fee pending dues.' 
+                        : 'Enter exact admission fee collected from parent now.'}
+                    </p>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -1657,13 +1666,14 @@ export default function StudentManagement() {
                         disabled={isInstructor}
                         value={formData.admissionFee}
                         onChange={(e) => {
-                          const total = parseInt(e.target.value) || 0;
+                          const val = e.target.value;
+                          const total = val === '' ? '' : Math.max(0, parseInt(val) || 0);
                           const prevTotal = formData.admissionFee;
                           const wasFullPaid = formData.admissionFeePaidAmount === prevTotal || formData.admissionFeePaidAmount === 0;
                           setFormData({
                             ...formData,
                             admissionFee: total,
-                            admissionFeePaidAmount: wasFullPaid && formData.admissionFeePaidAmount !== 0 ? total : (formData.admissionFeePaidAmount > total ? total : formData.admissionFeePaidAmount)
+                            admissionFeePaidAmount: total === 0 ? 0 : (wasFullPaid && formData.admissionFeePaidAmount !== 0 ? total : (formData.admissionFeePaidAmount > total ? total : formData.admissionFeePaidAmount))
                           });
                         }}
                         className={`w-24 bg-white border border-amber-300 rounded-xl px-2.5 py-1.5 text-amber-900 font-black text-xs font-mono text-right focus:outline-none focus:border-amber-500 ${isInstructor ? 'opacity-70 cursor-not-allowed bg-amber-50/50' : ''}`}
@@ -1674,9 +1684,10 @@ export default function StudentManagement() {
                       <span className="text-[10px] text-emerald-700 font-bold">Amount Paid Now:</span>
                       <input
                         type="number"
-                        value={formData.admissionFeePaidAmount}
+                        disabled={formData.admissionFee === 0}
+                        value={formData.admissionFee === 0 ? 0 : formData.admissionFeePaidAmount}
                         onChange={(e) => setFormData({ ...formData, admissionFeePaidAmount: parseInt(e.target.value) || 0 })}
-                        className="w-28 bg-white border-2 border-emerald-500 rounded-xl px-2.5 py-1.5 text-emerald-700 font-black text-sm font-mono text-right focus:outline-none focus:border-emerald-600 shadow-sm"
+                        className={`w-28 bg-white border-2 border-emerald-500 rounded-xl px-2.5 py-1.5 text-emerald-700 font-black text-sm font-mono text-right focus:outline-none focus:border-emerald-600 shadow-sm ${formData.admissionFee === 0 ? 'opacity-60 cursor-not-allowed bg-gray-100' : ''}`}
                       />
                     </div>
                   </div>
@@ -1684,41 +1695,62 @@ export default function StudentManagement() {
 
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-200/60">
                   <span className="text-[10px] text-gray-600 font-bold">Quick Presets:</span>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, admissionFeePaidAmount: formData.admissionFee })}
+                      onClick={() => setFormData({ ...formData, admissionFee: 0, admissionFeePaidAmount: 0 })}
+                      className={`px-3 py-1 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1 ${
+                        formData.admissionFee === 0
+                          ? 'bg-emerald-700 text-white shadow ring-2 ring-emerald-500'
+                          : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300'
+                      }`}
+                    >
+                      🎁 Free / Waived (₹0)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const baseTotal = formData.admissionFee === 0 ? 1000 : formData.admissionFee;
+                        setFormData({ ...formData, admissionFee: baseTotal, admissionFeePaidAmount: baseTotal });
+                      }}
                       className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        formData.admissionFeePaidAmount === formData.admissionFee
+                        formData.admissionFee > 0 && formData.admissionFeePaidAmount === formData.admissionFee
                           ? 'bg-emerald-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
                     >
-                      ✓ Full Paid (₹{formData.admissionFee})
+                      ✓ Full Paid (₹{formData.admissionFee === 0 ? 1000 : formData.admissionFee})
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, admissionFeePaidAmount: Math.floor(formData.admissionFee / 2) })}
+                      onClick={() => {
+                        const baseTotal = formData.admissionFee === 0 ? 1000 : formData.admissionFee;
+                        setFormData({ ...formData, admissionFee: baseTotal, admissionFeePaidAmount: Math.floor(baseTotal / 2) });
+                      }}
                       className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        formData.admissionFeePaidAmount === Math.floor(formData.admissionFee / 2)
+                        formData.admissionFee > 0 && formData.admissionFeePaidAmount === Math.floor(formData.admissionFee / 2)
                           ? 'bg-amber-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
                     >
-                      Half Paid (₹{Math.floor(formData.admissionFee / 2)})
+                      Half Paid (₹{Math.floor((formData.admissionFee === 0 ? 1000 : formData.admissionFee) / 2)})
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, admissionFeePaidAmount: 0 })}
+                      onClick={() => {
+                        const baseTotal = formData.admissionFee === 0 ? 1000 : formData.admissionFee;
+                        setFormData({ ...formData, admissionFee: baseTotal, admissionFeePaidAmount: 0 });
+                      }}
                       className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                        formData.admissionFeePaidAmount === 0
+                        formData.admissionFee > 0 && formData.admissionFeePaidAmount === 0
                           ? 'bg-red-100 text-red-700 border border-red-300 shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
                     >
-                      ❌ ₹0 (Pending)
+                      ❌ ₹0 (Pending ₹{formData.admissionFee === 0 ? 1000 : formData.admissionFee})
                     </button>
                   </div>
                 </div>
