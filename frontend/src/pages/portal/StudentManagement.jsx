@@ -1830,13 +1830,6 @@ export default function StudentManagement() {
                         <span>360°</span>
                       </button>
                       <button
-                        onClick={() => handleOpenPromoteModal(std)}
-                        title="Promote Cadet Belt Rank & Issue Certificate"
-                        className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl border border-emerald-300/80 transition shadow-xs cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
-                      >
-                        <Award className="w-3.5 h-3.5" />
-                      </button>
-                      <button
                         onClick={() => setActiveCardStudent(std)}
                         title="View Digital QR Profile Card"
                         className="p-1.5 bg-white text-amber-600 hover:bg-amber-500 hover:text-white rounded-xl border border-gray-200 transition shadow-xs cursor-pointer"
