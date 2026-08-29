@@ -45,3 +45,14 @@ class Testimonial(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.role}"
+
+class GlobalCmsConfig(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    data = models.JSONField(default=dict)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f"Global CMS Configuration (Updated: {self.updated_at})"

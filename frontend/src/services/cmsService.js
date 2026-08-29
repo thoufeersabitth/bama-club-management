@@ -4,8 +4,8 @@ const LOCAL_STORAGE_KEY = 'bama_cms_config';
 
 export const getCmsConfig = async () => {
   try {
-    const response = await api.get('/cms-config/');
-    if (response.data && Object.keys(response.data).length > 0) {
+    const response = await api.get(`/cms-config/?_t=${Date.now()}`);
+    if (response.data && typeof response.data === 'object' && Object.keys(response.data).length > 0) {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(response.data));
       return response.data;
     }
@@ -28,7 +28,10 @@ export const saveCmsConfig = async (config) => {
   } catch (e) {}
 
   try {
-    await api.post('/cms-config/', config);
+    const res = await api.post('/cms-config/', config);
+    if (res.data && res.data.data) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.data.data));
+    }
     window.dispatchEvent(new Event('cms_updated'));
   } catch (err) {
     console.warn('Backend CMS save error:', err);
