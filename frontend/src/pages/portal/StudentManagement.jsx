@@ -591,63 +591,66 @@ export default function StudentManagement() {
     const newMonthly = parseInt(globalFeeSettings.defaultMonthlyFee) || 500;
     const newSchoolBatch = parseInt(globalFeeSettings.defaultSchoolBatchFee) || 1200;
     const newAdmission = parseInt(globalFeeSettings.defaultAdmissionFee) || 1000;
+    const shouldUpdateExisting = globalFeeSettings.updateExistingStudents ?? true;
 
-    const currentStudents = students.length > 0 ? students : getStoredStudents();
+    if (shouldUpdateExisting) {
+      const currentStudents = students.length > 0 ? students : getStoredStudents();
 
-    // AUTOMATIC SMART SYNC: 
-    // Regular students automatically get the Regular Monthly rate
-    // School batch students automatically get the School Batch rate
-    const updatedRoster = currentStudents.map(s => {
-      const isSchool = (
-        s.feeFrequency === 'QUARTERLY' || 
-        s.billingPlan === 'SCHOOL_BATCH' || 
-        s.billing_plan === 'SCHOOL_BATCH' || 
-        (s.shift && s.shift.toLowerCase().includes('school'))
-      );
+      // AUTOMATIC SMART SYNC: 
+      // Regular students automatically get the Regular Monthly rate
+      // School batch students automatically get the School Batch rate
+      const updatedRoster = currentStudents.map(s => {
+        const isSchool = (
+          s.feeFrequency === 'QUARTERLY' || 
+          s.billingPlan === 'SCHOOL_BATCH' || 
+          s.billing_plan === 'SCHOOL_BATCH' || 
+          (s.shift && s.shift.toLowerCase().includes('school'))
+        );
 
-      const applicableRate = isSchool ? newSchoolBatch : newMonthly;
-      const currentPaid = parseInt(s.initialPaidAmount || s.initial_paid_amount || 0);
-      const newPending = Math.max(0, applicableRate - currentPaid);
-      const newFeeStatus = newPending === 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : 'Pending';
+        const applicableRate = isSchool ? newSchoolBatch : newMonthly;
+        const currentPaid = parseInt(s.initialPaidAmount || s.initial_paid_amount || 0);
+        const newPending = Math.max(0, applicableRate - currentPaid);
+        const newFeeStatus = newPending === 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : 'Pending';
 
-      const updatedObj = {
-        ...s,
-        feeAmount: applicableRate,
-        fee_amount: applicableRate,
-        monthlyFee: applicableRate,
-        monthly_fee: applicableRate,
-        admissionFee: newAdmission,
-        admission_fee: newAdmission,
-        pendingAmount: newPending,
-        pending_amount: newPending,
-        feeStatus: newFeeStatus,
-        fee_status: newFeeStatus
-      };
-
-      if (s.id) {
-        updateStudent(s.id, {
-          fee_amount: applicableRate,
+        const updatedObj = {
+          ...s,
           feeAmount: applicableRate,
-          admission_fee: newAdmission,
+          fee_amount: applicableRate,
+          monthlyFee: applicableRate,
+          monthly_fee: applicableRate,
           admissionFee: newAdmission,
-          pending_amount: newPending,
+          admission_fee: newAdmission,
           pendingAmount: newPending,
-          fee_status: newFeeStatus,
-          feeStatus: newFeeStatus
-        }).catch(() => {});
-      }
+          pending_amount: newPending,
+          feeStatus: newFeeStatus,
+          fee_status: newFeeStatus
+        };
 
-      return updatedObj;
-    });
+        if (s.id) {
+          updateStudent(s.id, {
+            fee_amount: applicableRate,
+            feeAmount: applicableRate,
+            admission_fee: newAdmission,
+            admissionFee: newAdmission,
+            pending_amount: newPending,
+            pendingAmount: newPending,
+            fee_status: newFeeStatus,
+            feeStatus: newFeeStatus
+          }).catch(() => {});
+        }
 
-    setStudents(updatedRoster);
-    saveStoredStudents(updatedRoster);
+        return updatedObj;
+      });
+
+      setStudents(updatedRoster);
+      saveStoredStudents(updatedRoster);
+    }
 
     window.dispatchEvent(new Event('bama_fee_settings_updated'));
     window.dispatchEvent(new Event('bama_data_updated'));
 
     setShowGlobalFeeModal(false);
-    alert(`✅ Global Academy Fees successfully updated & synced!\n\n📅 Effective From: ${globalFeeSettings.effectiveMonth || 'September 2026'}\n🥋 Regular Dojo: ₹${newMonthly} / Month\n🏫 School Batch: ₹${newSchoolBatch} / 3 Months\n🎁 Admission Fee: ₹${newAdmission}`);
+    alert(`✅ Global Academy Fees successfully updated & synced!\n\n📅 Effective From: ${globalFeeSettings.effectiveMonth || 'September 2026'}\n🥋 Regular Dojo: ₹${newMonthly} / Month\n🏫 School Batch: ₹${newSchoolBatch} / 3 Months\n🎁 Admission Fee: ₹${newAdmission}\n${shouldUpdateExisting ? '👥 Applied to active cadets' : '🌟 Reserved for future new admissions'}`);
   };
 
   const STANDARD_BELT_RANKS = [
@@ -3840,7 +3843,7 @@ export default function StudentManagement() {
               </div>
 
               {/* Effective Month & Scope Configuration */}
-              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 shadow-xs">
+              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2.5 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                   <label className="text-blue-950 font-black text-xs flex items-center gap-1 uppercase tracking-wider">
                     <Calendar className="w-3.5 h-3.5 text-blue-600" /> Effective Month *
@@ -3860,6 +3863,20 @@ export default function StudentManagement() {
                     <option value="December 2026">December 2026</option>
                     <option value="January 2027">January 2027</option>
                   </select>
+                </div>
+
+                {/* Tick box to confirm applying from this month */}
+                <div className="flex items-center gap-2 pt-1 border-t border-blue-200/70">
+                  <input
+                    type="checkbox"
+                    id="updateExistingCadetsCheckbox"
+                    checked={globalFeeSettings.updateExistingStudents ?? true}
+                    onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, updateExistingStudents: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer accent-blue-600"
+                  />
+                  <label htmlFor="updateExistingCadetsCheckbox" className="text-[11px] text-blue-950 font-bold cursor-pointer select-none">
+                    ഈ മാസം ({globalFeeSettings.effectiveMonth || 'September'} {globalFeeSettings.effectiveYear || 2026}) മുതൽ നിലവിലുള്ള എല്ലാ കുട്ടികൾക്കും ഫീസ് മാറ്റം ബാധകമാക്കുക (Tick to apply)
+                  </label>
                 </div>
               </div>
             </div>
