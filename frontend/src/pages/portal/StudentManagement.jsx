@@ -647,7 +647,7 @@ export default function StudentManagement() {
     window.dispatchEvent(new Event('bama_data_updated'));
 
     setShowGlobalFeeModal(false);
-    alert(`✅ Global Academy Fees successfully updated & synced!\n\n• Regular Dojo: ₹${newMonthly}/Month\n• School Batch: ₹${newSchoolBatch}/3 Months\n• Admission Fee: ₹${newAdmission}`);
+    alert(`✅ Global Academy Fees successfully updated & synced!\n\n📅 Effective From: ${globalFeeSettings.effectiveMonth || 'September 2026'}\n🥋 Regular Dojo: ₹${newMonthly} / Month\n🏫 School Batch: ₹${newSchoolBatch} / 3 Months\n🎁 Admission Fee: ₹${newAdmission}`);
   };
 
   const STANDARD_BELT_RANKS = [
