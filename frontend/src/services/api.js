@@ -847,6 +847,116 @@ export const updateBranchBackend = async (id, branchData) => {
   }
 };
 
+export const fetchTrainingSchedules = async () => {
+  const branches = await fetchBranches();
+  
+  // Base default schedules for branches
+  const defaultSchedules = [
+    {
+      id: 'shift-101',
+      name: 'Evening Regular Karate Batch',
+      branch: 'Pulikkal Branch (Head Office)',
+      days: 'Mon, Wed, Fri',
+      time: '5:00 PM - 7:00 PM',
+      instructor: 'Sensei Abdul Rahman (5th Dan)',
+      targetGroup: 'All Belts & Cadets',
+      status: 'Active'
+    },
+    {
+      id: 'shift-102',
+      name: 'Morning Fitness & Kata Batch',
+      branch: 'Pulikkal Branch (Head Office)',
+      days: 'Mon, Wed, Fri',
+      time: '6:00 AM - 7:30 AM',
+      instructor: 'Sensei Rahul Kumar (3rd Dan)',
+      targetGroup: 'Adults & Senior Cadets',
+      status: 'Active'
+    },
+    {
+      id: 'shift-103',
+      name: 'Weekend Intensive Sparring & Belt Camp',
+      branch: 'Pulikkal Branch (Head Office)',
+      days: 'Sat & Sun',
+      time: '7:00 AM - 9:00 AM',
+      instructor: 'Sensei Abdul Rahman (5th Dan)',
+      targetGroup: 'Green Belt & Above',
+      status: 'Active'
+    },
+    {
+      id: 'shift-104',
+      name: 'Chungam Evening Karate & Kickboxing',
+      branch: 'Chungam Branch Dojo',
+      days: 'Tue, Thu, Sat',
+      time: '5:30 PM - 7:30 PM',
+      instructor: 'Sensei Muhammad Shafi (3rd Dan)',
+      targetGroup: 'Kids & Beginners',
+      status: 'Active'
+    },
+    {
+      id: 'shift-105',
+      name: 'Mongam Dawn Kickboxing Batch',
+      branch: 'Mongam Branch Dojo',
+      days: 'Mon, Wed, Fri',
+      time: '6:00 AM - 7:30 AM',
+      instructor: 'Sensei Muhammed Haneen (2nd Dan)',
+      targetGroup: 'All Cadets',
+      status: 'Active'
+    },
+    {
+      id: 'shift-106',
+      name: 'Feroke Weekend Karate Camp',
+      branch: 'Feroke Branch',
+      days: 'Sat & Sun',
+      time: '7:00 AM - 9:30 AM & 4:00 PM - 6:00 PM',
+      instructor: 'Sensei Rajesh Kumar (4th Dan)',
+      targetGroup: 'All Belts & Cadets',
+      status: 'Active'
+    }
+  ];
+
+  const scheduleMap = new Map();
+  defaultSchedules.forEach(s => scheduleMap.set(String(s.name + s.branch).toLowerCase().trim(), s));
+
+  // Merge custom branches
+  branches.forEach(b => {
+    const bName = b.name || 'Dojo Branch';
+    const key = String(`General Training Batch - ${bName}`).toLowerCase().trim();
+    if (!scheduleMap.has(key)) {
+      scheduleMap.set(key, {
+        id: `shift-branch-${b.id || Date.now()}`,
+        name: `General Training Batch (${bName})`,
+        branch: bName,
+        days: 'Mon, Wed, Fri',
+        time: b.timings || '5:00 PM - 7:00 PM',
+        instructor: b.branch_head || 'Head Sensei',
+        targetGroup: 'All Belts & Cadets',
+        status: 'Active'
+      });
+    }
+  });
+
+  // Check localStorage for any user-created shifts
+  try {
+    const stored = localStorage.getItem('bama_training_schedules');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed.forEach(s => {
+          const key = String(s.name + (s.branch || '')).toLowerCase().trim();
+          if (key) scheduleMap.set(key, s);
+        });
+      }
+    }
+  } catch (e) {}
+
+  const finalSchedules = Array.from(scheduleMap.values());
+  try {
+    localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
+  } catch (e) {}
+
+  return finalSchedules;
+};
+
 export const deleteBranchBackend = async (id) => {
   try {
     if (typeof id === 'string' && id.length > 20) {

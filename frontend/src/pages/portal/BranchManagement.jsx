@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, openWhatsApp } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
 
 const INITIAL_TRAINING_SCHEDULES = [
@@ -162,6 +162,12 @@ export default function BranchManagement() {
       }
     });
 
+    fetchTrainingSchedules().then(schs => {
+      if (schs && schs.length > 0) {
+        setSchedules(schs);
+      }
+    });
+
     fetchStudents().then(stds => setStudentsList(stds || []));
   }, []);
 
@@ -244,6 +250,8 @@ export default function BranchManagement() {
     }
     setSchedules(updated);
     localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
+    window.dispatchEvent(new Event('bama_schedules_updated'));
+    window.dispatchEvent(new Event('bama_data_updated'));
     setShowShiftModal(false);
     setEditShift(null);
   };
@@ -297,6 +305,8 @@ export default function BranchManagement() {
       const updated = schedules.filter(s => s.id !== id);
       setSchedules(updated);
       localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
+      window.dispatchEvent(new Event('bama_schedules_updated'));
+      window.dispatchEvent(new Event('bama_data_updated'));
     }
   };
 

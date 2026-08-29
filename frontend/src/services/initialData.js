@@ -31,15 +31,19 @@ export const SHIFT_OPTIONS = [
 ];
 
 // Helper to resolve active training shift schedules dynamically from Branch Management storage
-export const getDynamicShiftOptions = () => {
+export const getDynamicShiftOptions = (branchFilter = null) => {
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map(s => `${s.name} (${s.time})`);
-      } else if (Array.isArray(parsed) && parsed.length === 0) {
-        return ['General Training Batch (Regular)'];
+        let list = parsed;
+        if (branchFilter && branchFilter !== 'All') {
+          const bLow = branchFilter.toLowerCase().trim();
+          const filtered = parsed.filter(s => String(s.branch || '').toLowerCase().includes(bLow) || bLow.includes(String(s.branch || '').toLowerCase()));
+          if (filtered.length > 0) list = filtered;
+        }
+        return list.map(s => `${s.name} (${s.time})`);
       }
     }
   } catch (e) {}
