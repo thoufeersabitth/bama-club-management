@@ -2,15 +2,21 @@ import api from './api';
 
 const LOCAL_STORAGE_KEY = 'bama_cms_config';
 
-export const getCmsConfig = async () => {
-  try {
-    const response = await api.get(`/cms-config/?_t=${Date.now()}`);
-    if (response.data && typeof response.data === 'object' && Object.keys(response.data).length > 0) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(response.data));
-      return response.data;
+export const getCmsConfig = async (retries = 2) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await api.get(`/cms-config/?_t=${Date.now()}`, { timeout: 10000 });
+      if (response.data && typeof response.data === 'object' && Object.keys(response.data).length > 0) {
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(response.data));
+        } catch (e) {}
+        return response.data;
+      }
+    } catch (err) {
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
     }
-  } catch (err) {
-    console.warn('Backend CMS fetch fallback to localStorage:', err);
   }
 
   try {
@@ -28,9 +34,11 @@ export const saveCmsConfig = async (config) => {
   } catch (e) {}
 
   try {
-    const res = await api.post('/cms-config/', config);
+    const res = await api.post('/cms-config/', config, { timeout: 20000 });
     if (res.data && res.data.data) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.data.data));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.data.data));
+      } catch (e) {}
     }
     window.dispatchEvent(new Event('cms_updated'));
   } catch (err) {
