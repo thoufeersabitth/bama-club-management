@@ -275,7 +275,8 @@ export default function CMSManagement() {
       window.dispatchEvent(new Event('bama_data_updated'));
       window.dispatchEvent(new Event('cms_updated'));
       setSaveNotification(true);
-      setTimeout(() => setSaveNotification(false), 3000);
+      setTimeout(() => setSaveNotification(false), 4000);
+      alert('✅ SUCCESS!\n\nAll live website changes (Hero, Gallery, Courses, Branches, Stats) have been successfully published to the cloud database!\n\nAll mobile phones and computers will now see your updates immediately.');
     } catch (err) {
       alert('Error saving CMS configuration.');
     }
