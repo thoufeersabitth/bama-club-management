@@ -601,8 +601,8 @@ export const updateStudent = async (id, data) => {
       (data.admissionNo && (String(s.admissionNo).trim() === String(data.admissionNo).trim() || String(s.admission_no).trim() === String(data.admissionNo).trim()));
   };
 
-  const updatedFeeAmount = parseInt(data.fee_amount ?? data.feeAmount) || 500;
-  const updatedAdmissionFee = parseInt(data.admission_fee ?? data.admissionFee) || 1000;
+  const updatedFeeAmount = data.fee_amount !== undefined ? Math.max(0, parseInt(data.fee_amount) || 0) : (data.feeAmount !== undefined ? Math.max(0, parseInt(data.feeAmount) || 0) : 500);
+  const updatedAdmissionFee = data.admission_fee !== undefined ? Math.max(0, parseInt(data.admission_fee) || 0) : (data.admissionFee !== undefined ? Math.max(0, parseInt(data.admissionFee) || 0) : 1000);
 
   const payload = {
     ...data,

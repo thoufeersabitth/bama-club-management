@@ -163,7 +163,9 @@ export default function FeeManagement() {
 
     if (paymentType === 'ADMISSION') {
       // Record Admission Fee Payment
-      const admTotal = parseFloat(paymentModalFee.student_detail?.admissionFee || 1000);
+      const admTotal = paymentModalFee.student_detail?.admissionFee !== undefined 
+        ? parseFloat(paymentModalFee.student_detail?.admissionFee) 
+        : (paymentModalFee.student_detail?.admission_fee !== undefined ? parseFloat(paymentModalFee.student_detail?.admission_fee) : 1000);
       const currentAdmPaid = parseFloat(paymentModalFee.student_detail?.admissionFeePaidAmount || 0);
       const newAdmPaid = currentAdmPaid + paidVal;
       const newAdmPending = Math.max(0, admTotal - newAdmPaid);
