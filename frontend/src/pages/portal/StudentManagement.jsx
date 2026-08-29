@@ -691,6 +691,8 @@ export default function StudentManagement() {
 
       setStudents(updatedList);
       saveStoredStudents(updatedList);
+      window.dispatchEvent(new Event('bama_data_updated'));
+      window.dispatchEvent(new Event('bama_cadets_updated'));
 
       setDetailStudent(prev => {
         if (prev && (prev.id === promoteModalStudent.id || prev.admissionNo === promoteModalStudent.admissionNo || prev.admission_no === promoteModalStudent.admission_no)) {

@@ -96,8 +96,24 @@ export const getFeeForBelt = (beltName) => {
   if (targetLower.includes('brown-2') || targetLower.includes('2nd kyu')) return Number(currentMap['Brown Belt (2nd Kyu)'] ?? 1000);
   if (targetLower.includes('brown-3') || targetLower.includes('3rd kyu')) return Number(currentMap['Brown Belt (3rd Kyu)'] ?? 1000);
   if (targetLower.includes('brown')) return Number(currentMap['Brown Belt (4th Kyu)'] ?? 1000);
-  if (targetLower.includes('black') || targetLower.includes('dan')) return Number(currentMap['Black Belt (1st Dan)'] ?? 1500);
   return 500;
+};
+
+export const getNextTargetBelt = (currentBelt) => {
+  if (!currentBelt) return 'Yellow Belt';
+  const c = String(currentBelt).toLowerCase().trim();
+  if (c.includes('white')) return 'Yellow Belt';
+  if (c.includes('yellow')) return 'Orange Belt';
+  if (c.includes('orange')) return 'Green Belt';
+  if (c.includes('green')) return 'Blue Belt';
+  if (c.includes('blue')) return 'Purple Belt';
+  if (c.includes('purple')) return 'Brown Belt (4th Kyu)';
+  if (c.includes('brown-4') || c.includes('4th kyu')) return 'Brown Belt (3rd Kyu)';
+  if (c.includes('brown-3') || c.includes('3rd kyu')) return 'Brown Belt (2nd Kyu)';
+  if (c.includes('brown-2') || c.includes('2nd kyu')) return 'Brown Belt (1st Kyu)';
+  if (c.includes('brown-1') || c.includes('1st kyu') || c.includes('brown')) return 'Black Belt (1st Dan)';
+  if (c.includes('black') || c.includes('dan')) return '2nd Dan Candidate';
+  return 'Yellow Belt';
 };
 
 export default function OfficeGrading({ hideDuplicateHeader = false }) {
@@ -515,7 +531,13 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     };
     loadStudents();
     window.addEventListener('bama_data_updated', loadStudents);
-    return () => window.removeEventListener('bama_data_updated', loadStudents);
+    window.addEventListener('bama_cadets_updated', loadStudents);
+    window.addEventListener('storage', loadStudents);
+    return () => {
+      window.removeEventListener('bama_data_updated', loadStudents);
+      window.removeEventListener('bama_cadets_updated', loadStudents);
+      window.removeEventListener('storage', loadStudents);
+    };
   }, []);
 
   // Combined Candidates Roster (Registered Candidates + Academy Eligible Cadets)
@@ -525,10 +547,6 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     const feeOverrides = getStoredFeeOverrides();
 
     const list = safeRegistrations.map(r => {
-      const calculatedFee = getExamFeeForCandidate(r);
-      const customFee = feeOverrides[r.id] !== undefined ? feeOverrides[r.id] : r.custom_exam_fee;
-      const customPayment = paymentOverrides[r.id] || r.payment_status;
-
       const candidateStudent = (students || []).find(st =>
         (r.student && String(st.id) === String(r.student)) ||
         (r.student_db_id && String(st.id) === String(r.student_db_id)) ||
@@ -536,10 +554,32 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         (r.registration_no && String(st.admissionNo || st.admission_no) === String(r.registration_no)) ||
         (r.student_name && String(st.name || '').toLowerCase().trim() === String(r.student_name || '').toLowerCase().trim())
       );
+
+      // LIVE REAL-TIME BELT SYNC: Always prioritize student's current belt from academy database!
+      const liveCurrentBelt = candidateStudent?.currentBelt || candidateStudent?.current_belt || r.current_belt || 'White Belt';
+      const liveTargetBelt = getNextTargetBelt(liveCurrentBelt);
+      
+      const targetLower = liveTargetBelt.toLowerCase();
+      let dynamicFormType = r.form_type;
+      if (['black', 'dan', 'shodan', 'nidan', 'sandan'].some(t => targetLower.includes(t))) {
+        dynamicFormType = 'JAPAN_DIRECT_BLACK_BELT';
+      } else if (['brown-3', 'brown 3', 'brown-2', 'brown 2', 'brown-1', 'brown 1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => targetLower.includes(t))) {
+        dynamicFormType = 'JKK_BROWN';
+      } else {
+        dynamicFormType = 'JKK_WHITE_TO_BROWN_4';
+      }
+
+      const calculatedFee = getExamFeeForCandidate({ ...r, target_belt: liveTargetBelt, form_type: dynamicFormType });
+      const customFee = feeOverrides[r.id] !== undefined ? feeOverrides[r.id] : (r.custom_exam_fee !== undefined ? r.custom_exam_fee : calculatedFee);
+      const customPayment = paymentOverrides[r.id] || r.payment_status;
+
       const candPhoto = r.photo || r.photoUrl || r.avatar || r.profile_photo || r.image || r.img || candidateStudent?.photo || candidateStudent?.avatar || candidateStudent?.photoUrl || candidateStudent?.profile_photo || candidateStudent?.image || candidateStudent?.img;
 
       return {
         ...r,
+        current_belt: liveCurrentBelt,
+        target_belt: liveTargetBelt,
+        form_type: dynamicFormType,
         photo: candPhoto,
         payment_status: customPayment || 'Pending',
         exam_fee: customFee !== undefined ? customFee : (r.exam_fee && r.exam_fee !== 1000 ? r.exam_fee : calculatedFee),
