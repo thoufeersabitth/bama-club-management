@@ -8,11 +8,23 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { INITIAL_BRANCHES } from '../services/initialData';
 import { fetchBranches } from '../services/api';
+import BamaPageLoader from '../components/common/BamaPageLoader';
 
 export default function AdminLayout({ children }) {
   const { user, logout, activeBranch, setActiveBranch, hasPermission } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    setIsPageLoading(true);
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
   const [branchesList, setBranchesList] = useState(() => {
     try {
       const saved = localStorage.getItem('bama_custom_branches');
@@ -62,8 +74,6 @@ export default function AdminLayout({ children }) {
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
-  const location = useLocation();
-  const navigate = useNavigate();
 
   const menuItems = [
     { label: 'Dashboard', path: '/portal', icon: LayoutDashboard, moduleKey: 'dashboard' },
@@ -90,6 +100,14 @@ export default function AdminLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-gray-800 flex font-sans selection:bg-red-600 selection:text-white overflow-x-hidden">
+      {/* Route / Page Transition Loader */}
+      {isPageLoading && (
+        <BamaPageLoader 
+          message="Loading B.A.M.A. Academy Portal..." 
+          subMessage="Synchronizing Martial Arts Database • Real-time Cloud Sync" 
+        />
+      )}
+
       {/* Mobile Backdrop Overlay */}
       {isSidebarOpen && (
         <div

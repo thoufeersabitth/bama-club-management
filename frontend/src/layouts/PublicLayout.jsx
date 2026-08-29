@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ACADEMY_INFO } from '../services/initialData';
 import { useAuth } from '../context/AuthContext';
+import BamaPageLoader from '../components/common/BamaPageLoader';
 
 const InstagramIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 24 24">
@@ -22,9 +23,18 @@ const FacebookIcon = ({ className = "w-4 h-4" }) => (
 export default function PublicLayout({ children }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, switchRole } = useAuth();
+
+  useEffect(() => {
+    setIsPageLoading(true);
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -46,6 +56,14 @@ export default function PublicLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-[#07080C] text-gray-100 flex flex-col font-sans selection:bg-red-600 selection:text-white">
+      {/* Route / Page Transition Loader */}
+      {isPageLoading && (
+        <BamaPageLoader 
+          message="Loading Brave Academy of Martial Arts..." 
+          subMessage="Traditional Shotokan Karate-Do • Official B.A.M.A. Academy" 
+        />
+      )}
+
       {/* 1. Top Info Bar */}
       <div className="bg-[#090A0F] text-gray-300 text-xs py-2 px-4 border-b border-gray-800/80">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
