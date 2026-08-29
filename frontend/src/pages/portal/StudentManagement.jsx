@@ -186,6 +186,19 @@ export default function StudentManagement() {
   const [promoExaminer, setPromoExaminer] = useState('Sensei Abdul Rahman (5th Dan)');
   const [promoCertNo, setPromoCertNo] = useState('');
   const [promoRemarks, setPromoRemarks] = useState('Promoted on merit via Academy Examination');
+  const [promoSuccessData, setPromoSuccessData] = useState(null);
+
+  const handleOpenPromoteModal = (std) => {
+    if (!std) return;
+    const currentB = std.currentBelt || std.current_belt || 'White Belt';
+    const nextB = getNextTargetBelt(currentB);
+    setPromoteModalStudent(std);
+    setPromoTargetBelt(nextB);
+    setPromoExamDate(new Date().toISOString().split('T')[0]);
+    setPromoExaminer('Sensei Abdul Rahman (5th Dan)');
+    setPromoCertNo(`CERT-BAMA-${Math.floor(1000 + Math.random() * 9000)}`);
+    setPromoRemarks(`Promoted from ${currentB} to ${nextB} on merit.`);
+  };
 
   // Inline Photo Resizer State for New Admission Form
   const [addPhotoState, setAddPhotoState] = useState({
@@ -651,18 +664,6 @@ export default function StudentManagement() {
     return 'Yellow Belt';
   };
 
-  // Open Belt Promotion Modal
-  const handleOpenPromoteModal = (std) => {
-    const currentB = std.currentBelt || std.current_belt || 'White Belt';
-    const nextB = getNextBeltRank(currentB);
-    setPromoteModalStudent(std);
-    setPromoTargetBelt(nextB);
-    setPromoExamDate(new Date().toISOString().split('T')[0]);
-    setPromoExaminer('Sensei Abdul Rahman (5th Dan)');
-    setPromoCertNo(`CERT-BAMA-${Math.floor(1000 + Math.random() * 9000)}`);
-    setPromoRemarks(`Promoted from ${currentB} to ${nextB} on merit.`);
-  };
-
   // Submit Belt Promotion
   const handleConfirmPromotion = async (e) => {
     e.preventDefault();
@@ -721,12 +722,14 @@ export default function StudentManagement() {
 
       const targetCadet = promoteModalStudent;
       setPromoteModalStudent(null);
-
-      if (window.confirm(`🎉 ${cadetName} promoted to ${promoTargetBelt} successfully!\n\nWould you like to send WhatsApp congratulations to parent (+91 ${phone})?`)) {
-        openWhatsApp({ phone: waPhone, message: text });
-      }
+      setPromoSuccessData({
+        cadetName,
+        targetBelt: promoTargetBelt,
+        certNo: promoCertNo,
+        phone: waPhone,
+        message: text
+      });
     } catch (err) {
-      alert('Promotion recorded locally.');
       setPromoteModalStudent(null);
     }
   };
@@ -967,7 +970,216 @@ export default function StudentManagement() {
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
   const indexOfLastStudent = Math.min(currentPage * itemsPerPage, filteredStudents.length);
   const indexOfFirstStudent = (currentPage - 1) * itemsPerPage;
-  const currentPaginatedStudents = filteredStudents.slice(indexOfFirstStudent, indexOfLastStudent);
+  const renderPromoteModal = () => {
+    return (
+      <>
+        {promoteModalStudent && (
+          <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => setPromoteModalStudent(null)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 transition p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3.5 border-b border-gray-100 pb-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shadow-sm flex-shrink-0">
+                  <Award className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 leading-tight">Promote Cadet Belt Rank</h3>
+                  <p className="text-xs text-gray-500 font-medium">Record examination result & upgrade cadet belt rank in real-time.</p>
+                </div>
+              </div>
+
+              {/* Cadet Info Summary Box */}
+              <div className="p-4 bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-white border-2 border-emerald-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  {promoteModalStudent.photo ? (
+                    <img src={promoteModalStudent.photo} alt={promoteModalStudent.name} className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-sm" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-emerald-600 text-white font-black text-lg flex items-center justify-center shadow-sm">
+                      {promoteModalStudent.name ? promoteModalStudent.name.charAt(0).toUpperCase() : 'C'}
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-black text-gray-900 text-sm leading-tight">{promoteModalStudent.name}</h4>
+                    <span className="text-[11px] text-gray-600 font-mono font-bold block">
+                      {promoteModalStudent.admissionNo || promoteModalStudent.admission_no} • {promoteModalStudent.branch_name || promoteModalStudent.branch || 'Head Office'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[9px] text-gray-400 font-bold uppercase block">Current Belt</span>
+                  <span className="px-2.5 py-1 bg-white text-gray-800 font-bold rounded-lg border border-gray-200 text-xs shadow-xs inline-block">
+                    🥋 {promoteModalStudent.currentBelt || promoteModalStudent.current_belt || 'White Belt'}
+                  </span>
+                </div>
+              </div>
+
+              <form onSubmit={handleConfirmPromotion} className="space-y-4 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1 text-emerald-800 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Promoted Belt Rank *
+                    </label>
+                    <select
+                      required
+                      value={promoTargetBelt}
+                      onChange={(e) => setPromoTargetBelt(e.target.value)}
+                      className="w-full bg-emerald-50/50 border-2 border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 cursor-pointer shadow-xs"
+                    >
+                      {STANDARD_BELT_RANKS.map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-gray-500" /> Exam Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={promoExamDate}
+                      onChange={(e) => setPromoExamDate(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                      <Shield className="w-3.5 h-3.5 text-gray-500" /> Chief Examiner *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={promoExaminer}
+                      onChange={(e) => setPromoExaminer(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-medium text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                      <FileText className="w-3.5 h-3.5 text-gray-500" /> Certificate No
+                    </label>
+                    <input
+                      type="text"
+                      value={promoCertNo}
+                      onChange={(e) => setPromoCertNo(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-mono font-bold text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1">Remarks / Merit Notes</label>
+                  <input
+                    type="text"
+                    value={promoRemarks}
+                    onChange={(e) => setPromoRemarks(e.target.value)}
+                    placeholder="e.g. Excellent Kata performance & sparring form"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setPromoteModalStudent(null)}
+                    className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-black text-xs shadow-md shadow-emerald-500/25 flex items-center gap-2 transform hover:-translate-y-0.5 transition cursor-pointer"
+                  >
+                    <Award className="w-4 h-4" /> Confirm Belt Promotion 🥋
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* PROMOTION SUCCESS POPUP WITH WHATSAPP AND CLOSE BUTTON */}
+        {promoSuccessData && (
+          <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 border-2 border-emerald-400 space-y-5 shadow-2xl text-center relative">
+              <button
+                type="button"
+                onClick={() => setPromoSuccessData(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 transition p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-700 border-2 border-emerald-300 flex items-center justify-center mx-auto shadow-md">
+                <Award className="w-8 h-8 text-emerald-600" />
+              </div>
+
+              <div className="space-y-1">
+                <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-wider font-mono">
+                  🎉 PROMOTION SUCCESSFUL
+                </span>
+                <h3 className="text-xl font-black text-gray-900 pt-2">
+                  {promoSuccessData.cadetName} Promoted!
+                </h3>
+                <p className="text-xs text-gray-600 font-medium">
+                  Successfully upgraded to <strong className="text-emerald-700 font-bold">{promoSuccessData.targetBelt}</strong> in Academy Database.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-gray-600 space-y-1.5 text-left">
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">Promoted Belt:</span>
+                  <strong className="text-emerald-800 font-bold">🥋 {promoSuccessData.targetBelt}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">Certificate No:</span>
+                  <strong className="font-mono text-gray-900">{promoSuccessData.certNo}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">Parent Contact:</span>
+                  <strong className="font-mono text-emerald-700">+{promoSuccessData.phone}</strong>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    openWhatsApp({ phone: promoSuccessData.phone, message: promoSuccessData.message });
+                    setPromoSuccessData(null);
+                  }}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Send WhatsApp Notice</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPromoSuccessData(null)}
+                  className="py-3 px-5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   // FULL DEDICATED CADET 360° PROFILE & FINANCIAL DUES DASHBOARD PAGE VIEW
   if (detailStudent) {
@@ -1836,6 +2048,9 @@ export default function StudentManagement() {
             })()}
           </div>
         </div>
+
+        {/* Promote & Success Modals in 360 View */}
+        {renderPromoteModal()}
       </div>
     );
   }
@@ -3780,141 +3995,7 @@ export default function StudentManagement() {
       )}
 
       {/* MODAL: Promote Cadet Belt Rank & Issue Certificate */}
-      {promoteModalStudent && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setPromoteModalStudent(null)}
-              className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3.5 border-b border-gray-100 pb-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shadow-sm flex-shrink-0">
-                <Award className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-black text-gray-900 leading-tight">Promote Cadet Belt Rank</h3>
-                <p className="text-xs text-gray-500 font-medium">Record examination result & upgrade cadet belt rank in real-time.</p>
-              </div>
-            </div>
-
-            {/* Cadet Info Summary Box */}
-            <div className="p-4 bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-white border-2 border-emerald-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3">
-                {promoteModalStudent.photo ? (
-                  <img src={promoteModalStudent.photo} alt={promoteModalStudent.name} className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500 shadow-sm" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-emerald-600 text-white font-black text-lg flex items-center justify-center shadow-sm">
-                    {promoteModalStudent.name ? promoteModalStudent.name.charAt(0).toUpperCase() : 'C'}
-                  </div>
-                )}
-                <div>
-                  <h4 className="font-black text-gray-900 text-sm leading-tight">{promoteModalStudent.name}</h4>
-                  <span className="text-[11px] text-gray-600 font-mono font-bold block">
-                    {promoteModalStudent.admissionNo || promoteModalStudent.admission_no} • {promoteModalStudent.branch_name || promoteModalStudent.branch || 'Head Office'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[9px] text-gray-400 font-bold uppercase block">Current Belt</span>
-                <span className="px-2.5 py-1 bg-white text-gray-800 font-bold rounded-lg border border-gray-200 text-xs shadow-xs inline-block">
-                  🥋 {promoteModalStudent.currentBelt || promoteModalStudent.current_belt || 'White Belt'}
-                </span>
-              </div>
-            </div>
-
-            <form onSubmit={handleConfirmPromotion} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 text-emerald-800 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Promoted Belt Rank *
-                  </label>
-                  <select
-                    required
-                    value={promoTargetBelt}
-                    onChange={(e) => setPromoTargetBelt(e.target.value)}
-                    className="w-full bg-emerald-50/50 border-2 border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 cursor-pointer shadow-xs"
-                  >
-                    {STANDARD_BELT_RANKS.map(b => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-gray-500" /> Exam Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={promoExamDate}
-                    onChange={(e) => setPromoExamDate(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
-                    <Shield className="w-3.5 h-3.5 text-gray-500" /> Chief Examiner *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={promoExaminer}
-                    onChange={(e) => setPromoExaminer(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-medium text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5 text-gray-500" /> Certificate No
-                  </label>
-                  <input
-                    type="text"
-                    value={promoCertNo}
-                    onChange={(e) => setPromoCertNo(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-mono font-bold text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-gray-700 font-bold mb-1">Remarks / Merit Notes</label>
-                <input
-                  type="text"
-                  value={promoRemarks}
-                  onChange={(e) => setPromoRemarks(e.target.value)}
-                  placeholder="e.g. Excellent Kata performance & sparring form"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs focus:bg-white focus:outline-none focus:border-emerald-500 shadow-xs"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setPromoteModalStudent(null)}
-                  className="px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-black text-xs shadow-md shadow-emerald-500/25 flex items-center gap-2 transform hover:-translate-y-0.5 transition cursor-pointer"
-                >
-                  <Award className="w-4 h-4" /> Confirm Belt Promotion 🥋
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {renderPromoteModal()}
     </div>
   );
 }
