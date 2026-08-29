@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, openWhatsApp } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, deleteTrainingSchedule, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
 
 const INITIAL_TRAINING_SCHEDULES = [
@@ -289,9 +289,11 @@ export default function BranchManagement() {
   };
 
   const handleDeleteBranch = async (id) => {
-    if (window.confirm('Are you sure you want to delete this Branch Dojo?')) {
-      deleteBranchBackend(id).catch(() => {});
-      const updatedList = branches.filter(b => b.id !== id);
+    const targetBranch = branches.find(b => b.id === id);
+    const branchName = targetBranch?.name || '';
+    if (window.confirm(`Are you sure you want to delete "${branchName || 'this Branch Dojo'}"?`)) {
+      await deleteBranchBackend(id, branchName);
+      const updatedList = branches.filter(b => b.id !== id && b.name !== branchName);
       setBranches(updatedList);
       localStorage.setItem('bama_custom_branches', JSON.stringify(updatedList));
       localStorage.setItem('bama_branches', JSON.stringify(updatedList));
@@ -301,8 +303,11 @@ export default function BranchManagement() {
   };
 
   const handleDeleteShift = (id) => {
-    if (window.confirm('Are you sure you want to delete this training shift schedule?')) {
-      const updated = schedules.filter(s => s.id !== id);
+    const targetShift = schedules.find(s => s.id === id);
+    const shiftName = targetShift?.name || '';
+    if (window.confirm(`Are you sure you want to delete "${shiftName || 'this training shift schedule'}"?`)) {
+      deleteTrainingSchedule(id, shiftName);
+      const updated = schedules.filter(s => s.id !== id && s.name !== shiftName);
       setSchedules(updated);
       localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
       window.dispatchEvent(new Event('bama_schedules_updated'));

@@ -735,10 +735,20 @@ export const sanitizeBranches = (list) => {
 export const fetchBranches = async () => {
   const branchMap = new Map();
 
-  // 1. Base default branches
+  const deletedBranchIds = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('bama_deleted_branch_ids') || '[]');
+    } catch (e) {
+      return [];
+    }
+  })();
+
+  // 1. Base default branches (excluding deleted)
   INITIAL_BRANCHES.forEach(b => {
     const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-    if (key) branchMap.set(key, b);
+    if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+      branchMap.set(key, b);
+    }
   });
 
   // 2. Fetch directly from Fly.io live PostgreSQL server FIRST
@@ -753,7 +763,7 @@ export const fetchBranches = async () => {
       if (Array.isArray(serverBranches) && serverBranches.length > 0) {
         serverBranches.forEach(b => {
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-          if (key) {
+          if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
             branchMap.set(key, {
               ...b,
               isHeadOffice: b.is_head_office ?? b.isHeadOffice,
@@ -776,13 +786,17 @@ export const fetchBranches = async () => {
       if (Array.isArray(parsed)) {
         parsed.forEach(b => {
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-          if (key && !branchMap.has(key)) branchMap.set(key, b);
+          if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+            branchMap.set(key, b);
+          }
         });
       }
     }
   } catch (e) {}
 
-  const cleaned = sanitizeBranches(Array.from(branchMap.values()));
+  const cleaned = sanitizeBranches(Array.from(branchMap.values()).filter(b => 
+    !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())
+  ));
   try {
     localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
     localStorage.setItem('bama_branches', JSON.stringify(cleaned));
@@ -847,8 +861,63 @@ export const updateBranchBackend = async (id, branchData) => {
   }
 };
 
+export const deleteBranchBackend = async (id, branchName = '') => {
+  try {
+    const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_branch_ids') || '[]');
+    if (id) deletedIds.push(String(id));
+    if (branchName) deletedIds.push(String(branchName).toLowerCase().trim());
+    localStorage.setItem('bama_deleted_branch_ids', JSON.stringify(Array.from(new Set(deletedIds))));
+  } catch (e) {}
+
+  try {
+    const saved = localStorage.getItem('bama_custom_branches');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      const filtered = parsed.filter(b => b.id !== id && b.name !== branchName);
+      localStorage.setItem('bama_custom_branches', JSON.stringify(filtered));
+      localStorage.setItem('bama_branches', JSON.stringify(filtered));
+    }
+  } catch (e) {}
+
+  try {
+    if (typeof id === 'string' && id.length > 20) {
+      await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
+        method: 'DELETE'
+      });
+    }
+  } catch (err) {
+    console.error('Failed to delete branch on backend:', err);
+  }
+};
+
+export const deleteTrainingSchedule = (id, shiftName = '') => {
+  try {
+    const deletedShifts = JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
+    if (id) deletedShifts.push(String(id));
+    if (shiftName) deletedShifts.push(String(shiftName).toLowerCase().trim());
+    localStorage.setItem('bama_deleted_shift_ids', JSON.stringify(Array.from(new Set(deletedShifts))));
+  } catch (e) {}
+
+  try {
+    const stored = localStorage.getItem('bama_training_schedules');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const filtered = parsed.filter(s => s.id !== id && s.name !== shiftName);
+      localStorage.setItem('bama_training_schedules', JSON.stringify(filtered));
+    }
+  } catch (e) {}
+};
+
 export const fetchTrainingSchedules = async () => {
   const branches = await fetchBranches();
+
+  const deletedShiftIds = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
+    } catch (e) {
+      return [];
+    }
+  })();
   
   // Base default schedules for branches
   const defaultSchedules = [
@@ -915,13 +984,18 @@ export const fetchTrainingSchedules = async () => {
   ];
 
   const scheduleMap = new Map();
-  defaultSchedules.forEach(s => scheduleMap.set(String(s.name + s.branch).toLowerCase().trim(), s));
+  defaultSchedules.forEach(s => {
+    const key = String(s.name + s.branch).toLowerCase().trim();
+    if (!deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())) {
+      scheduleMap.set(key, s);
+    }
+  });
 
   // Merge custom branches
   branches.forEach(b => {
     const bName = b.name || 'Dojo Branch';
     const key = String(`General Training Batch - ${bName}`).toLowerCase().trim();
-    if (!scheduleMap.has(key)) {
+    if (!scheduleMap.has(key) && !deletedShiftIds.includes(key)) {
       scheduleMap.set(key, {
         id: `shift-branch-${b.id || Date.now()}`,
         name: `General Training Batch (${bName})`,
@@ -943,30 +1017,22 @@ export const fetchTrainingSchedules = async () => {
       if (Array.isArray(parsed) && parsed.length > 0) {
         parsed.forEach(s => {
           const key = String(s.name + (s.branch || '')).toLowerCase().trim();
-          if (key) scheduleMap.set(key, s);
+          if (key && !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())) {
+            scheduleMap.set(key, s);
+          }
         });
       }
     }
   } catch (e) {}
 
-  const finalSchedules = Array.from(scheduleMap.values());
+  const finalSchedules = Array.from(scheduleMap.values()).filter(s => 
+    !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())
+  );
   try {
     localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
   } catch (e) {}
 
   return finalSchedules;
-};
-
-export const deleteBranchBackend = async (id) => {
-  try {
-    if (typeof id === 'string' && id.length > 20) {
-      await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
-        method: 'DELETE'
-      });
-    }
-  } catch (err) {
-    console.error('Failed to delete branch on backend:', err);
-  }
 };
 
 export const fetchFees = async () => {
