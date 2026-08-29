@@ -908,9 +908,28 @@ export const deleteTrainingSchedule = (id, shiftName = '') => {
   } catch (e) {}
 };
 
-export const fetchTrainingSchedules = async () => {
-  const branches = await fetchBranches();
+const DUMMY_SHIFT_IDS = ['shift-101', 'shift-102', 'shift-103', 'shift-104', 'shift-105', 'shift-106'];
+const DUMMY_SHIFT_NAMES = [
+  'evening regular karate batch',
+  'morning fitness & kata batch',
+  'weekend intensive sparring & belt camp',
+  'chungam evening karate & kickboxing',
+  'mongam dawn kickboxing batch',
+  'feroke weekend karate camp'
+];
 
+export const filterOutDummyShifts = (list) => {
+  if (!Array.isArray(list)) return [];
+  return list.filter(s => {
+    if (!s) return false;
+    const sId = String(s.id || '').trim();
+    const sName = String(s.name || '').toLowerCase().trim();
+    if (DUMMY_SHIFT_IDS.includes(sId) || DUMMY_SHIFT_NAMES.includes(sName)) return false;
+    return true;
+  });
+};
+
+export const fetchTrainingSchedules = async () => {
   const deletedShiftIds = (() => {
     try {
       return JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
@@ -919,53 +938,24 @@ export const fetchTrainingSchedules = async () => {
     }
   })();
 
-  const scheduleMap = new Map();
-
-  // 1. Load user-saved shifts from localStorage
+  let schedules = [];
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        parsed.forEach(s => {
-          const key = String(s.name + (s.branch || '')).toLowerCase().trim();
-          if (key && !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())) {
-            scheduleMap.set(key, s);
-          }
-        });
+      if (Array.isArray(parsed)) {
+        schedules = filterOutDummyShifts(parsed).filter(s => 
+          !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())
+        );
       }
     }
   } catch (e) {}
 
-  // 2. If NO custom shift has been created yet, generate strictly 1 primary shift from each branch's actual configured timings
-  if (scheduleMap.size === 0) {
-    branches.forEach(b => {
-      const bName = b.name || 'Dojo Branch';
-      const key = String(`Regular Dojo Batch - ${bName}`).toLowerCase().trim();
-      if (!deletedShiftIds.includes(key) && !deletedShiftIds.includes(bName.toLowerCase().trim())) {
-        scheduleMap.set(key, {
-          id: `shift-branch-${b.id || Date.now()}`,
-          name: `Regular Dojo Batch (${bName})`,
-          branch: bName,
-          days: 'Mon, Wed, Fri',
-          time: b.timings || '5:00 PM - 7:00 PM',
-          instructor: b.branch_head || 'Sensei Instructor',
-          targetGroup: 'All Belts & Cadets',
-          status: 'Active'
-        });
-      }
-    });
-  }
-
-  const finalSchedules = Array.from(scheduleMap.values()).filter(s => 
-    !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())
-  );
-
   try {
-    localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
+    localStorage.setItem('bama_training_schedules', JSON.stringify(schedules));
   } catch (e) {}
 
-  return finalSchedules;
+  return schedules;
 };
 
 export const fetchFees = async () => {

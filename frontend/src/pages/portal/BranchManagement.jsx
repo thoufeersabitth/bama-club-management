@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, deleteTrainingSchedule, openWhatsApp } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, deleteTrainingSchedule, filterOutDummyShifts, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -15,7 +15,10 @@ export default function BranchManagement() {
   const [schedules, setSchedules] = useState(() => {
     try {
       const stored = localStorage.getItem('bama_training_schedules');
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return filterOutDummyShifts(parsed);
+      }
     } catch (e) {}
     return [];
   });
@@ -596,73 +599,105 @@ export default function BranchManagement() {
 
       {/* TAB 2: TRAINING SHIFT SCHEDULES & BATCH TIMINGS */}
       {activeTab === 'SCHEDULES' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSchedules.map((sch) => (
-            <div
-              key={sch.id}
-              className="bg-white rounded-3xl p-6 border border-gray-200/90 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-all duration-200"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 font-black text-[11px] rounded-xl font-mono">
-                    {sch.branch}
-                  </span>
-                  <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10px] rounded-full">
-                    {sch.status}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-black text-gray-900 leading-snug">{sch.name}</h3>
-                  <p className="text-xs text-gray-500 font-medium flex items-center gap-1 mt-1">
-                    <Shield className="w-3.5 h-3.5 text-red-600" />
-                    <span>Sensei: {sch.instructor}</span>
-                  </p>
-                </div>
-
-                <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2 text-xs">
-                  <p className="flex items-center gap-2 font-bold text-gray-800">
-                    <Calendar className="w-4 h-4 text-red-600" />
-                    <span>Days: {sch.days}</span>
-                  </p>
-                  <p className="flex items-center gap-2 font-bold text-gray-800">
-                    <Clock className="w-4 h-4 text-amber-600" />
-                    <span>Timings: {sch.time}</span>
-                  </p>
-                  <p className="flex items-center gap-2 text-gray-600 pt-1 border-t border-gray-200">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Target: {sch.targetGroup}</span>
-                  </p>
-                </div>
+        <>
+          {filteredSchedules.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-gray-200 shadow-sm space-y-3">
+              <div className="w-16 h-16 bg-red-50 text-red-600 rounded-3xl flex items-center justify-center mx-auto border border-red-100">
+                <Clock className="w-8 h-8" />
               </div>
-
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => openEditShift(sch)}
-                    className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
-                  >
-                    <Edit className="w-3.5 h-3.5" /> Edit
-                  </button>
-                  <button
-                    onClick={() => sendShiftWhatsAppNotice(sch)}
-                    className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 font-black text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
-                    title="Send WhatsApp Notice to Parents"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" /> Notice
-                  </button>
-                  <button
-                    onClick={() => handleDeleteShift(sch.id)}
-                    className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl transition cursor-pointer shadow-xs"
-                    title="Delete Training Shift"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+              <h3 className="text-base font-black text-gray-900">No Training Shift Schedules Added Yet</h3>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                Only the batch shifts and timings you explicitly add will be displayed here. Click the button below to add your first batch shift!
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditShift(null);
+                  setShiftData({
+                    name: '',
+                    branch: branches[0]?.name || 'Pulikkal Branch (Head Office)',
+                    days: 'Mon, Wed, Fri',
+                    time: '5:00 PM - 7:00 PM',
+                    instructor: 'Sensei Abdul Rahman (5th Dan)',
+                    targetGroup: 'All Belts & Cadets'
+                  });
+                  setShowShiftModal(true);
+                }}
+                className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-2xl shadow-md transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4" /> Add Training Shift Batch
+              </button>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredSchedules.map((sch) => (
+                <div
+                  key={sch.id}
+                  className="bg-white rounded-3xl p-6 border border-gray-200/90 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-all duration-200"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 font-black text-[11px] rounded-xl font-mono">
+                        {sch.branch}
+                      </span>
+                      <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10px] rounded-full">
+                        {sch.status}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 className="text-base font-black text-gray-900 leading-snug">{sch.name}</h3>
+                      <p className="text-xs text-gray-500 font-medium flex items-center gap-1 mt-1">
+                        <Shield className="w-3.5 h-3.5 text-red-600" />
+                        <span>Sensei: {sch.instructor}</span>
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2 text-xs">
+                      <p className="flex items-center gap-2 font-bold text-gray-800">
+                        <Calendar className="w-4 h-4 text-red-600" />
+                        <span>Days: {sch.days}</span>
+                      </p>
+                      <p className="flex items-center gap-2 font-bold text-gray-800">
+                        <Clock className="w-4 h-4 text-amber-600" />
+                        <span>Timings: {sch.time}</span>
+                      </p>
+                      <p className="flex items-center gap-2 text-gray-600 pt-1 border-t border-gray-200">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Target: {sch.targetGroup}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => openEditShift(sch)}
+                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
+                      >
+                        <Edit className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button
+                        onClick={() => sendShiftWhatsAppNotice(sch)}
+                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 font-black text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
+                        title="Send WhatsApp Notice to Parents"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" /> Notice
+                      </button>
+                      <button
+                        onClick={() => handleDeleteShift(sch.id)}
+                        className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl transition cursor-pointer shadow-xs"
+                        title="Delete Training Shift"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* MODAL: Create / Edit Branch Dojo */}
