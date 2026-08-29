@@ -583,79 +583,71 @@ export default function StudentManagement() {
     }
   };
 
-  // Save Global Fee Defaults and Update Roster Across Backend & Frontend
+  // Save Global Fee Defaults and Update Roster Across Backend & Frontend (Automatic Batch Sync)
   const handleSaveGlobalFeeSettings = async () => {
     saveGlobalFeeSettings(globalFeeSettings);
     await saveFeeSettingsBackend(globalFeeSettings);
 
     const newMonthly = parseInt(globalFeeSettings.defaultMonthlyFee) || 500;
+    const newSchoolBatch = parseInt(globalFeeSettings.defaultSchoolBatchFee) || 1200;
     const newAdmission = parseInt(globalFeeSettings.defaultAdmissionFee) || 1000;
-    const updateTarget = globalFeeSettings.feeUpdateTarget || 'REGULAR_ONLY';
 
-    if (globalFeeSettings.updateExistingStudents && updateTarget !== 'NONE') {
-      const currentStudents = students.length > 0 ? students : getStoredStudents();
+    const currentStudents = students.length > 0 ? students : getStoredStudents();
 
-      const updatedRoster = currentStudents.map(s => {
-        const isSchool = (
-          s.feeFrequency === 'QUARTERLY' || 
-          s.billingPlan === 'SCHOOL_BATCH' || 
-          s.billing_plan === 'SCHOOL_BATCH' || 
-          (s.shift && s.shift.toLowerCase().includes('school'))
-        );
+    // AUTOMATIC SMART SYNC: 
+    // Regular students automatically get the Regular Monthly rate
+    // School batch students automatically get the School Batch rate
+    const updatedRoster = currentStudents.map(s => {
+      const isSchool = (
+        s.feeFrequency === 'QUARTERLY' || 
+        s.billingPlan === 'SCHOOL_BATCH' || 
+        s.billing_plan === 'SCHOOL_BATCH' || 
+        (s.shift && s.shift.toLowerCase().includes('school'))
+      );
 
-        // SAFEGUARD: If updating Regular Cadets Only, DO NOT TOUCH School Batch Cadets!
-        if (updateTarget === 'REGULAR_ONLY' && isSchool) {
-          return s; // Preserved untouched
-        }
+      const applicableRate = isSchool ? newSchoolBatch : newMonthly;
+      const currentPaid = parseInt(s.initialPaidAmount || s.initial_paid_amount || 0);
+      const newPending = Math.max(0, applicableRate - currentPaid);
+      const newFeeStatus = newPending === 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : 'Pending';
 
-        // SAFEGUARD: If updating School Batch Only, DO NOT TOUCH Regular Cadets!
-        if (updateTarget === 'SCHOOL_BATCH_ONLY' && !isSchool) {
-          return s; // Preserved untouched
-        }
+      const updatedObj = {
+        ...s,
+        feeAmount: applicableRate,
+        fee_amount: applicableRate,
+        monthlyFee: applicableRate,
+        monthly_fee: applicableRate,
+        admissionFee: newAdmission,
+        admission_fee: newAdmission,
+        pendingAmount: newPending,
+        pending_amount: newPending,
+        feeStatus: newFeeStatus,
+        fee_status: newFeeStatus
+      };
 
-        const currentPaid = parseInt(s.initialPaidAmount || s.initial_paid_amount || 0);
-        const newPending = Math.max(0, newMonthly - currentPaid);
-        const newFeeStatus = newPending === 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : 'Pending';
-
-        const updatedObj = {
-          ...s,
-          feeAmount: newMonthly,
-          fee_amount: newMonthly,
-          monthlyFee: newMonthly,
-          monthly_fee: newMonthly,
-          admissionFee: newAdmission,
+      if (s.id) {
+        updateStudent(s.id, {
+          fee_amount: applicableRate,
+          feeAmount: applicableRate,
           admission_fee: newAdmission,
-          pendingAmount: newPending,
+          admissionFee: newAdmission,
           pending_amount: newPending,
-          feeStatus: newFeeStatus,
-          fee_status: newFeeStatus
-        };
+          pendingAmount: newPending,
+          fee_status: newFeeStatus,
+          feeStatus: newFeeStatus
+        }).catch(() => {});
+      }
 
-        if (s.id) {
-          updateStudent(s.id, {
-            fee_amount: newMonthly,
-            feeAmount: newMonthly,
-            admission_fee: newAdmission,
-            admissionFee: newAdmission,
-            pending_amount: newPending,
-            pendingAmount: newPending,
-            fee_status: newFeeStatus,
-            feeStatus: newFeeStatus
-          }).catch(() => {});
-        }
+      return updatedObj;
+    });
 
-        return updatedObj;
-      });
-
-      setStudents(updatedRoster);
-      saveStoredStudents(updatedRoster);
-    }
+    setStudents(updatedRoster);
+    saveStoredStudents(updatedRoster);
 
     window.dispatchEvent(new Event('bama_fee_settings_updated'));
     window.dispatchEvent(new Event('bama_data_updated'));
 
     setShowGlobalFeeModal(false);
-    alert(`✅ Global Academy Fee Defaults updated & Backend Synced! New rate (₹${newMonthly}/Month) is effective from ${globalFeeSettings.effectiveMonth || 'August'} ${globalFeeSettings.effectiveYear || 2026}.`);
+    alert(`✅ Global Academy Fees successfully updated & synced!\n\n• Regular Dojo: ₹${newMonthly}/Month\n• School Batch: ₹${newSchoolBatch}/3 Months\n• Admission Fee: ₹${newAdmission}`);
   };
 
   const STANDARD_BELT_RANKS = [
@@ -3867,22 +3859,6 @@ export default function StudentManagement() {
                     <option value="November 2026">November 2026</option>
                     <option value="December 2026">December 2026</option>
                     <option value="January 2027">January 2027</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1 pt-1.5 border-t border-blue-200/60">
-                  <label className="text-[11px] text-blue-950 font-bold block">
-                    🎯 Which Cadets Should Receive This Rate?
-                  </label>
-                  <select
-                    value={globalFeeSettings.feeUpdateTarget || 'REGULAR_ONLY'}
-                    onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, feeUpdateTarget: e.target.value })}
-                    className="w-full bg-white border border-blue-300 rounded-lg px-2.5 py-1.5 text-xs text-blue-950 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
-                  >
-                    <option value="REGULAR_ONLY">🥋 Regular Monthly Cadets Only (Regular Dojo only - School Batch Safe)</option>
-                    <option value="SCHOOL_BATCH_ONLY">🏫 School Batch (3-Month Term) Cadets Only</option>
-                    <option value="ALL">👥 All Active Cadets (Both Plans)</option>
-                    <option value="NONE">🌟 Future New Admissions Only (Keep existing cadets unchanged)</option>
                   </select>
                 </div>
               </div>
