@@ -3689,73 +3689,72 @@ export default function StudentManagement() {
       )}
 
       {/* Global Academy Fee & Tariff Configuration Modal (Super Admin Only) */}
+      {/* Global Academy Fee & Tariff Configuration Modal (Super Admin Only) */}
       {showGlobalFeeModal && !isInstructor && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="bg-gradient-to-r from-gray-900 via-gray-900 to-red-950 p-5 text-white flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[150] flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+            <div className="bg-gradient-to-r from-gray-900 via-gray-900 to-red-950 p-4 text-white flex items-center justify-between flex-shrink-0">
               <div>
-                <span className="text-[10px] font-black tracking-widest text-red-400 uppercase">Academy Administration</span>
-                <h2 className="text-base font-black flex items-center gap-2 mt-0.5">
-                  <Settings className="w-5 h-5 text-red-500" /> Global Fee & Tariff Settings
+                <span className="text-[9px] font-black tracking-widest text-red-400 uppercase">Academy Administration</span>
+                <h2 className="text-sm sm:text-base font-black flex items-center gap-1.5 mt-0.5">
+                  <Settings className="w-4 h-4 text-red-500" /> Global Fee & Tariff Settings
                 </h2>
               </div>
               <button
                 onClick={() => setShowGlobalFeeModal(false)}
                 className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
-              <p className="text-xs text-gray-600 font-medium">
-                Configure default fee rates for the entire academy. Changing these values updates default rates across all future admissions, online forms, and fee invoice generators.
+            <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1 text-xs">
+              <p className="text-[11px] text-gray-500 font-medium">
+                Configure default fee rates for the entire academy. Updates default rates across future admissions, invoices, and active cadets.
               </p>
 
               {/* Global Default Admission Fee */}
-              <div className="p-4 bg-amber-50/80 border-2 border-amber-200 rounded-2xl space-y-2">
-                <label className="text-amber-900 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><Award className="w-4 h-4 text-amber-600" /> Default One-Time Admission Fee (₹)</span>
-                  <span className="text-amber-700 font-mono text-sm font-black">₹{globalFeeSettings.defaultAdmissionFee}</span>
+              <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2 shadow-xs">
+                <label className="text-amber-950 font-black text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1"><Award className="w-3.5 h-3.5 text-amber-600" /> Default One-Time Admission Fee (₹)</span>
+                  <span className="text-amber-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultAdmissionFee}</span>
                 </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    value={globalFeeSettings.defaultAdmissionFee}
-                    onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultAdmissionFee: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2 text-gray-900 font-black text-sm font-mono focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {[500, 1000, 1500, 2000, 2500, 3000].map(amt => (
+                <input
+                  type="number"
+                  value={globalFeeSettings.defaultAdmissionFee}
+                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultAdmissionFee: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-amber-500"
+                />
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {[0, 500, 1000, 1500, 2000, 2500, 3000].map(amt => (
                     <button
                       key={amt}
                       type="button"
                       onClick={() => setGlobalFeeSettings({ ...globalFeeSettings, defaultAdmissionFee: amt })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
                         globalFeeSettings.defaultAdmissionFee === amt
                           ? 'bg-amber-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
                     >
-                      ₹{amt}
+                      {amt === 0 ? '🎁 Free' : `₹${amt}`}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Default Fee Billing Cycle */}
-              <div className="p-4 bg-purple-50/80 border-2 border-purple-200 rounded-2xl space-y-2">
-                <label className="text-purple-900 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-purple-600" /> Default Academy Billing Cycle</span>
-                  <span className="text-purple-700 text-xs font-black">
-                    {globalFeeSettings.defaultFeeFrequency === 'MONTHLY' ? '🥋 Monthly' : '🏫 School Batch (3 Months)'}
+              <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl space-y-1.5 shadow-xs">
+                <label className="text-purple-950 font-black text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-purple-600" /> Default Academy Billing Cycle</span>
+                  <span className="text-purple-700 text-[11px] font-black">
+                    {globalFeeSettings.defaultFeeFrequency === 'MONTHLY' ? '🥋 Monthly' : '🏫 School Batch (3 Mos)'}
                   </span>
                 </label>
                 <select
                   value={globalFeeSettings.defaultFeeFrequency || 'MONTHLY'}
                   onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultFeeFrequency: e.target.value })}
-                  className="w-full bg-white border border-purple-300 rounded-xl px-3.5 py-2 text-gray-900 font-bold text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
+                  className="w-full bg-white border border-purple-300 rounded-lg px-3 py-1.5 text-gray-900 font-bold text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
                 >
                   <option value="MONTHLY">🥋 Regular Dojo (Monthly - Default: ₹{globalFeeSettings.defaultMonthlyFee}/Month)</option>
                   <option value="QUARTERLY">🏫 School Batch (Every 3 Months - Default: ₹{globalFeeSettings.defaultMonthlyFee} for 3 Months)</option>
@@ -3763,26 +3762,24 @@ export default function StudentManagement() {
               </div>
 
               {/* Global Default Monthly Cadet Fee */}
-              <div className="p-4 bg-emerald-50/80 border-2 border-emerald-200 rounded-2xl space-y-2">
-                <label className="text-emerald-900 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><CreditCard className="w-4 h-4 text-emerald-600" /> Default Monthly Cadet Fee (₹)</span>
-                  <span className="text-emerald-700 font-mono text-sm font-black">₹{globalFeeSettings.defaultMonthlyFee} / Month</span>
+              <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2 shadow-xs">
+                <label className="text-emerald-950 font-black text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Default Monthly Cadet Fee (₹)</span>
+                  <span className="text-emerald-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultMonthlyFee} / Month</span>
                 </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="number"
-                    value={globalFeeSettings.defaultMonthlyFee}
-                    onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultMonthlyFee: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-white border border-emerald-300 rounded-xl px-3.5 py-2 text-gray-900 font-black text-sm font-mono focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
+                <input
+                  type="number"
+                  value={globalFeeSettings.defaultMonthlyFee}
+                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultMonthlyFee: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-emerald-500"
+                />
+                <div className="flex flex-wrap gap-1 pt-0.5">
                   {[500, 600, 700, 800, 1000, 1200, 1500, 2000].map(amt => (
                     <button
                       key={amt}
                       type="button"
                       onClick={() => setGlobalFeeSettings({ ...globalFeeSettings, defaultMonthlyFee: amt })}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
                         globalFeeSettings.defaultMonthlyFee === amt
                           ? 'bg-emerald-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
@@ -3795,10 +3792,10 @@ export default function StudentManagement() {
               </div>
 
               {/* Effective Month & Scope Configuration */}
-              <div className="p-4 bg-blue-50/80 border-2 border-blue-200 rounded-2xl space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <label className="text-blue-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                    <Calendar className="w-4 h-4 text-blue-600" /> Effective Month for Fee Increase *
+              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <label className="text-blue-950 font-black text-xs flex items-center gap-1 uppercase tracking-wider">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" /> Effective Month *
                   </label>
 
                   <select
@@ -3807,9 +3804,9 @@ export default function StudentManagement() {
                       const [m, y] = e.target.value.split(' ');
                       setGlobalFeeSettings({ ...globalFeeSettings, effectiveMonth: m, effectiveYear: parseInt(y) || 2026 });
                     }}
-                    className="bg-white border border-blue-300 rounded-xl px-3 py-1.5 text-xs text-blue-950 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                    className="bg-white border border-blue-300 rounded-lg px-2.5 py-1 text-xs text-blue-950 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
                   >
-                    <option value="September 2026">September 2026 (Next Month - Recommended)</option>
+                    <option value="September 2026">September 2026 (Recommended)</option>
                     <option value="October 2026">October 2026</option>
                     <option value="November 2026">November 2026</option>
                     <option value="December 2026">December 2026</option>
@@ -3823,30 +3820,30 @@ export default function StudentManagement() {
                     id="updateExistingStudentsCb"
                     checked={globalFeeSettings.updateExistingStudents ?? true}
                     onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, updateExistingStudents: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                    className="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                   />
-                  <label htmlFor="updateExistingStudentsCb" className="text-xs text-blue-950 font-bold cursor-pointer">
-                    Apply new rate (₹{globalFeeSettings.defaultMonthlyFee}/Month) to all existing active cadets from {globalFeeSettings.effectiveMonth || 'August'} {globalFeeSettings.effectiveYear || 2026} onwards
+                  <label htmlFor="updateExistingStudentsCb" className="text-[11px] text-blue-950 font-bold cursor-pointer">
+                    Apply new rate (₹{globalFeeSettings.defaultMonthlyFee}/Month) to all existing active cadets
                   </label>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setShowGlobalFeeModal(false)}
-                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveGlobalFeeSettings}
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs transition shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="w-4 h-4" /> Save Global Settings & Update Roster
-                </button>
-              </div>
+            <div className="p-3.5 sm:px-5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowGlobalFeeModal(false)}
+                className="px-3.5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-bold text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveGlobalFeeSettings}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs transition shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Save Global Settings & Sync Roster
+              </button>
             </div>
           </div>
         </div>

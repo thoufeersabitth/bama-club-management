@@ -547,13 +547,22 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     const feeOverrides = getStoredFeeOverrides();
 
     const list = safeRegistrations.map(r => {
-      const candidateStudent = (students || []).find(st =>
-        (r.student && String(st.id) === String(r.student)) ||
-        (r.student_db_id && String(st.id) === String(r.student_db_id)) ||
-        (r.admission_no && String(st.admissionNo || st.admission_no) === String(r.admission_no)) ||
-        (r.registration_no && String(st.admissionNo || st.admission_no) === String(r.registration_no)) ||
-        (r.student_name && String(st.name || '').toLowerCase().trim() === String(r.student_name || '').toLowerCase().trim())
-      );
+      const candAdm = String(r.admission_no || r.registration_no || '').trim().toLowerCase();
+      const candPhone = String(r.phone || '').replace(/\D/g, '');
+      const candName = String(r.student_name || r.name || '').toLowerCase().trim();
+
+      const candidateStudent = (students || []).find(st => {
+        const stAdm = String(st.admissionNo || st.admission_no || '').trim().toLowerCase();
+        const stPhone = String(st.phone || st.whatsapp || '').replace(/\D/g, '');
+        const stName = String(st.name || '').toLowerCase().trim();
+
+        if (r.student && String(st.id) === String(r.student)) return true;
+        if (r.student_db_id && String(st.id) === String(r.student_db_id)) return true;
+        if (candAdm && stAdm && candAdm === stAdm) return true;
+        if (candName && stName && (candName === stName || candName.includes(stName) || stName.includes(candName))) return true;
+        if (candPhone && stPhone && candPhone.length >= 10 && stPhone.length >= 10 && (candPhone.endsWith(stPhone) || stPhone.endsWith(candPhone))) return true;
+        return false;
+      });
 
       // LIVE REAL-TIME BELT SYNC: Always prioritize student's current belt from academy database!
       const liveCurrentBelt = candidateStudent?.currentBelt || candidateStudent?.current_belt || r.current_belt || 'White Belt';
