@@ -87,14 +87,39 @@ class StudentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user if self.request.user and self.request.user.is_authenticated else None
         
-        # If branch staff created the student, enforce their assigned branch
+        assigned_branch = None
         if user and getattr(user, 'role', None) in ['BRANCH_ADMIN', 'INSTRUCTOR', 'STAFF'] and not getattr(user, 'is_super_admin', False):
             assigned_branch = user.assigned_branch
-            if assigned_branch:
-                serializer.save(branch=assigned_branch)
-                return
 
-        serializer.save()
+        student = serializer.save(branch=assigned_branch) if assigned_branch else serializer.save()
+
+        # Automatically generate initial FeeRecord for joining month
+        try:
+            from fees.models import FeeRecord
+            from decimal import Decimal
+            from django.utils import timezone
+            now = timezone.now()
+            month_name = now.strftime('%B')
+            year_num = now.year
+            fee_amt = Decimal(str(student.fee_amount or 500))
+            init_paid = Decimal(str(student.initial_paid_amount or 0))
+            pending = max(Decimal('0.00'), fee_amt - init_paid)
+            f_status = 'Paid' if pending == Decimal('0.00') else ('Partial' if init_paid > 0 else 'Unpaid')
+
+            FeeRecord.objects.get_or_create(
+                student=student,
+                month=month_name,
+                year=year_num,
+                defaults={
+                    'amount': fee_amt,
+                    'paid_amount': init_paid,
+                    'pending_amount': pending,
+                    'status': f_status,
+                    'receipt_no': f"REC-{student.admission_no or student.id.hex[:8]}-{month_name[:3].upper()}{year_num}"
+                }
+            )
+        except Exception:
+            pass
 
     def destroy(self, request, *args, **kwargs):
         pk = kwargs.get('pk')

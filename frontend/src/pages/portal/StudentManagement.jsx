@@ -6,7 +6,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase
 } from 'lucide-react';
-import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate } from '../../services/api';
+import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, saveFeePaymentBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -1431,6 +1431,16 @@ export default function StudentManagement() {
                       paid_months: newPaidMonths,
                       initial_paid_amount: newTotalPaid
                     });
+                    saveFeePaymentBackend({
+                      student: std.id,
+                      month: term.title,
+                      year: 2026,
+                      amount: term.rate,
+                      paid_amount: term.rate,
+                      pending_amount: 0,
+                      status: 'Paid',
+                      receipt_no: `REC-${std.admissionNo || std.admission_no || String(std.id).slice(0, 6)}-TERM${term.termIndex + 1}`
+                    }).catch(() => {});
                   } catch (e) {}
 
                   setSettleSuccessMsg(`✓ Successfully cleared ${term.title} (${term.period}) for ₹${term.rate}!`);
@@ -1643,6 +1653,18 @@ export default function StudentManagement() {
                   await updateStudent(std.id, {
                     paid_months: newPaidMonths,
                     initial_paid_amount: newTotalPaid
+                  });
+                  selectedDuesMonths.forEach(mName => {
+                    saveFeePaymentBackend({
+                      student: std.id,
+                      month: mName,
+                      year: 2026,
+                      amount: monthlyRate,
+                      paid_amount: monthlyRate,
+                      pending_amount: 0,
+                      status: 'Paid',
+                      receipt_no: `REC-${std.admissionNo || std.admission_no || String(std.id).slice(0, 6)}-${mName.slice(0, 3).toUpperCase()}`
+                    }).catch(() => {});
                   });
                 } catch (e) {}
 

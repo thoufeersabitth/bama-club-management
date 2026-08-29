@@ -1097,11 +1097,21 @@ export const saveFeePaymentBackend = async (feeData) => {
       status: feeData.status || 'Unpaid',
       receipt_no: feeData.receipt_no || `REC-${Date.now()}`
     };
-    const res = await api.post('/fees/', payload);
-    return res.data;
+    const res = await fetch('https://bama-club-backend.fly.dev/api/fees/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
   } catch (err) {
-    return feeData;
+    console.error('Failed to save fee payment to backend:', err);
   }
+  return feeData;
 };
 
 export const saveBeltGradingBackend = async (gradingData) => {
@@ -1115,11 +1125,21 @@ export const saveBeltGradingBackend = async (gradingData) => {
       examiner: gradingData.examiner || 'Sensei Abdul Rahman (5th Dan)',
       certificate_no: gradingData.certificate_no || `CERT-${Date.now()}`
     };
-    const res = await api.post('/belt-gradings/', payload);
-    return res.data;
+    const res = await fetch('https://bama-club-backend.fly.dev/api/belt-gradings/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
   } catch (err) {
-    return gradingData;
+    console.error('Failed to save belt grading to backend:', err);
   }
+  return gradingData;
 };
 
 // Staff & User Management API Endpoints & Local Persistent Helpers
