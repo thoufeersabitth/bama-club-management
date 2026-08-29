@@ -4,7 +4,7 @@ import {
   Award, Shield, Trophy, Medal, Search, Plus, Calendar, MapPin, User,
   CheckCircle2, AlertCircle, Send, QrCode, Sparkles, ExternalLink, RefreshCw, FileText, Printer, X, Star, MessageSquare, ArrowRight, Filter
 } from 'lucide-react';
-import { fetchBeltGradings, fetchStudents, saveBeltGradingBackend, openWhatsApp } from '../../services/api';
+import { fetchBeltGradings, fetchStudents, saveBeltGradingBackend, promoteStudent, openWhatsApp } from '../../services/api';
 import OfficeGrading from '../office/OfficeGrading';
 import { BELT_LEVELS, ACADEMY_INFO, UPCOMING_EVENTS } from '../../services/initialData';
 

@@ -7,7 +7,7 @@ import {
   PieChart, Activity, UserPlus, Check, Star, Sparkles, Flame, LogIn, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { fetchStudents, fetchFees, getStoredStudents } from '../../services/api';
+import { fetchStudents, fetchFees, fetchAttendance, getStoredStudents } from '../../services/api';
 import { INITIAL_BRANCHES } from '../../services/initialData';
 import { buildRealDatabaseActivities } from '../../services/activityLogger';
 
@@ -88,8 +88,9 @@ export default function DashboardPortal() {
 
   useEffect(() => {
     const loadDashboardData = () => {
-      Promise.all([fetchStudents(), fetchFees()])
-        .then(([stdData, feeData]) => {
+      const today = new Date().toISOString().split('T')[0];
+      Promise.all([fetchStudents(), fetchFees(), fetchAttendance(today)])
+        .then(([stdData, feeData, liveAttRecords]) => {
           const rawCadets = stdData || [];
           const cadetList = rawCadets.filter(matchesActiveBranch);
           setStudents(rawCadets);
@@ -98,10 +99,7 @@ export default function DashboardPortal() {
 
           // Compute Live Attendance Summary
           try {
-            const today = new Date().toISOString().split('T')[0];
             const savedDayStatus = localStorage.getItem(`bama_day_status_${today}`);
-            const savedRecordsToday = localStorage.getItem(`bama_attendance_${today}`);
-            const savedSummary = localStorage.getItem('bama_latest_attendance_summary');
 
             if (savedDayStatus === 'HOLIDAY') {
               setAttendanceStats({
@@ -111,7 +109,40 @@ export default function DashboardPortal() {
                 isMarkedToday: true,
                 isHoliday: true
               });
-            } else if (savedRecordsToday) {
+              return;
+            }
+
+            if (Array.isArray(liveAttRecords) && liveAttRecords.length > 0) {
+              let pCount = 0;
+              let aCount = 0;
+
+              cadetList.forEach(s => {
+                const rec = liveAttRecords.find(r => 
+                  String(r.student) === String(s.id) || 
+                  String(r.student_detail?.id) === String(s.id) || 
+                  String(r.student_detail?.admission_no) === String(s.admissionNo || s.admission_no)
+                );
+                const status = rec ? String(rec.status).toUpperCase() : 'PRESENT';
+                if (status === 'PRESENT') pCount++;
+                if (status === 'ABSENT') aCount++;
+              });
+
+              const total = cadetList.length || 1;
+              const rate = ((pCount / total) * 100).toFixed(1);
+              setAttendanceStats({
+                attendanceRate: rate,
+                presentCount: pCount,
+                absentCount: aCount,
+                isMarkedToday: true,
+                isHoliday: false
+              });
+              return;
+            }
+
+            const savedRecordsToday = localStorage.getItem(`bama_attendance_${today}`);
+            const savedSummary = localStorage.getItem('bama_latest_attendance_summary');
+
+            if (savedRecordsToday) {
               const records = JSON.parse(savedRecordsToday);
               let pCount = 0;
               let aCount = 0;
