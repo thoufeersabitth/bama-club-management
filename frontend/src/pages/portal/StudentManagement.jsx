@@ -1405,12 +1405,15 @@ export default function StudentManagement() {
               // ----------------------------------------------------
               if (isQuarterly) {
                 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                
+                const currentMonthIdx = new Date().getMonth(); // 7 for August
+
                 const schoolTerms = [];
                 for (let t = 0; t < 4; t++) {
                   const termMonths = [];
+                  const termStartGlobalIdx = joiningMonthIdx + (t * 3);
+
                   for (let i = 0; i < 3; i++) {
-                    const globalIdx = joiningMonthIdx + (t * 3) + i;
+                    const globalIdx = termStartGlobalIdx + i;
                     const mIdx = globalIdx % 12;
                     const yr = startYear + Math.floor(globalIdx / 12);
                     termMonths.push(`${MONTH_NAMES[mIdx]} ${yr}`);
@@ -1425,13 +1428,20 @@ export default function StudentManagement() {
                   const coveredByTotal = totalPaidAmount >= (t + 1) * monthlyRate;
                   const isPaid = allInList || coveredByTotal;
 
+                  // Term is only overdue/due if it has started (past or current month)
+                  const isCurrentOrPastTerm = termStartGlobalIdx <= (joiningMonthIdx + Math.max(0, currentMonthIdx - joiningMonthIdx));
+                  const isUpcomingTerm = !isCurrentOrPastTerm;
+
                   schoolTerms.push({
                     termIndex: t,
                     title: `Term ${t + 1}`,
                     period: `${startM} – ${endM} ${yrLabel}`,
+                    startMonthName: startM,
                     months: termMonths,
                     rate: monthlyRate,
-                    isPaid
+                    isPaid,
+                    isCurrentOrPastTerm,
+                    isUpcomingTerm
                   });
                 }
 
@@ -1485,6 +1495,8 @@ export default function StudentManagement() {
                   });
                 };
 
+                const overdueTerms = schoolTerms.filter(t => !t.isPaid && t.isCurrentOrPastTerm);
+
                 return (
                   <div className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
@@ -1498,7 +1510,9 @@ export default function StudentManagement() {
                           </span>
                         </div>
                         <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                          School students pay in 3-month blocks (Terms). Paying ₹{monthlyRate} fully clears all 3 consecutive months.
+                          {overdueTerms.length === 0 
+                            ? '✓ Current term is fully cleared (₹0 Due). Next term is upcoming.' 
+                            : `⚠️ Current active term (${overdueTerms[0].title}: ${overdueTerms[0].period}) is due for payment.`}
                         </p>
                       </div>
                     </div>
@@ -1510,16 +1524,21 @@ export default function StudentManagement() {
                       </div>
                     )}
 
-                    {/* 4 Clean Term Cards */}
+                    {/* Term Cards with Accurate Status */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       {schoolTerms.map((term, tIdx) => {
+                        const isCurrentDue = !term.isPaid && term.isCurrentOrPastTerm;
+                        const isUpcoming = !term.isPaid && term.isUpcomingTerm;
+
                         return (
                           <div 
                             key={tIdx} 
                             className={`p-4 rounded-2xl border-2 transition ${
                               term.isPaid 
                                 ? 'bg-emerald-50/70 border-emerald-300 shadow-xs' 
-                                : 'bg-rose-50/60 border-rose-300 shadow-sm'
+                                : isCurrentDue
+                                  ? 'bg-rose-50/70 border-rose-300 shadow-sm ring-1 ring-rose-200'
+                                  : 'bg-gray-50/70 border-gray-200 shadow-xs'
                             }`}
                           >
                             <div className="flex items-center justify-between border-b border-gray-200/60 pb-2">
@@ -1528,9 +1547,13 @@ export default function StudentManagement() {
                                 <span className="font-bold text-gray-700 text-xs">{term.period}</span>
                               </div>
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                term.isPaid ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                                term.isPaid 
+                                  ? 'bg-emerald-600 text-white' 
+                                  : isCurrentDue 
+                                    ? 'bg-rose-600 text-white' 
+                                    : 'bg-blue-100 text-blue-800 border border-blue-200'
                               }`}>
-                                {term.isPaid ? '✓ Paid' : '❌ Due'}
+                                {term.isPaid ? '✓ Paid' : isCurrentDue ? '❌ Term Due' : '🗓️ Upcoming'}
                               </span>
                             </div>
 
@@ -1551,14 +1574,22 @@ export default function StudentManagement() {
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                                   <span>Fully Cleared (₹{term.rate} Paid)</span>
                                 </div>
+                              ) : isCurrentDue ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSettleTerm(term)}
+                                  className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer"
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  <span>Collect ₹{term.rate} & Settle {term.title}</span>
+                                </button>
                               ) : (
                                 <button
                                   type="button"
                                   onClick={() => handleSettleTerm(term)}
-                                  className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition cursor-pointer"
+                                  className="w-full py-2 px-3 bg-white hover:bg-blue-50 text-blue-700 border border-blue-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
                                 >
-                                  <CreditCard className="w-3.5 h-3.5" />
-                                  <span>Collect ₹{term.rate} & Settle {term.title}</span>
+                                  <span>Pay Advance (Due in {term.startMonthName})</span>
                                 </button>
                               )}
                             </div>
