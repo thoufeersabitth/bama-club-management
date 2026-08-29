@@ -891,7 +891,7 @@ export const deleteBranchBackend = async (id, branchName = '') => {
   }
 };
 
-export const deleteTrainingSchedule = (id, shiftName = '') => {
+export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
   try {
     const deletedShifts = JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
     if (id) deletedShifts.push(String(id));
@@ -907,6 +907,59 @@ export const deleteTrainingSchedule = (id, shiftName = '') => {
       localStorage.setItem('bama_training_schedules', JSON.stringify(filtered));
     }
   } catch (e) {}
+
+  try {
+    if (typeof id === 'string' && id.length > 20) {
+      await fetch(`https://bama-club-backend.fly.dev/api/announcements/${id}/`, {
+        method: 'DELETE'
+      });
+    }
+  } catch (err) {
+    console.error('Failed to delete shift on backend:', err);
+  }
+};
+
+export const createTrainingScheduleBackend = async (shiftData) => {
+  try {
+    const payload = {
+      title: shiftData.name || 'Training Batch Shift',
+      content: JSON.stringify(shiftData),
+      category: 'TRAINING_SHIFT',
+      is_important: true
+    };
+    const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const serverData = await res.json();
+      return { ...shiftData, id: serverData.id };
+    }
+  } catch (err) {
+    console.error('Failed to create shift on backend:', err);
+  }
+  return shiftData;
+};
+
+export const updateTrainingScheduleBackend = async (id, shiftData) => {
+  try {
+    const payload = {
+      title: shiftData.name || 'Training Batch Shift',
+      content: JSON.stringify(shiftData),
+      category: 'TRAINING_SHIFT',
+      is_important: true
+    };
+    if (typeof id === 'string' && id.length > 20) {
+      await fetch(`https://bama-club-backend.fly.dev/api/announcements/${id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+  } catch (err) {
+    console.error('Failed to update shift on backend:', err);
+  }
 };
 
 const DUMMY_SHIFT_IDS = ['shift-101', 'shift-102', 'shift-103', 'shift-104', 'shift-105', 'shift-106'];
@@ -939,24 +992,61 @@ export const fetchTrainingSchedules = async () => {
     }
   })();
 
-  let schedules = [];
+  const scheduleMap = new Map();
+
+  // 1. Fetch from live Fly.io PostgreSQL announcements API
+  try {
+    const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const announcements = data.results || (Array.isArray(data) ? data : []);
+      announcements.forEach(a => {
+        if (a.category === 'TRAINING_SHIFT' && a.content) {
+          try {
+            const parsed = JSON.parse(a.content);
+            const shiftObj = {
+              ...parsed,
+              id: a.id,
+              name: parsed.name || a.title || 'Training Batch',
+              status: parsed.status || 'Active'
+            };
+            const key = String(shiftObj.name + (shiftObj.branch || '')).toLowerCase().trim();
+            if (key && !deletedShiftIds.includes(String(a.id)) && !deletedShiftIds.includes(String(shiftObj.name).toLowerCase().trim())) {
+              scheduleMap.set(key, shiftObj);
+            }
+          } catch (e) {}
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Failed to fetch training schedules from Fly.io live server:', err);
+  }
+
+  // 2. Check localStorage for any local shifts
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
-        schedules = filterOutDummyShifts(parsed).filter(s => 
-          !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())
-        );
+        filterOutDummyShifts(parsed).forEach(s => {
+          const key = String(s.name + (s.branch || '')).toLowerCase().trim();
+          if (key && !scheduleMap.has(key) && !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())) {
+            scheduleMap.set(key, s);
+          }
+        });
       }
     }
   } catch (e) {}
 
+  const finalSchedules = Array.from(scheduleMap.values());
   try {
-    localStorage.setItem('bama_training_schedules', JSON.stringify(schedules));
+    localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
   } catch (e) {}
 
-  return schedules;
+  return finalSchedules;
 };
 
 export const fetchFees = async () => {

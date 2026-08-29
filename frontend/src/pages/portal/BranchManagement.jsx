@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, deleteTrainingSchedule, filterOutDummyShifts, openWhatsApp } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, filterOutDummyShifts, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -199,18 +199,22 @@ export default function BranchManagement() {
     resetForm();
   };
 
-  const handleCreateOrUpdateShift = (e) => {
+  const handleCreateOrUpdateShift = async (e) => {
     e.preventDefault();
     let updated = [];
     if (editShift) {
-      updated = schedules.map(s => s.id === editShift.id ? { ...s, ...shiftData } : s);
+      const updatedItem = { ...editShift, ...shiftData };
+      updated = schedules.map(s => s.id === editShift.id ? updatedItem : s);
+      updateTrainingScheduleBackend(editShift.id, updatedItem).catch(() => {});
     } else {
       const newS = {
         id: `shift-${Date.now()}`,
         ...shiftData,
         status: 'Active'
       };
-      updated = [...schedules, newS];
+      const serverCreated = await createTrainingScheduleBackend(newS);
+      const finalShift = serverCreated?.id ? serverCreated : newS;
+      updated = [...schedules, finalShift];
     }
     setSchedules(updated);
     localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
@@ -266,11 +270,11 @@ export default function BranchManagement() {
     }
   };
 
-  const handleDeleteShift = (id) => {
+  const handleDeleteShift = async (id) => {
     const targetShift = schedules.find(s => s.id === id);
     const shiftName = targetShift?.name || '';
     if (window.confirm(`Are you sure you want to delete "${shiftName || 'this training shift schedule'}"?`)) {
-      deleteTrainingSchedule(id, shiftName);
+      await deleteTrainingScheduleBackend(id, shiftName);
       const updated = schedules.filter(s => s.id !== id && s.name !== shiftName);
       setSchedules(updated);
       localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
