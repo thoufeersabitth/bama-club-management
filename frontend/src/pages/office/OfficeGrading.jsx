@@ -1475,21 +1475,11 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 </div>
 
                 {/* Action Buttons Bar */}
-                <div className="flex items-center gap-2 pt-0.5">
-                  {r.exam_status !== 'Passed' && (
-                    <button
-                      onClick={() => handlePromoteBelt(r, 'Passed')}
-                      className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-xs transition cursor-pointer shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5"
-                    >
-                      <UserCheck className="w-4 h-4" />
-                      <span>PROMOTE & PASS</span>
-                    </button>
-                  )}
-
+                <div className="flex items-center justify-end gap-2 pt-0.5">
                   {(filterSource === 'SUBMITTED_ONLY' || r.is_submitted === true) && (
                     <button
                       onClick={() => setViewFormCandidate(r)}
-                      className="py-2.5 px-3 bg-gradient-to-r from-red-600 via-amber-600 to-red-700 text-white rounded-2xl font-black text-xs shadow-sm transition cursor-pointer flex items-center justify-center gap-1 flex-shrink-0"
+                      className="py-2 px-3 bg-gradient-to-r from-red-600 via-amber-600 to-red-700 text-white rounded-xl font-black text-xs shadow-sm transition cursor-pointer flex items-center justify-center gap-1 flex-shrink-0"
                     >
                       <FileText className="w-3.5 h-3.5" />
                       <span>FORM</span>
@@ -1498,7 +1488,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
                   <button
                     onClick={() => handleSendPersonalStudentLink(r)}
-                    className="p-2.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 rounded-2xl transition cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
+                    className="p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 rounded-xl transition cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
                     title="Send WhatsApp Link"
                   >
                     <Send className="w-4 h-4" />
@@ -1506,11 +1496,21 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
                   <button
                     onClick={() => triggerPrintForm(r)}
-                    className="p-2.5 bg-gray-100 hover:bg-gray-900 text-gray-700 hover:text-white border border-gray-200 rounded-2xl transition cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
+                    className="p-2 bg-gray-100 hover:bg-gray-900 text-gray-700 hover:text-white border border-gray-200 rounded-xl transition cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
                     title="Print Form"
                   >
                     <Printer className="w-4 h-4" />
                   </button>
+
+                  {(filterSource === 'SUBMITTED_ONLY' || r.is_submitted === true) && (
+                    <button
+                      onClick={() => handleDeleteSubmission(r)}
+                      className="p-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 rounded-xl transition cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
+                      title="Delete Submission"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -1669,24 +1669,16 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                           <Send className="w-3.5 h-3.5" />
                         </button>
 
-                        {r.exam_status !== 'Passed' && (
+                        {/* DELETE BUTTON: ONLY for Submitted Forms (not for regular cadet roster) */}
+                        {(filterSource === 'SUBMITTED_ONLY' || r.is_submitted === true) && (
                           <button
-                            onClick={() => handlePromoteBelt(r, 'Passed')}
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-sm transition cursor-pointer flex items-center gap-1 whitespace-nowrap"
-                            title="Pass Candidate & Promote Belt Rank"
+                            onClick={() => handleDeleteSubmission(r)}
+                            className="p-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl font-bold text-xs border border-red-200 transition cursor-pointer shadow-2xs"
+                            title="Delete Submitted Exam Form Record"
                           >
-                            <UserCheck className="w-3.5 h-3.5" />
-                            <span>PROMOTE</span>
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
-
-                        <button
-                          onClick={() => handleDeleteSubmission(r)}
-                          className="p-1.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl font-bold text-xs border border-red-200 transition cursor-pointer shadow-2xs"
-                          title="Delete Submitted Exam Form Record"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </td>
                   </tr>
