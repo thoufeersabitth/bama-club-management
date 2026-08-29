@@ -1732,7 +1732,7 @@ export default function StudentManagement() {
                         <button
                           type="button"
                           onClick={selectOverdueMonths}
-                          className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-xs shadow-xs cursor-pointer flex items-center gap-1"
                         >
                           ⚡ Settle Overdue ({unpaidDueMonths.length} Due = ₹{unpaidDueMonths.length * monthlyRate})
                         </button>
@@ -1740,29 +1740,19 @@ export default function StudentManagement() {
                         <button
                           type="button"
                           onClick={selectNextAdvanceMonth}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs shadow-xs cursor-pointer flex items-center gap-1"
                         >
                           ⚡ Pay Advance ({unpaidFutureMonths[0].month.split(' ')[0]} - ₹{monthlyRate})
                         </button>
                       ) : null}
 
-                      {allUnpaidMonths.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={selectAllUnpaid}
-                          className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-black rounded-lg font-bold text-xs shadow-xs cursor-pointer"
-                        >
-                          Select All ({allUnpaidMonths.length})
-                        </button>
-                      )}
-
                       {selectedDuesMonths.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setSelectedDuesMonths([])}
-                          className="px-2.5 py-1 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg font-bold text-xs cursor-pointer"
+                          className="px-2.5 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl font-bold text-xs cursor-pointer"
                         >
-                          Clear
+                          Clear Selection
                         </button>
                       )}
                     </div>
