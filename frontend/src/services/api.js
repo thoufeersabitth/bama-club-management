@@ -985,6 +985,8 @@ export const filterOutDummyShifts = (list) => {
 };
 
 export const fetchTrainingSchedules = async () => {
+  const branches = await fetchBranches();
+
   const deletedShiftIds = (() => {
     try {
       return JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
@@ -1026,7 +1028,34 @@ export const fetchTrainingSchedules = async () => {
     console.error('Failed to fetch training schedules from Fly.io live server:', err);
   }
 
-  // 2. Check localStorage for any local shifts
+  // 2. Automatically ensure every active branch with timings has its official training shift
+  branches.forEach(b => {
+    if (b && b.name && b.timings) {
+      const bName = b.name;
+      const bShiftName = `${bName} Batch`;
+      const key = String(bShiftName + bName).toLowerCase().trim();
+      const bId = String(b.id || '');
+      if (!deletedShiftIds.includes(bId) && !deletedShiftIds.includes(key) && !deletedShiftIds.includes(bName.toLowerCase().trim())) {
+        const hasExistingShiftForBranch = Array.from(scheduleMap.values()).some(
+          s => String(s.branch || '').toLowerCase().trim() === bName.toLowerCase().trim()
+        );
+        if (!hasExistingShiftForBranch) {
+          scheduleMap.set(key, {
+            id: `shift-${b.id || Date.now()}`,
+            name: bShiftName,
+            branch: bName,
+            days: 'Mon, Wed, Fri',
+            time: b.timings,
+            instructor: b.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+            targetGroup: 'All Belts & Cadets',
+            status: 'Active'
+          });
+        }
+      }
+    }
+  });
+
+  // 3. Check localStorage for any local user shifts
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
@@ -1044,7 +1073,9 @@ export const fetchTrainingSchedules = async () => {
     }
   } catch (e) {}
 
-  const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values()));
+  const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values())).filter(
+    s => !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())
+  );
   try {
     localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
   } catch (e) {}

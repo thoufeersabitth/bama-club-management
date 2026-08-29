@@ -186,6 +186,25 @@ export default function BranchManagement() {
       const serverCreated = await createBranchBackend(newB);
       const finalBranch = serverCreated?.id ? serverCreated : newB;
       updatedList = [...branches, finalBranch];
+
+      // Auto-create training shift for this new branch
+      if (formData.timings && String(formData.timings).trim() !== '') {
+        const bName = formData.name || 'Dojo Branch';
+        const branchShift = {
+          id: `shift-${Date.now()}`,
+          name: `${bName} Batch`,
+          branch: bName,
+          days: 'Mon, Wed, Fri',
+          time: formData.timings,
+          instructor: formData.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+          targetGroup: 'All Belts & Cadets',
+          status: 'Active'
+        };
+        createTrainingScheduleBackend(branchShift).then(savedShift => {
+          setSchedules(prev => [...prev, savedShift]);
+          window.dispatchEvent(new Event('bama_schedules_updated'));
+        }).catch(() => {});
+      }
     }
 
     setBranches(updatedList);
