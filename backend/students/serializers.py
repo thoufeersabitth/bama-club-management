@@ -32,6 +32,11 @@ class StudentSerializer(serializers.ModelSerializer):
             'initialPaidAmount': 'initial_paid_amount',
             'pendingAmount': 'pending_amount',
             'feeStatus': 'fee_status',
+            'feeFrequency': 'fee_frequency',
+            'paidMonths': 'paid_months',
+            'admissionFee': 'admission_fee',
+            'admissionFeePaidAmount': 'admission_fee_paid_amount',
+            'admissionFeePaid': 'admission_fee_paid',
             'joiningDate': 'joining_date',
             'medicalNotes': 'medical_notes'
         }

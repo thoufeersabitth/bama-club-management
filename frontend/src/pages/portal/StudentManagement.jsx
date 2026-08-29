@@ -1579,21 +1579,29 @@ export default function StudentManagement() {
                 'September 2026', 'October 2026', 'November 2026', 'December 2026'
               ];
 
+              const currentMonthIdx = new Date().getMonth(); // 7 for August
+
               const monthlyBreakdown = ALL_MONTHS.map((mName, idx) => {
                 const isBeforeJoining = idx < joiningMonthIdx;
                 const explicitlyPaid = paidMonthsList.includes(mName);
                 const isPaid = isBeforeJoining ? true : explicitlyPaid;
+                const isPastOrCurrent = idx <= currentMonthIdx;
+                const isFuture = idx > currentMonthIdx;
 
                 return {
                   month: mName,
                   rate: monthlyRate,
                   isBeforeJoining,
                   isPaid,
-                  status: isBeforeJoining ? 'Before Joining' : isPaid ? 'Paid' : 'Unpaid'
+                  isPastOrCurrent,
+                  isFuture,
+                  status: isBeforeJoining ? 'Before Joining' : isPaid ? 'Paid' : isPastOrCurrent ? 'Overdue' : 'Upcoming'
                 };
               });
 
-              const unpaidMonths = monthlyBreakdown.filter(m => !m.isBeforeJoining && !m.isPaid);
+              const unpaidDueMonths = monthlyBreakdown.filter(m => !m.isBeforeJoining && !m.isPaid && m.isPastOrCurrent);
+              const unpaidFutureMonths = monthlyBreakdown.filter(m => !m.isBeforeJoining && !m.isPaid && m.isFuture);
+              const allUnpaidMonths = monthlyBreakdown.filter(m => !m.isBeforeJoining && !m.isPaid);
               const selectedMonthsCost = selectedDuesMonths.length * monthlyRate;
 
               const toggleSelectMonth = (mName) => {
@@ -1604,8 +1612,18 @@ export default function StudentManagement() {
                 }
               };
 
+              const selectOverdueMonths = () => {
+                setSelectedDuesMonths(unpaidDueMonths.map(m => m.month));
+              };
+
+              const selectNextAdvanceMonth = () => {
+                if (unpaidFutureMonths.length > 0) {
+                  setSelectedDuesMonths([unpaidFutureMonths[0].month]);
+                }
+              };
+
               const selectAllUnpaid = () => {
-                setSelectedDuesMonths(unpaidMonths.map(m => m.month));
+                setSelectedDuesMonths(allUnpaidMonths.map(m => m.month));
               };
 
               const handleCollectSelectedMonths = async () => {
@@ -1672,30 +1690,51 @@ export default function StudentManagement() {
                         </span>
                       </div>
                       <p className="text-[11px] text-gray-500 font-medium mt-0.5">
-                        Select unpaid months to settle dues (₹{monthlyRate} per month) and send WhatsApp receipt.
+                        {unpaidDueMonths.length === 0 
+                          ? `✓ All current dues are cleared (₹0 Due). Future months can be paid in advance.` 
+                          : `⚠️ ${unpaidDueMonths.length} month(s) overdue from joining date.`}
                       </p>
                     </div>
 
-                    {unpaidMonths.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {unpaidDueMonths.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={selectOverdueMonths}
+                          className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
+                        >
+                          ⚡ Settle Overdue ({unpaidDueMonths.length} Due = ₹{unpaidDueMonths.length * monthlyRate})
+                        </button>
+                      ) : unpaidFutureMonths.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={selectNextAdvanceMonth}
+                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1"
+                        >
+                          ⚡ Pay Advance ({unpaidFutureMonths[0].month.split(' ')[0]} - ₹{monthlyRate})
+                        </button>
+                      ) : null}
+
+                      {allUnpaidMonths.length > 0 && (
                         <button
                           type="button"
                           onClick={selectAllUnpaid}
                           className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-black rounded-lg font-bold text-xs shadow-xs cursor-pointer"
                         >
-                          Select All ({unpaidMonths.length} Unpaid = ₹{unpaidMonths.length * monthlyRate})
+                          Select All ({allUnpaidMonths.length})
                         </button>
-                        {selectedDuesMonths.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDuesMonths([])}
-                            className="px-2.5 py-1 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg font-bold text-xs cursor-pointer"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
-                    )}
+                      )}
+
+                      {selectedDuesMonths.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedDuesMonths([])}
+                          className="px-2.5 py-1 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg font-bold text-xs cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {settleSuccessMsg && (
@@ -1727,6 +1766,33 @@ export default function StudentManagement() {
                         );
                       }
 
+                      if (m.isPastOrCurrent) {
+                        return (
+                          <div 
+                            key={idx} 
+                            onClick={() => toggleSelectMonth(m.month)}
+                            className={`p-2.5 rounded-xl border text-center text-xs font-bold cursor-pointer transition select-none shadow-xs ${
+                              isSelected 
+                                ? 'bg-amber-500 text-black border-amber-600 shadow-sm ring-2 ring-amber-400' 
+                                : 'bg-rose-50/70 text-rose-700 border-rose-300 hover:border-amber-400 hover:bg-amber-50/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-center gap-1">
+                              <input 
+                                type="checkbox" 
+                                checked={isSelected} 
+                                onChange={() => {}} 
+                                className="w-3.5 h-3.5 rounded text-amber-600 cursor-pointer"
+                              />
+                              <span>{m.month}</span>
+                            </div>
+                            <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'text-black' : 'text-rose-600'}`}>
+                              ❌ Overdue: ₹{m.rate}
+                            </span>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div 
                           key={idx} 
@@ -1734,7 +1800,7 @@ export default function StudentManagement() {
                           className={`p-2.5 rounded-xl border text-center text-xs font-bold cursor-pointer transition select-none shadow-xs ${
                             isSelected 
                               ? 'bg-amber-500 text-black border-amber-600 shadow-sm ring-2 ring-amber-400' 
-                              : 'bg-white text-rose-700 border-rose-200 hover:border-amber-400 hover:bg-amber-50/50'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400 hover:bg-blue-50/50'
                           }`}
                         >
                           <div className="flex items-center justify-center gap-1">
@@ -1746,8 +1812,8 @@ export default function StudentManagement() {
                             />
                             <span>{m.month}</span>
                           </div>
-                          <span className={`block text-[10px] font-black mt-0.5 ${isSelected ? 'text-black' : 'text-rose-600'}`}>
-                            ❌ Due: ₹{m.rate}
+                          <span className={`block text-[10px] font-semibold mt-0.5 ${isSelected ? 'text-black font-bold' : 'text-gray-500'}`}>
+                            🗓️ Advance (₹{m.rate})
                           </span>
                         </div>
                       );
