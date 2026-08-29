@@ -108,6 +108,22 @@ export const INITIAL_BRANCHES = [
     status: "Active",
     isHeadOffice: false,
     mapUrl: "https://maps.google.com/?q=Feroke+Kozhikode"
+  },
+  {
+    id: "a2393611-68f4-435a-a8cb-38715bc30673",
+    name: "Mongam Branch Dojo",
+    code: "MNG-03",
+    address: "Dojo Complex, Near Bus Stand, Mongam, Malappuram, Kerala - 673642",
+    phone: "+91 98471 22334",
+    whatsapp: "+91 98471 22334",
+    email: "mongam@bama.in",
+    branch_head: "Sensei Muhammed Haneen (2nd Dan)",
+    head: "Sensei Muhammed Haneen (2nd Dan)",
+    timings: "Mon, Wed, Fri: 6:00 AM - 7:30 AM & 4:30 PM - 6:30 PM",
+    facilities: ["🥋 Professional Tatami Mats", "🥊 Heavy Kick Bags", "❄️ AC Dojo Hall"],
+    status: "Active",
+    isHeadOffice: false,
+    mapUrl: "https://maps.google.com/?q=Mongam+Malappuram"
   }
 ];
 

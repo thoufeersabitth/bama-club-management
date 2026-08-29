@@ -741,7 +741,34 @@ export const fetchBranches = async () => {
     if (key) branchMap.set(key, b);
   });
 
-  // 2. Check local storage cache keys
+  // 2. Fetch directly from Fly.io live PostgreSQL server FIRST
+  try {
+    const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const serverBranches = data.results || (Array.isArray(data) ? data : []);
+      if (Array.isArray(serverBranches) && serverBranches.length > 0) {
+        serverBranches.forEach(b => {
+          const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+          if (key) {
+            branchMap.set(key, {
+              ...b,
+              isHeadOffice: b.is_head_office ?? b.isHeadOffice,
+              head: b.branch_head || b.head,
+              image: b.image || b.photo || '/assets/prog_adults.jpg'
+            });
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch branches from Fly.io live server:', err);
+  }
+
+  // 3. Merge with local storage cache keys
   try {
     const saved = localStorage.getItem('bama_custom_branches');
     if (saved) {
@@ -749,63 +776,11 @@ export const fetchBranches = async () => {
       if (Array.isArray(parsed)) {
         parsed.forEach(b => {
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-          if (key) branchMap.set(key, { ...(branchMap.get(key) || {}), ...b });
+          if (key && !branchMap.has(key)) branchMap.set(key, b);
         });
       }
     }
   } catch (e) {}
-
-  try {
-    const saved2 = localStorage.getItem('bama_branches');
-    if (saved2) {
-      const parsed2 = JSON.parse(saved2);
-      if (Array.isArray(parsed2)) {
-        parsed2.forEach(b => {
-          const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-          if (key) branchMap.set(key, { ...(branchMap.get(key) || {}), ...b });
-        });
-      }
-    }
-  } catch (e) {}
-
-  // 3. Scan existing cadet records for any active branches
-  try {
-    const stds = getStoredStudents();
-    stds.forEach(s => {
-      const bName = s.branch_name || s.branch || (typeof s.branch_detail === 'object' ? s.branch_detail?.name : '');
-      if (bName && typeof bName === 'string') {
-        const key = bName.toLowerCase().trim();
-        if (key && !branchMap.has(key) && !key.includes('all')) {
-          branchMap.set(key, {
-            id: s.branch_id || `branch-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-            name: bName,
-            code: `BAMA-${key.slice(0, 4).toUpperCase()}`,
-            address: s.address || 'Kerala, India',
-            phone: '+91 95440 85442',
-            whatsapp: '+91 95440 85442',
-            email: '',
-            branch_head: 'Sensei Abdul Rahman (5th Dan)',
-            is_head_office: false,
-            timings: 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
-            facilities: ['🥋 Tatami Safety Mats', '🥊 Heavy Bags', '❄️ AC Hall'],
-            status: 'Active'
-          });
-        }
-      }
-    });
-  } catch (e) {}
-
-  // 4. Fetch from Fly.io live server
-  try {
-    const res = await api.get('/branches/');
-    const serverBranches = res.data.results || res.data || [];
-    if (Array.isArray(serverBranches) && serverBranches.length > 0) {
-      serverBranches.forEach(b => {
-        const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-        if (key) branchMap.set(key, { ...(branchMap.get(key) || {}), ...b });
-      });
-    }
-  } catch (err) {}
 
   const cleaned = sanitizeBranches(Array.from(branchMap.values()));
   try {
