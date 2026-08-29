@@ -976,9 +976,10 @@ export const filterOutDummyShifts = (list) => {
   if (!Array.isArray(list)) return [];
   return list.filter(s => {
     if (!s) return false;
-    const sId = String(s.id || '').trim();
+    const sId = String(s.id || '').trim().toLowerCase();
     const sName = String(s.name || '').toLowerCase().trim();
     if (DUMMY_SHIFT_IDS.includes(sId) || DUMMY_SHIFT_NAMES.includes(sName)) return false;
+    if (sName.startsWith('general training batch') || sId.startsWith('shift-branch-') || sName.includes('general training batch')) return false;
     return true;
   });
 };
@@ -994,7 +995,7 @@ export const fetchTrainingSchedules = async () => {
 
   const scheduleMap = new Map();
 
-  // 1. Fetch from live Fly.io PostgreSQL announcements API
+  // 1. Fetch from live Fly.io PostgreSQL announcements API (Single Source of Truth)
   try {
     const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
       headers: { 'Accept': 'application/json' },
@@ -1034,14 +1035,16 @@ export const fetchTrainingSchedules = async () => {
         filterOutDummyShifts(parsed).forEach(s => {
           const key = String(s.name + (s.branch || '')).toLowerCase().trim();
           if (key && !scheduleMap.has(key) && !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())) {
-            scheduleMap.set(key, s);
+            if (typeof s.id === 'string' && s.id.length > 20) {
+              scheduleMap.set(key, s);
+            }
           }
         });
       }
     }
   } catch (e) {}
 
-  const finalSchedules = Array.from(scheduleMap.values());
+  const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values()));
   try {
     localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
   } catch (e) {}
