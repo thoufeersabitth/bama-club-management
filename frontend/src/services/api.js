@@ -980,8 +980,72 @@ export const publicSubmitExamRegistrationBackend = async (data) => {
   }
 };
 
+export const fetchAttendance = async (dateStr, branchId) => {
+  try {
+    let url = `https://bama-club-backend.fly.dev/api/attendance/?date=${dateStr}`;
+    if (branchId && branchId !== 'All') {
+      url += `&branch=${branchId}`;
+    }
+    const res = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.results || []);
+    }
+  } catch (err) {
+    console.error('Failed to fetch live attendance:', err);
+  }
+  return [];
+};
+
+export const saveSingleAttendanceRecord = async (studentId, dateStr, status, branchId) => {
+  try {
+    const formattedStatus = String(status || 'Present').charAt(0).toUpperCase() + String(status || 'Present').slice(1).toLowerCase();
+    const payload = {
+      student: studentId,
+      date: dateStr,
+      status: formattedStatus,
+      branch: branchId || null,
+      marked_by: 'Sensei Master'
+    };
+
+    const res = await fetch('https://bama-club-backend.fly.dev/api/attendance/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('Failed to save single attendance:', err);
+  }
+  return null;
+};
+
 export const saveAttendanceToBackend = async (dateStr, records, studentsList) => {
   try {
+    const res = await fetch('https://bama-club-backend.fly.dev/api/attendance/bulk_save/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        date: dateStr,
+        records: records,
+        marked_by: 'Sensei Master'
+      })
+    });
+
+    if (res.ok) {
+      return true;
+    }
+
     const promises = Object.entries(records).map(async ([studentKey, status]) => {
       const formattedStatus = (status || 'PRESENT').toLowerCase() === 'absent' ? 'Absent' 
         : (status || 'PRESENT').toLowerCase() === 'late' ? 'Late' 
@@ -1001,7 +1065,14 @@ export const saveAttendanceToBackend = async (dateStr, records, studentsList) =>
       };
 
       try {
-        return await api.post('/attendance/', payload);
+        return await fetch('https://bama-club-backend.fly.dev/api/attendance/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
       } catch (err) {
         return null;
       }

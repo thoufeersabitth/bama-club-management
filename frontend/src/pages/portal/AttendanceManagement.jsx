@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings } from 'lucide-react';
-import { fetchStudents, saveAttendanceToBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
+import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings, RefreshCw } from 'lucide-react';
+import { fetchStudents, fetchAttendance, saveSingleAttendanceRecord, saveAttendanceToBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -134,26 +134,60 @@ export default function AttendanceManagement() {
   };
 
   const monthlyStats = getMonthlyClassStats();
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
 
-  // Load students & saved attendance for selected date
+  // Load students & live database saved attendance for selected date
   useEffect(() => {
-    fetchStudents().then(data => {
-      setStudents(data || []);
+    setLoadingAttendance(true);
+    Promise.all([
+      fetchStudents(),
+      fetchAttendance(selectedDate)
+    ]).then(([stdData, liveAttRecords]) => {
+      const cadets = stdData || [];
+      setStudents(cadets);
 
+      const initial = {};
+      cadets.forEach(s => {
+        initial[s.id || s.admissionNo] = 'PRESENT';
+      });
+
+      // 1. Check if backend database has attendance records for this date
+      if (Array.isArray(liveAttRecords) && liveAttRecords.length > 0) {
+        liveAttRecords.forEach(rec => {
+          const stdId = rec.student || rec.student_detail?.id || rec.student_detail?.admission_no || rec.student_detail?.admissionNo;
+          const status = String(rec.status || 'Present').toUpperCase();
+          if (stdId) {
+            initial[stdId] = status;
+            const matchedCadet = cadets.find(c => String(c.id) === String(stdId) || String(c.admissionNo || c.admission_no) === String(stdId));
+            if (matchedCadet) {
+              if (matchedCadet.id) initial[matchedCadet.id] = status;
+              if (matchedCadet.admissionNo) initial[matchedCadet.admissionNo] = status;
+              if (matchedCadet.admission_no) initial[matchedCadet.admission_no] = status;
+            }
+          }
+        });
+        setAttendanceRecords(initial);
+        try {
+          localStorage.setItem(`bama_attendance_${selectedDate}`, JSON.stringify(initial));
+        } catch (e) {}
+        setLoadingAttendance(false);
+        return;
+      }
+
+      // 2. Fallback to localStorage cache if backend has no records yet
       try {
         const saved = localStorage.getItem(`bama_attendance_${selectedDate}`);
         if (saved) {
           setAttendanceRecords(JSON.parse(saved));
+          setLoadingAttendance(false);
           return;
         }
       } catch (e) {}
 
-      // Default all cadets to PRESENT
-      const initial = {};
-      (data || []).forEach(s => {
-        initial[s.id || s.admissionNo] = 'PRESENT';
-      });
       setAttendanceRecords(initial);
+      setLoadingAttendance(false);
+    }).catch(() => {
+      setLoadingAttendance(false);
     });
   }, [selectedDate]);
 
@@ -164,7 +198,7 @@ export default function AttendanceManagement() {
     };
     setAttendanceRecords(updated);
 
-    // Auto sync live summary
+    // Auto sync live summary & localStorage
     try {
       localStorage.setItem(`bama_attendance_${selectedDate}`, JSON.stringify(updated));
       const total = filteredStudents.length;
@@ -183,6 +217,11 @@ export default function AttendanceManagement() {
       };
       localStorage.setItem('bama_latest_attendance_summary', JSON.stringify(summary));
     } catch (e) {}
+
+    // Auto-save this single student change directly to PostgreSQL live database!
+    const targetCadet = students.find(s => String(s.id) === String(studentId) || String(s.admissionNo || s.admission_no) === String(studentId));
+    const branchId = targetCadet?.branch_id || targetCadet?.branch;
+    saveSingleAttendanceRecord(targetCadet?.id || studentId, selectedDate, status, branchId).catch(() => {});
   };
 
   const handleSaveAttendance = async () => {
@@ -597,6 +636,9 @@ export default function AttendanceManagement() {
                 const allPresent = { ...attendanceRecords };
                 filteredStudents.forEach(s => { allPresent[s.id || s.admissionNo] = 'PRESENT'; });
                 setAttendanceRecords(allPresent);
+                saveAttendanceToBackend(selectedDate, allPresent, students).catch(() => {});
+                setSaveSuccessMsg(`✓ Marked all cadets Present for ${selectedDate}!`);
+                setTimeout(() => setSaveSuccessMsg(''), 3000);
               }}
               className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
             >
@@ -608,6 +650,9 @@ export default function AttendanceManagement() {
                 const allAbsent = { ...attendanceRecords };
                 filteredStudents.forEach(s => { allAbsent[s.id || s.admissionNo] = 'ABSENT'; });
                 setAttendanceRecords(allAbsent);
+                saveAttendanceToBackend(selectedDate, allAbsent, students).catch(() => {});
+                setSaveSuccessMsg(`✓ Marked all cadets Absent for ${selectedDate}!`);
+                setTimeout(() => setSaveSuccessMsg(''), 3000);
               }}
               className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer shadow-2xs"
             >
