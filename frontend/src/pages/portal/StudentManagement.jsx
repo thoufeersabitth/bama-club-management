@@ -3875,7 +3875,7 @@ export default function StudentManagement() {
                     className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer accent-blue-600"
                   />
                   <label htmlFor="updateExistingCadetsCheckbox" className="text-[11px] text-blue-950 font-bold cursor-pointer select-none">
-                    ഈ മാസം ({globalFeeSettings.effectiveMonth || 'September'} {globalFeeSettings.effectiveYear || 2026}) മുതൽ നിലവിലുള്ള എല്ലാ കുട്ടികൾക്കും ഫീസ് മാറ്റം ബാധകമാക്കുക (Tick to apply)
+                    Apply updated fee rates to all active cadets starting from {globalFeeSettings.effectiveMonth || 'September'} {globalFeeSettings.effectiveYear || 2026} onwards
                   </label>
                 </div>
               </div>
