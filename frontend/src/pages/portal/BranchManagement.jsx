@@ -8,59 +8,6 @@ import {
 import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, deleteTrainingSchedule, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
 
-const INITIAL_TRAINING_SCHEDULES = [
-  {
-    id: 'shift-101',
-    name: 'Evening Regular Karate Batch',
-    branch: 'Pulikkal Branch (Head Office)',
-    days: 'Mon, Wed, Fri',
-    time: '5:00 PM - 7:00 PM',
-    instructor: 'Sensei Abdul Rahman (5th Dan)',
-    targetGroup: 'All Belts & Cadets',
-    status: 'Active'
-  },
-  {
-    id: 'shift-102',
-    name: 'Morning Fitness & Kata Batch',
-    branch: 'Pulikkal Branch (Head Office)',
-    days: 'Mon, Wed, Fri',
-    time: '6:00 AM - 7:30 AM',
-    instructor: 'Sensei Rahul Kumar (3rd Dan)',
-    targetGroup: 'Adults & Senior Cadets',
-    status: 'Active'
-  },
-  {
-    id: 'shift-103',
-    name: 'Weekend Intensive Sparring & Belt Camp',
-    branch: 'Pulikkal Branch (Head Office)',
-    days: 'Sat & Sun',
-    time: '7:00 AM - 9:00 AM',
-    instructor: 'Sensei Abdul Rahman (5th Dan)',
-    targetGroup: 'Green Belt & Above',
-    status: 'Active'
-  },
-  {
-    id: 'shift-104',
-    name: 'Chungam Evening Karate & Kickboxing',
-    branch: 'Chungam Branch Dojo',
-    days: 'Tue, Thu, Sat',
-    time: '5:30 PM - 7:30 PM',
-    instructor: 'Sensei Rahul Kumar (3rd Dan)',
-    targetGroup: 'Kids & Beginners',
-    status: 'Active'
-  },
-  {
-    id: 'shift-105',
-    name: 'Mongam Dawn Kickboxing Batch',
-    branch: 'Mongam Branch Dojo',
-    days: 'Mon, Wed, Fri',
-    time: '6:00 AM - 7:30 AM',
-    instructor: 'Sensei Muhammed Haneen (2nd Dan)',
-    targetGroup: 'All Cadets',
-    status: 'Active'
-  }
-];
-
 export default function BranchManagement() {
   const navigate = useNavigate();
   const [branches, setBranches] = useState([]);
@@ -70,7 +17,7 @@ export default function BranchManagement() {
       const stored = localStorage.getItem('bama_training_schedules');
       if (stored) return JSON.parse(stored);
     } catch (e) {}
-    return INITIAL_TRAINING_SCHEDULES;
+    return [];
   });
   
   const [activeTab, setActiveTab] = useState('BRANCHES'); // 'BRANCHES' | 'SCHEDULES'

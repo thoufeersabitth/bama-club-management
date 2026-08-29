@@ -918,98 +918,10 @@ export const fetchTrainingSchedules = async () => {
       return [];
     }
   })();
-  
-  // Base default schedules for branches
-  const defaultSchedules = [
-    {
-      id: 'shift-101',
-      name: 'Evening Regular Karate Batch',
-      branch: 'Pulikkal Branch (Head Office)',
-      days: 'Mon, Wed, Fri',
-      time: '5:00 PM - 7:00 PM',
-      instructor: 'Sensei Abdul Rahman (5th Dan)',
-      targetGroup: 'All Belts & Cadets',
-      status: 'Active'
-    },
-    {
-      id: 'shift-102',
-      name: 'Morning Fitness & Kata Batch',
-      branch: 'Pulikkal Branch (Head Office)',
-      days: 'Mon, Wed, Fri',
-      time: '6:00 AM - 7:30 AM',
-      instructor: 'Sensei Rahul Kumar (3rd Dan)',
-      targetGroup: 'Adults & Senior Cadets',
-      status: 'Active'
-    },
-    {
-      id: 'shift-103',
-      name: 'Weekend Intensive Sparring & Belt Camp',
-      branch: 'Pulikkal Branch (Head Office)',
-      days: 'Sat & Sun',
-      time: '7:00 AM - 9:00 AM',
-      instructor: 'Sensei Abdul Rahman (5th Dan)',
-      targetGroup: 'Green Belt & Above',
-      status: 'Active'
-    },
-    {
-      id: 'shift-104',
-      name: 'Chungam Evening Karate & Kickboxing',
-      branch: 'Chungam Branch Dojo',
-      days: 'Tue, Thu, Sat',
-      time: '5:30 PM - 7:30 PM',
-      instructor: 'Sensei Muhammad Shafi (3rd Dan)',
-      targetGroup: 'Kids & Beginners',
-      status: 'Active'
-    },
-    {
-      id: 'shift-105',
-      name: 'Mongam Dawn Kickboxing Batch',
-      branch: 'Mongam Branch Dojo',
-      days: 'Mon, Wed, Fri',
-      time: '6:00 AM - 7:30 AM',
-      instructor: 'Sensei Muhammed Haneen (2nd Dan)',
-      targetGroup: 'All Cadets',
-      status: 'Active'
-    },
-    {
-      id: 'shift-106',
-      name: 'Feroke Weekend Karate Camp',
-      branch: 'Feroke Branch',
-      days: 'Sat & Sun',
-      time: '7:00 AM - 9:30 AM & 4:00 PM - 6:00 PM',
-      instructor: 'Sensei Rajesh Kumar (4th Dan)',
-      targetGroup: 'All Belts & Cadets',
-      status: 'Active'
-    }
-  ];
 
   const scheduleMap = new Map();
-  defaultSchedules.forEach(s => {
-    const key = String(s.name + s.branch).toLowerCase().trim();
-    if (!deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())) {
-      scheduleMap.set(key, s);
-    }
-  });
 
-  // Merge custom branches
-  branches.forEach(b => {
-    const bName = b.name || 'Dojo Branch';
-    const key = String(`General Training Batch - ${bName}`).toLowerCase().trim();
-    if (!scheduleMap.has(key) && !deletedShiftIds.includes(key)) {
-      scheduleMap.set(key, {
-        id: `shift-branch-${b.id || Date.now()}`,
-        name: `General Training Batch (${bName})`,
-        branch: bName,
-        days: 'Mon, Wed, Fri',
-        time: b.timings || '5:00 PM - 7:00 PM',
-        instructor: b.branch_head || 'Head Sensei',
-        targetGroup: 'All Belts & Cadets',
-        status: 'Active'
-      });
-    }
-  });
-
-  // Check localStorage for any user-created shifts
+  // 1. Load user-saved shifts from localStorage
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
@@ -1025,9 +937,30 @@ export const fetchTrainingSchedules = async () => {
     }
   } catch (e) {}
 
+  // 2. If NO custom shift has been created yet, generate strictly 1 primary shift from each branch's actual configured timings
+  if (scheduleMap.size === 0) {
+    branches.forEach(b => {
+      const bName = b.name || 'Dojo Branch';
+      const key = String(`Regular Dojo Batch - ${bName}`).toLowerCase().trim();
+      if (!deletedShiftIds.includes(key) && !deletedShiftIds.includes(bName.toLowerCase().trim())) {
+        scheduleMap.set(key, {
+          id: `shift-branch-${b.id || Date.now()}`,
+          name: `Regular Dojo Batch (${bName})`,
+          branch: bName,
+          days: 'Mon, Wed, Fri',
+          time: b.timings || '5:00 PM - 7:00 PM',
+          instructor: b.branch_head || 'Sensei Instructor',
+          targetGroup: 'All Belts & Cadets',
+          status: 'Active'
+        });
+      }
+    });
+  }
+
   const finalSchedules = Array.from(scheduleMap.values()).filter(s => 
     !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())
   );
+
   try {
     localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
   } catch (e) {}
