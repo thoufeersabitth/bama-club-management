@@ -40,6 +40,7 @@ export default function FeeManagement() {
   const [selectedMonth, setSelectedMonth] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedShift, setSelectedShift] = useState('All');
+  const [selectedBillingPlan, setSelectedBillingPlan] = useState('All'); // 'All' | 'MONTHLY' | 'QUARTERLY'
   const [selectedFeeIds, setSelectedFeeIds] = useState([]);
 
   const [activeReceipt, setActiveReceipt] = useState(null);
@@ -94,14 +95,21 @@ export default function FeeManagement() {
       fetchStudents().then(stdList => {
         const cadets = stdList || getStoredStudents();
         const dynamicFees = cadets.map(s => {
+          const cadetFreq = String(s.fee_frequency || s.feeFrequency || 'MONTHLY').toUpperCase();
+          const isQuarterly = cadetFreq === 'QUARTERLY' || cadetFreq === '3_MONTHS' || cadetFreq === 'SCHOOL_BATCH' || s.feeCycleMonths === 3;
+
           const isNewRate = isMonthOnOrAfterEffective(activeMonth, 2026, effMonth, effYear);
           const oldRate = parseInt(s.fee_amount ?? s.feeAmount ?? 500);
           const newRate = parseInt(globalSettings.defaultMonthlyFee) || 500;
           const feeAmt = isNewRate ? newRate : oldRate;
 
+          const paidMonthsList = Array.isArray(s.paid_months) ? s.paid_months : (Array.isArray(s.paidMonths) ? s.paidMonths : []);
           const initialPaid = parseInt(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
-          const pendingAmt = Math.max(0, feeAmt - initialPaid);
-          const calculatedStatus = pendingAmt === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
+
+          // For quarterly: check if active month is covered in paid_months
+          const isMonthPaidInList = paidMonthsList.some(m => m.toLowerCase().includes(activeMonth.toLowerCase()));
+          const pendingAmt = isMonthPaidInList ? 0 : Math.max(0, feeAmt - initialPaid);
+          const calculatedStatus = (pendingAmt === 0 || isMonthPaidInList) ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
 
           const admFee = parseInt(s.admissionFee !== undefined ? s.admissionFee : (s.admission_fee !== undefined ? s.admission_fee : 1000));
           const admPaid = parseInt(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? (admFee === 0 || s.admissionFeePaid || s.admission_fee_paid ? admFee : 0));
@@ -117,10 +125,12 @@ export default function FeeManagement() {
               admissionFeePaidAmount: admPaid,
               admissionFeePending: admPending
             },
+            billing_plan: isQuarterly ? 'QUARTERLY' : 'MONTHLY',
+            is_quarterly: isQuarterly,
             month: activeMonth,
             year: 2026,
             amount: feeAmt,
-            paid_amount: initialPaid,
+            paid_amount: isMonthPaidInList ? feeAmt : initialPaid,
             pending_amount: pendingAmt,
             admission_pending: admPending,
             status: calculatedStatus,
@@ -242,6 +252,16 @@ export default function FeeManagement() {
       try {
         const storedStudents = getStoredStudents();
         const targetId = paymentModalFee.student_detail?.id || paymentModalFee.student;
+        const isQuarterly = paymentModalFee.is_quarterly || String(paymentModalFee.student_detail?.fee_frequency || paymentModalFee.student_detail?.feeFrequency).toUpperCase() === 'QUARTERLY';
+        
+        const currentPaidMonths = Array.isArray(paymentModalFee.student_detail?.paid_months) 
+          ? paymentModalFee.student_detail.paid_months 
+          : (Array.isArray(paymentModalFee.student_detail?.paidMonths) ? paymentModalFee.student_detail.paidMonths : []);
+
+        const newPaidMonths = isQuarterly
+          ? Array.from(new Set([...currentPaidMonths, 'August 2026', 'September 2026', 'October 2026']))
+          : Array.from(new Set([...currentPaidMonths, `${paymentModalFee.month || 'August'} 2026`]));
+
         const updatedStudents = storedStudents.map(s => {
           if (s.id === targetId || s.admissionNo === paymentModalFee.student_detail?.admissionNo) {
             const newPaid = (parseFloat(s.initialPaidAmount || 0)) + paidVal;
@@ -251,6 +271,8 @@ export default function FeeManagement() {
 
             return {
               ...s,
+              paid_months: newPaidMonths,
+              paidMonths: newPaidMonths,
               initialPaidAmount: newPaid,
               initial_paid_amount: newPaid,
               pendingAmount: newPending,
@@ -267,7 +289,8 @@ export default function FeeManagement() {
           updateStudent(targetId, {
             initial_paid_amount: updatedFeeObj?.paid_amount,
             pending_amount: updatedFeeObj?.pending_amount,
-            fee_status: updatedFeeObj?.status
+            fee_status: updatedFeeObj?.status,
+            paid_months: newPaidMonths
           }).catch(() => {});
         }
 
@@ -409,7 +432,10 @@ export default function FeeManagement() {
     const cadetShift = std.shift || 'Evening Batch (5:00 PM - 7:00 PM)';
     const matchesShift = selectedShift === 'All' || cadetShift.toLowerCase().includes(selectedShift.toLowerCase());
 
-    return matchesSearch && matchesMonth && matchesStatus && matchesShift && matchesBranch;
+    const isQuarterly = f.is_quarterly || String(std.fee_frequency || std.feeFrequency).toUpperCase() === 'QUARTERLY';
+    const matchesPlan = selectedBillingPlan === 'All' || (selectedBillingPlan === 'QUARTERLY' ? isQuarterly : !isQuarterly);
+
+    return matchesSearch && matchesMonth && matchesStatus && matchesShift && matchesBranch && matchesPlan;
   });
 
   const totalCollected = filteredFees.reduce((acc, f) => {
@@ -554,7 +580,7 @@ export default function FeeManagement() {
           </div>
 
           {/* Filter Dropdowns Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 w-full sm:w-auto">
             {/* Branch Dojo Filter */}
             <div className="flex items-center gap-1.5 font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5">
               <Filter className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
@@ -582,6 +608,20 @@ export default function FeeManagement() {
                 {getDynamicShiftOptions().map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
+              </select>
+            </div>
+
+            {/* Billing Plan Filter */}
+            <div className="flex items-center gap-1.5 font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5">
+              <Calendar className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+              <select
+                value={selectedBillingPlan}
+                onChange={(e) => setSelectedBillingPlan(e.target.value)}
+                className="w-full bg-transparent text-xs text-gray-900 font-bold focus:outline-none cursor-pointer truncate"
+              >
+                <option value="All">All Billing Plans</option>
+                <option value="MONTHLY">🥋 Regular Dojo (Monthly)</option>
+                <option value="QUARTERLY">🏫 School Batch (3-Month)</option>
               </select>
             </div>
 
@@ -951,7 +991,18 @@ export default function FeeManagement() {
                           </div>
                         )}
                         <div>
-                          <strong className="text-gray-900 font-black text-sm block leading-tight">{std.name}</strong>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <strong className="text-gray-900 font-black text-sm block leading-tight">{std.name}</strong>
+                            {fee.is_quarterly ? (
+                              <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-800 border border-blue-200 text-[9px] font-black">
+                                🏫 School (3-Mo)
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-bold">
+                                🥋 Regular (Mo)
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[10px] text-gray-500 font-medium block">
                             {std.guardianName || std.guardian_name} • {std.phone}
                           </span>
@@ -964,7 +1015,16 @@ export default function FeeManagement() {
                       </span>
                     </td>
                     <td className="py-4 px-5 text-gray-700 font-bold text-xs">
-                      {fee.month || 'August'}
+                      {fee.is_quarterly ? (
+                        <div className="space-y-0.5">
+                          <span className="font-black text-blue-900 block">{fee.month || 'August'} 2026</span>
+                          <span className="text-[9px] text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded font-black block w-fit">
+                            3-Mo Block
+                          </span>
+                        </div>
+                      ) : (
+                        <span>{fee.month || 'August'} 2026</span>
+                      )}
                     </td>
                     <td className="py-4 px-5 font-mono">
                       <span className="text-emerald-600 font-black">₹{paidAmt}</span>

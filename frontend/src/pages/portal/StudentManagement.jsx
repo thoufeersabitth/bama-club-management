@@ -1036,46 +1036,6 @@ export default function StudentManagement() {
             </button>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Quick 1-Click Billing Plan Switcher */}
-              <button
-                type="button"
-                onClick={async () => {
-                  const currentPlan = String(std.fee_frequency || std.feeFrequency || 'MONTHLY').toUpperCase();
-                  const newPlan = (currentPlan === 'QUARTERLY' || currentPlan === '3_MONTHS' || currentPlan === 'SCHOOL_BATCH') ? 'MONTHLY' : 'QUARTERLY';
-                  const newCycleMonths = newPlan === 'MONTHLY' ? 1 : 3;
-
-                  const updatedStudentObj = {
-                    ...std,
-                    fee_frequency: newPlan,
-                    feeFrequency: newPlan,
-                    feeCycleMonths: newCycleMonths
-                  };
-
-                  setDetailStudent(updatedStudentObj);
-
-                  const currentStudents = getStoredStudents();
-                  const updatedRoster = currentStudents.map(s => 
-                    (s.id === std.id || s.admissionNo === std.admissionNo) ? updatedStudentObj : s
-                  );
-                  saveStoredStudents(updatedRoster);
-                  setStudents(updatedRoster);
-
-                  try {
-                    await updateStudent(std.id, {
-                      fee_frequency: newPlan,
-                      feeFrequency: newPlan
-                    });
-                  } catch (e) {}
-
-                  alert(`✓ Cadet billing plan switched to ${newPlan === 'QUARTERLY' ? 'School Batch (3-Month Term Plan)' : 'Regular Dojo (Monthly Plan)'}!`);
-                }}
-                className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-                title="Click to switch between Regular Monthly and School 3-Month Term Plan"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
-                <span>Switch to {String(std.fee_frequency || std.feeFrequency || 'MONTHLY').toUpperCase() === 'QUARTERLY' ? '🥋 Regular (Monthly)' : '🏫 School (3-Month)'}</span>
-              </button>
-
               <button
                 type="button"
                 onClick={() => openWhatsApp({ 
