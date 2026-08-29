@@ -185,6 +185,9 @@ export const getStoredStudents = () => {
             const pendingDues = parseFloat(st.pendingAmount ?? st.pending_amount ?? Math.max(0, monthlyFee - monthlyPaid));
             const feeStat = st.feeStatus || st.fee_status || (pendingDues === 0 ? 'Paid' : monthlyPaid > 0 ? 'Partial' : 'Pending');
 
+            const cadetFeeFreq = st.fee_frequency || st.feeFrequency || 'MONTHLY';
+            const cadetPaidMonths = Array.isArray(st.paid_months) ? st.paid_months : (Array.isArray(st.paidMonths) ? st.paidMonths : []);
+
             return {
               ...st,
               name: st.name || st.student_name || 'Cadet',
@@ -197,6 +200,11 @@ export const getStoredStudents = () => {
               admission_fee_paid_amount: admPaid,
               admissionFeePaid: st.admissionFeePaid ?? st.admission_fee_paid ?? (admPaid >= admFee),
               admission_fee_paid: st.admissionFeePaid ?? st.admission_fee_paid ?? (admPaid >= admFee),
+              feeFrequency: cadetFeeFreq,
+              fee_frequency: cadetFeeFreq,
+              feeCycleMonths: st.feeCycleMonths || (cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1),
+              paid_months: cadetPaidMonths,
+              paidMonths: cadetPaidMonths,
               feeAmount: monthlyFee,
               fee_amount: monthlyFee,
               initialPaidAmount: monthlyPaid,
@@ -255,6 +263,9 @@ export const saveStoredStudents = (students) => {
       const pendingDues = parseFloat(st.pendingAmount ?? st.pending_amount ?? Math.max(0, (admFee + monthlyFee) - (admPaid + monthlyPaid)));
       const feeStat = st.feeStatus || st.fee_status || (pendingDues === 0 ? 'Paid' : (admPaid + monthlyPaid) > 0 ? 'Partial' : 'Pending');
 
+      const cadetFeeFreq = st.fee_frequency || st.feeFrequency || 'MONTHLY';
+      const cadetPaidMonths = Array.isArray(st.paid_months) ? st.paid_months : (Array.isArray(st.paidMonths) ? st.paidMonths : []);
+
       return {
         ...st,
         name: st.name || st.student_name || 'Cadet',
@@ -267,6 +278,11 @@ export const saveStoredStudents = (students) => {
         admission_fee_paid_amount: admPaid,
         admissionFeePaid: st.admissionFeePaid ?? st.admission_fee_paid ?? (admPaid >= admFee),
         admission_fee_paid: st.admissionFeePaid ?? st.admission_fee_paid ?? (admPaid >= admFee),
+        feeFrequency: cadetFeeFreq,
+        fee_frequency: cadetFeeFreq,
+        feeCycleMonths: st.feeCycleMonths || (cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1),
+        paid_months: cadetPaidMonths,
+        paidMonths: cadetPaidMonths,
         feeAmount: monthlyFee,
         fee_amount: monthlyFee,
         initialPaidAmount: monthlyPaid,
@@ -416,6 +432,9 @@ export const fetchStudents = async (params = {}) => {
           const pendingDues = parseFloat(s.pendingAmount ?? s.pending_amount ?? Math.max(0, (admFee + monthlyFee) - (admPaid + monthlyPaid)));
           const feeStat = s.feeStatus || s.fee_status || (pendingDues === 0 ? 'Paid' : (admPaid + monthlyPaid) > 0 ? 'Partial' : 'Pending');
 
+          const cadetFeeFreq = s.fee_frequency || s.feeFrequency || 'MONTHLY';
+          const cadetPaidMonths = Array.isArray(s.paid_months) ? s.paid_months : (Array.isArray(s.paidMonths) ? s.paidMonths : []);
+
           return {
             ...s,
             name: s.name || s.student_name || 'Cadet',
@@ -427,6 +446,12 @@ export const fetchStudents = async (params = {}) => {
             admissionFeePaidAmount: admPaid,
             admission_fee_paid_amount: admPaid,
             admissionFeePaid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
+            admission_fee_paid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
+            feeFrequency: cadetFeeFreq,
+            fee_frequency: cadetFeeFreq,
+            feeCycleMonths: s.feeCycleMonths || (cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1),
+            paid_months: cadetPaidMonths,
+            paidMonths: cadetPaidMonths,
             feeAmount: monthlyFee,
             fee_amount: monthlyFee,
             initialPaidAmount: monthlyPaid,
@@ -469,6 +494,9 @@ export const createStudent = async (data) => {
   const pendingAmt = parseFloat(data.pendingAmount ?? data.pending_amount ?? Math.max(0, (admFee + amount) - totalCollected));
   const status = data.feeStatus ?? data.fee_status ?? (pendingAmt === 0 ? 'Paid' : totalCollected > 0 ? 'Partial' : 'Pending');
 
+  const cadetFeeFreq = data.fee_frequency || data.feeFrequency || 'MONTHLY';
+  const cadetPaidMonths = Array.isArray(data.paid_months) ? data.paid_months : (Array.isArray(data.paidMonths) ? data.paidMonths : []);
+
   const branchVal = data.branch_id || data.branch || data.branch_name || '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
   const branchName = data.branch_name || data.branchName || (typeof data.branch === 'string' && data.branch.length < 50 ? data.branch : 'Pulikkal Branch (Head Office)');
 
@@ -487,11 +515,14 @@ export const createStudent = async (data) => {
     branch: branchVal,
     shift: data.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
     admission_fee: admFee,
+    admission_fee_paid_amount: admPaid,
+    admission_fee_paid: isAdmPaid,
+    fee_frequency: cadetFeeFreq,
     fee_amount: amount,
     initial_paid_amount: initialPaid,
-    admission_fee_paid_amount: admPaid,
     pending_amount: pendingAmt,
     fee_status: status,
+    paid_months: cadetPaidMonths,
     joining_date: data.joiningDate || data.joining_date || new Date().toISOString().split('T')[0],
     address: data.address || 'Pulikkal, Malappuram, Kerala',
     photo: data.photo || '',
@@ -520,6 +551,17 @@ export const createStudent = async (data) => {
         id: serverCadet?.id || `std-${Date.now()}`,
         admissionNo: adm,
         admission_no: adm,
+        feeFrequency: cadetFeeFreq,
+        fee_frequency: cadetFeeFreq,
+        feeCycleMonths: cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1,
+        paidMonths: cadetPaidMonths,
+        paid_months: cadetPaidMonths,
+        admissionFee: admFee,
+        admission_fee: admFee,
+        admissionFeePaidAmount: admPaid,
+        admission_fee_paid_amount: admPaid,
+        admissionFeePaid: isAdmPaid,
+        admission_fee_paid: isAdmPaid,
         branch: serverBranchName,
         branch_id: serverBranchId,
         branch_name: serverBranchName,
