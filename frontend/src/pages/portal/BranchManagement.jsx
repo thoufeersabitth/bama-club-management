@@ -212,8 +212,10 @@ export default function BranchManagement() {
         photo: photoUrl,
         status: 'Active'
       };
-      updatedList = [...branches, newB];
-      createBranchBackend(newB).catch(() => {});
+      
+      const serverCreated = await createBranchBackend(newB);
+      const finalBranch = serverCreated?.id ? serverCreated : newB;
+      updatedList = [...branches, finalBranch];
     }
 
     setBranches(updatedList);
@@ -278,12 +280,13 @@ export default function BranchManagement() {
     setShowShiftModal(true);
   };
 
-  const handleDeleteBranch = (id) => {
+  const handleDeleteBranch = async (id) => {
     if (window.confirm('Are you sure you want to delete this Branch Dojo?')) {
+      deleteBranchBackend(id).catch(() => {});
       const updatedList = branches.filter(b => b.id !== id);
       setBranches(updatedList);
-      deleteBranchBackend(id).catch(() => {});
       localStorage.setItem('bama_custom_branches', JSON.stringify(updatedList));
+      localStorage.setItem('bama_branches', JSON.stringify(updatedList));
       window.dispatchEvent(new Event('bama_branches_updated'));
       window.dispatchEvent(new Event('bama_data_updated'));
     }

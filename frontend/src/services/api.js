@@ -821,60 +821,66 @@ export const createBranchBackend = async (branchData) => {
     const payload = {
       name: branchData.name || 'New Dojo Branch',
       code: branchData.code || `BAMA-DOJO-${Math.floor(10 + Math.random() * 90)}`,
-      address: branchData.address || '',
-      phone: branchData.phone || '+91 95440 85442',
-      whatsapp: branchData.whatsapp || branchData.phone || '+91 95440 85442',
+      address: branchData.address || 'Kerala, India',
+      phone: branchData.phone || '+91 9544085442',
+      whatsapp: branchData.whatsapp || branchData.phone || '+91 9544085442',
       email: branchData.email || '',
       branch_head: branchData.branch_head || branchData.head || 'Sensei Abdul Rahman (5th Dan)',
-      is_head_office: !!branchData.isHeadOffice || !!branchData.is_head_office,
+      is_head_office: !!branchData.isHeadOffice,
       timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
       status: branchData.status || 'Active'
     };
     const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(payload)
     });
     if (res.ok) {
-      return await res.json();
+      const serverData = await res.json();
+      return { ...branchData, ...serverData };
     }
   } catch (err) {
-    console.error('Failed to create branch backend:', err);
+    console.error('Failed to create branch on backend:', err);
   }
   return branchData;
 };
 
-export const updateBranchBackend = async (branchId, branchData) => {
+export const updateBranchBackend = async (id, branchData) => {
   try {
-    const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/${branchId}/`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(branchData)
-    });
-    if (res.ok) {
-      return await res.json();
+    const payload = {
+      name: branchData.name || 'Dojo Branch',
+      code: branchData.code || `BAMA-DOJO-${Math.floor(10 + Math.random() * 90)}`,
+      address: branchData.address || 'Kerala, India',
+      phone: branchData.phone || '+91 9544085442',
+      whatsapp: branchData.whatsapp || branchData.phone || '+91 9544085442',
+      email: branchData.email || '',
+      branch_head: branchData.branch_head || branchData.head || 'Sensei Abdul Rahman (5th Dan)',
+      is_head_office: !!branchData.isHeadOffice,
+      timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
+      status: branchData.status || 'Active'
+    };
+    
+    if (typeof id === 'string' && id.length > 20) {
+      await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
     }
   } catch (err) {
-    console.error('Failed to update branch backend:', err);
+    console.error('Failed to update branch on backend:', err);
   }
-  return branchData;
 };
 
-export const deleteBranchBackend = async (branchId) => {
+export const deleteBranchBackend = async (id) => {
   try {
-    const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/${branchId}/`, {
-      method: 'DELETE'
-    });
-    return res.ok;
+    if (typeof id === 'string' && id.length > 20) {
+      await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
+        method: 'DELETE'
+      });
+    }
   } catch (err) {
-    console.error('Failed to delete branch backend:', err);
-    return false;
+    console.error('Failed to delete branch on backend:', err);
   }
 };
 
@@ -1021,72 +1027,8 @@ export const publicSubmitExamRegistrationBackend = async (data) => {
   }
 };
 
-export const fetchAttendance = async (dateStr, branchId) => {
-  try {
-    let url = `https://bama-club-backend.fly.dev/api/attendance/?date=${dateStr}`;
-    if (branchId && branchId !== 'All') {
-      url += `&branch=${branchId}`;
-    }
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' }
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return Array.isArray(data) ? data : (data.results || []);
-    }
-  } catch (err) {
-    console.error('Failed to fetch live attendance:', err);
-  }
-  return [];
-};
-
-export const saveSingleAttendanceRecord = async (studentId, dateStr, status, branchId) => {
-  try {
-    const formattedStatus = String(status || 'Present').charAt(0).toUpperCase() + String(status || 'Present').slice(1).toLowerCase();
-    const payload = {
-      student: studentId,
-      date: dateStr,
-      status: formattedStatus,
-      branch: branchId || null,
-      marked_by: 'Sensei Master'
-    };
-
-    const res = await fetch('https://bama-club-backend.fly.dev/api/attendance/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (err) {
-    console.error('Failed to save single attendance:', err);
-  }
-  return null;
-};
-
 export const saveAttendanceToBackend = async (dateStr, records, studentsList) => {
   try {
-    const res = await fetch('https://bama-club-backend.fly.dev/api/attendance/bulk_save/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        date: dateStr,
-        records: records,
-        marked_by: 'Sensei Master'
-      })
-    });
-
-    if (res.ok) {
-      return true;
-    }
-
     const promises = Object.entries(records).map(async ([studentKey, status]) => {
       const formattedStatus = (status || 'PRESENT').toLowerCase() === 'absent' ? 'Absent' 
         : (status || 'PRESENT').toLowerCase() === 'late' ? 'Late' 
@@ -1106,14 +1048,7 @@ export const saveAttendanceToBackend = async (dateStr, records, studentsList) =>
       };
 
       try {
-        return await fetch('https://bama-club-backend.fly.dev/api/attendance/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
+        return await api.post('/attendance/', payload);
       } catch (err) {
         return null;
       }
@@ -1138,21 +1073,11 @@ export const saveFeePaymentBackend = async (feeData) => {
       status: feeData.status || 'Unpaid',
       receipt_no: feeData.receipt_no || `REC-${Date.now()}`
     };
-    const res = await fetch('https://bama-club-backend.fly.dev/api/fees/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      return await res.json();
-    }
+    const res = await api.post('/fees/', payload);
+    return res.data;
   } catch (err) {
-    console.error('Failed to save fee payment to backend:', err);
+    return feeData;
   }
-  return feeData;
 };
 
 export const saveBeltGradingBackend = async (gradingData) => {
@@ -1166,21 +1091,11 @@ export const saveBeltGradingBackend = async (gradingData) => {
       examiner: gradingData.examiner || 'Sensei Abdul Rahman (5th Dan)',
       certificate_no: gradingData.certificate_no || `CERT-${Date.now()}`
     };
-    const res = await fetch('https://bama-club-backend.fly.dev/api/belt-gradings/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      return await res.json();
-    }
+    const res = await api.post('/belt-gradings/', payload);
+    return res.data;
   } catch (err) {
-    console.error('Failed to save belt grading to backend:', err);
+    return gradingData;
   }
-  return gradingData;
 };
 
 // Staff & User Management API Endpoints & Local Persistent Helpers
