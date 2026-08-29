@@ -590,7 +590,8 @@ export default function StudentManagement() {
 
     const newMonthly = parseInt(globalFeeSettings.defaultMonthlyFee) || 500;
     const newSchoolBatch = parseInt(globalFeeSettings.defaultSchoolBatchFee) || 1200;
-    const newAdmission = parseInt(globalFeeSettings.defaultAdmissionFee) || 1000;
+    const rawAdm = parseInt(globalFeeSettings.defaultAdmissionFee);
+    const newAdmission = isNaN(rawAdm) ? 1000 : rawAdm;
     const shouldUpdateExisting = globalFeeSettings.updateExistingStudents ?? true;
 
     if (shouldUpdateExisting) {
@@ -620,6 +621,10 @@ export default function StudentManagement() {
           monthly_fee: applicableRate,
           admissionFee: newAdmission,
           admission_fee: newAdmission,
+          admissionFeePaid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
+          admission_fee_paid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
+          admissionFeePaidAmount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
+          admission_fee_paid_amount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
           pendingAmount: newPending,
           pending_amount: newPending,
           feeStatus: newFeeStatus,
@@ -632,6 +637,10 @@ export default function StudentManagement() {
             feeAmount: applicableRate,
             admission_fee: newAdmission,
             admissionFee: newAdmission,
+            admission_fee_paid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
+            admissionFeePaid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
+            admission_fee_paid_amount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
+            admissionFeePaidAmount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
             pending_amount: newPending,
             pendingAmount: newPending,
             fee_status: newFeeStatus,

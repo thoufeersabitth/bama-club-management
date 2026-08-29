@@ -79,7 +79,7 @@ export const getGlobalFeeSettings = () => {
       if (parsed && typeof parsed === 'object') {
         const adm = parseInt(parsed.defaultAdmissionFee);
         const monthly = parseInt(parsed.defaultMonthlyFee);
-        if (adm === 1984 || isNaN(adm) || adm <= 0) parsed.defaultAdmissionFee = 1000;
+        if (adm === 1984 || isNaN(adm) || adm < 0) parsed.defaultAdmissionFee = 1000;
         if (isNaN(monthly) || monthly <= 0) parsed.defaultMonthlyFee = 500;
         if (!parsed.defaultFeeFrequency) parsed.defaultFeeFrequency = 'MONTHLY';
         return parsed;
@@ -94,7 +94,7 @@ export const getGlobalFeeSettings = () => {
     effectiveMonth: 'August',
     effectiveYear: 2026,
     updateExistingStudents: true,
-    admissionFeePresets: [500, 1000, 1500, 2000, 2500, 3000],
+    admissionFeePresets: [0, 500, 1000, 1500, 2000, 2500, 3000],
     monthlyFeePresets: [500, 600, 700, 800, 1000, 1200, 1500, 2000]
   };
 };
@@ -112,12 +112,12 @@ export const fetchFeeSettings = async () => {
     if (res.data && res.data.configuration) {
       const config = res.data.configuration;
       const settings = {
-        defaultAdmissionFee: parseInt(config.default_admission_fee) || 1000,
+        defaultAdmissionFee: config.default_admission_fee !== undefined ? parseInt(config.default_admission_fee) : 1000,
         defaultMonthlyFee: parseInt(config.default_monthly_fee) || 500,
         effectiveMonth: config.effective_month || 'August 2026',
         effectiveYear: 2026,
         updateExistingStudents: config.apply_to_existing_cadets,
-        admissionFeePresets: [500, 1000, 1500, 2000, 2500, 3000],
+        admissionFeePresets: [0, 500, 1000, 1500, 2000, 2500, 3000],
         monthlyFeePresets: [500, 600, 700, 800, 1000, 1200, 1500, 2000]
       };
       saveGlobalFeeSettings(settings);
