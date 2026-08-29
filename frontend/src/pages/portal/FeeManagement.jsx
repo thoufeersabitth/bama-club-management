@@ -94,14 +94,27 @@ export default function FeeManagement() {
 
       fetchStudents().then(stdList => {
         const cadets = stdList || getStoredStudents();
+        const defaultSchoolRate = parseInt(globalSettings.defaultSchoolBatchFee) || 1200;
+        const defaultMonthlyRate = parseInt(globalSettings.defaultMonthlyFee) || 500;
+        const defaultAdmSetting = parseInt(globalSettings.defaultAdmissionFee);
+        const isAcademyAdmFree = defaultAdmSetting === 0;
+
         const dynamicFees = cadets.map(s => {
-          const cadetFreq = String(s.fee_frequency || s.feeFrequency || 'MONTHLY').toUpperCase();
-          const isQuarterly = cadetFreq === 'QUARTERLY' || cadetFreq === '3_MONTHS' || cadetFreq === 'SCHOOL_BATCH' || s.feeCycleMonths === 3;
+          const cadetFreq = String(s.fee_frequency || s.feeFrequency || '').toUpperCase();
+          const isQuarterly = (
+            cadetFreq === 'QUARTERLY' || 
+            cadetFreq === '3_MONTHS' || 
+            cadetFreq === 'SCHOOL_BATCH' || 
+            s.billingPlan === 'SCHOOL_BATCH' || 
+            s.billing_plan === 'SCHOOL_BATCH' || 
+            s.feeCycleMonths === 3 || 
+            (s.shift && s.shift.toLowerCase().includes('school'))
+          );
 
           const isNewRate = isMonthOnOrAfterEffective(activeMonth, 2026, effMonth, effYear);
-          const oldRate = parseInt(s.fee_amount ?? s.feeAmount ?? 500);
-          const newRate = parseInt(globalSettings.defaultMonthlyFee) || 500;
-          const feeAmt = isNewRate ? newRate : oldRate;
+          const applicableDefault = isQuarterly ? defaultSchoolRate : defaultMonthlyRate;
+          const studentCustomRate = parseInt(s.fee_amount ?? s.feeAmount ?? 0);
+          const feeAmt = studentCustomRate > 0 ? studentCustomRate : applicableDefault;
 
           const paidMonthsList = Array.isArray(s.paid_months) ? s.paid_months : (Array.isArray(s.paidMonths) ? s.paidMonths : []);
           const initialPaid = parseInt(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
@@ -111,7 +124,8 @@ export default function FeeManagement() {
           const pendingAmt = isMonthPaidInList ? 0 : Math.max(0, feeAmt - initialPaid);
           const calculatedStatus = (pendingAmt === 0 || isMonthPaidInList) ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
 
-          const admFee = parseInt(s.admissionFee !== undefined ? s.admissionFee : (s.admission_fee !== undefined ? s.admission_fee : 1000));
+          const rawAdmFee = s.admissionFee !== undefined ? parseInt(s.admissionFee) : (s.admission_fee !== undefined ? parseInt(s.admission_fee) : defaultAdmSetting);
+          const admFee = isAcademyAdmFree ? 0 : (isNaN(rawAdmFee) ? 1000 : rawAdmFee);
           const admPaid = parseInt(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? (admFee === 0 || s.admissionFeePaid || s.admission_fee_paid ? admFee : 0));
           const admPending = (admFee === 0 || s.admissionFeePaid === true || s.admission_fee_paid === true) ? 0 : Math.max(0, admFee - admPaid);
 
@@ -123,7 +137,8 @@ export default function FeeManagement() {
               admissionFee: admFee,
               admissionFeePaid: admPending === 0,
               admissionFeePaidAmount: admPaid,
-              admissionFeePending: admPending
+              admissionFeePending: admPending,
+              feeAmount: feeAmt
             },
             billing_plan: isQuarterly ? 'QUARTERLY' : 'MONTHLY',
             is_quarterly: isQuarterly,
@@ -1036,7 +1051,14 @@ export default function FeeManagement() {
                     </td>
                     <td className="py-4 px-5 font-mono">
                       {(() => {
-                        const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
+                        const globalSettings = getGlobalFeeSettings();
+                        const isAdmFree = (
+                          std.admissionFee === 0 || 
+                          std.admission_fee === 0 || 
+                          String(std.admissionFee) === '0' || 
+                          String(std.admission_fee) === '0' || 
+                          globalSettings.defaultAdmissionFee === 0
+                        );
                         if (isAdmFree) {
                           return (
                             <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
