@@ -220,15 +220,21 @@ export default function BranchManagement() {
 
   const handleCreateOrUpdateShift = async (e) => {
     e.preventDefault();
+    const finalShiftName = shiftData.name?.trim() || `${shiftData.branch || 'Dojo'} (${shiftData.time || shiftData.days || 'Regular Batch'})`;
+    const cleanShiftData = {
+      ...shiftData,
+      name: finalShiftName
+    };
+
     let updated = [];
     if (editShift) {
-      const updatedItem = { ...editShift, ...shiftData };
+      const updatedItem = { ...editShift, ...cleanShiftData };
       updated = schedules.map(s => s.id === editShift.id ? updatedItem : s);
       updateTrainingScheduleBackend(editShift.id, updatedItem).catch(() => {});
     } else {
       const newS = {
         id: `shift-${Date.now()}`,
-        ...shiftData,
+        ...cleanShiftData,
         status: 'Active'
       };
       const serverCreated = await createTrainingScheduleBackend(newS);
@@ -667,71 +673,105 @@ export default function BranchManagement() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSchedules.map((sch) => (
-                <div
-                  key={sch.id}
-                  className="bg-white rounded-3xl p-6 border border-gray-200/90 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-all duration-200"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 font-black text-[11px] rounded-xl font-mono">
-                        {sch.branch}
-                      </span>
-                      <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10px] rounded-full">
-                        {sch.status}
-                      </span>
+              {filteredSchedules.map((sch) => {
+                const shiftCadetCount = (() => {
+                  if (!studentsList || studentsList.length === 0) return 0;
+                  const schBranch = String(sch.branch || '').toLowerCase().trim();
+                  const schTime = String(sch.time || '').toLowerCase().trim();
+                  const schName = String(sch.name || '').toLowerCase().trim();
+
+                  return studentsList.filter(s => {
+                    const sBranch = String(s.branch_name || s.branch || s.branch_detail?.name || '').toLowerCase().trim();
+                    const bMatch = sBranch === schBranch || (schBranch.length > 3 && sBranch.includes(schBranch)) || (sBranch.length > 3 && schBranch.includes(sBranch));
+                    if (!bMatch) return false;
+                    const sShift = String(s.shift || '').toLowerCase().trim();
+                    if (!sShift) return true;
+                    return sShift.includes(schTime) || schTime.includes(sShift) || sShift.includes(schName);
+                  }).length;
+                })();
+
+                return (
+                  <div
+                    key={sch.id}
+                    className="bg-white rounded-3xl p-6 border border-gray-200/90 shadow-sm space-y-4 flex flex-col justify-between hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-3 py-1 bg-amber-50 text-amber-800 border border-amber-200 font-black text-[11px] rounded-xl font-mono">
+                          {sch.branch}
+                        </span>
+                        <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10px] rounded-full">
+                          {sch.status}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h3 className="text-base font-black text-gray-900 leading-snug">{sch.name || `${sch.branch} Batch`}</h3>
+                        <p className="text-xs text-gray-500 font-medium flex items-center gap-1 mt-1">
+                          <Shield className="w-3.5 h-3.5 text-red-600" />
+                          <span>Sensei: {sch.instructor}</span>
+                        </p>
+                      </div>
+
+                      {/* Enrolled Cadets in this Shift */}
+                      <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex items-center justify-between text-xs">
+                        <span className="text-gray-700 font-bold flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-amber-600" /> Enrolled Cadets:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/portal/students?branch=${encodeURIComponent(sch.branch)}`)}
+                          className="text-xs font-black text-amber-800 bg-white px-3 py-1 rounded-xl border border-amber-300 shadow-xs hover:bg-amber-600 hover:text-white transition flex items-center gap-1 cursor-pointer"
+                          title="Click to view all enrolled cadets in this batch"
+                        >
+                          <span>{shiftCadetCount} Cadets</span>
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2 text-xs">
+                        <p className="flex items-center gap-2 font-bold text-gray-800">
+                          <Calendar className="w-4 h-4 text-red-600" />
+                          <span>Days: {sch.days}</span>
+                        </p>
+                        <p className="flex items-center gap-2 font-bold text-gray-800">
+                          <Clock className="w-4 h-4 text-amber-600" />
+                          <span>Timings: {sch.time}</span>
+                        </p>
+                        <p className="flex items-center gap-2 text-gray-600 pt-1 border-t border-gray-200">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Target: {sch.targetGroup}</span>
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <h3 className="text-base font-black text-gray-900 leading-snug">{sch.name}</h3>
-                      <p className="text-xs text-gray-500 font-medium flex items-center gap-1 mt-1">
-                        <Shield className="w-3.5 h-3.5 text-red-600" />
-                        <span>Sensei: {sch.instructor}</span>
-                      </p>
-                    </div>
-
-                    <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2 text-xs">
-                      <p className="flex items-center gap-2 font-bold text-gray-800">
-                        <Calendar className="w-4 h-4 text-red-600" />
-                        <span>Days: {sch.days}</span>
-                      </p>
-                      <p className="flex items-center gap-2 font-bold text-gray-800">
-                        <Clock className="w-4 h-4 text-amber-600" />
-                        <span>Timings: {sch.time}</span>
-                      </p>
-                      <p className="flex items-center gap-2 text-gray-600 pt-1 border-t border-gray-200">
-                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Target: {sch.targetGroup}</span>
-                      </p>
+                    <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => openEditShift(sch)}
+                          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        <button
+                          onClick={() => sendShiftWhatsAppNotice(sch)}
+                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 font-black text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
+                          title="Send WhatsApp Notice to Parents"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> Notice
+                        </button>
+                        <button
+                          onClick={() => handleDeleteShift(sch.id)}
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl transition cursor-pointer shadow-xs"
+                          title="Delete Training Shift"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => openEditShift(sch)}
-                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
-                      >
-                        <Edit className="w-3.5 h-3.5" /> Edit
-                      </button>
-                      <button
-                        onClick={() => sendShiftWhatsAppNotice(sch)}
-                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 font-black text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
-                        title="Send WhatsApp Notice to Parents"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" /> Notice
-                      </button>
-                      <button
-                        onClick={() => handleDeleteShift(sch.id)}
-                        className="p-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl transition cursor-pointer shadow-xs"
-                        title="Delete Training Shift"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -1003,11 +1043,12 @@ export default function BranchManagement() {
 
             <form onSubmit={handleCreateOrUpdateShift} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-gray-700 font-bold mb-1">Shift Batch Name *</label>
+                <label className="block text-gray-700 font-bold mb-1">
+                  Shift Batch Name <span className="text-gray-400 font-normal">(Optional - auto-generated from timing)</span>
+                </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Evening Regular Karate Batch"
+                  placeholder="e.g. Regular Batch (or leave empty to auto-name)"
                   value={shiftData.name}
                   onChange={(e) => setShiftData({ ...shiftData, name: e.target.value })}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-amber-500 shadow-sm"

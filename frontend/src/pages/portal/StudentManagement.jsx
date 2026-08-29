@@ -28,35 +28,33 @@ const calculateAgeFromDOB = (dobString) => {
 
 // Helper to get dynamically active training shift options for a specific branch
 const getActiveShiftOptions = (branchName = '') => {
-  if (!branchName) return SHIFT_OPTIONS;
+  if (!branchName) return [];
 
   const results = [];
   const bStr = String(branchName).toLowerCase().trim();
 
-  // 1. Check custom branches stored in localStorage 'bama_custom_branches'
+  // 1. Check custom branches stored in localStorage / API for THIS exact branch
   try {
-    const storedBranches = localStorage.getItem('bama_custom_branches');
-    if (storedBranches) {
-      const parsedBranches = JSON.parse(storedBranches);
-      if (Array.isArray(parsedBranches)) {
-        const matchedB = parsedBranches.find(b => {
-          const nameStr = String(b.name || '').toLowerCase().trim();
-          return nameStr === bStr || nameStr.includes(bStr) || bStr.includes(nameStr);
-        });
+    const storedBranches = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+    const parsedBranches = storedBranches ? JSON.parse(storedBranches) : INITIAL_BRANCHES;
+    if (Array.isArray(parsedBranches)) {
+      const matchedB = parsedBranches.find(b => {
+        const nameStr = String(b.name || '').toLowerCase().trim();
+        return nameStr === bStr || (bStr.length > 3 && nameStr.includes(bStr)) || (nameStr.length > 3 && bStr.includes(nameStr));
+      });
 
-        if (matchedB && matchedB.timings) {
-          const timingParts = String(matchedB.timings)
-            .split('|')
-            .map(t => t.trim())
-            .filter(Boolean);
+      if (matchedB && matchedB.timings && String(matchedB.timings).trim() !== '') {
+        const timingParts = String(matchedB.timings)
+          .split('|')
+          .map(t => t.trim())
+          .filter(Boolean);
 
-          timingParts.forEach(t => results.push(t));
-        }
+        timingParts.forEach(t => results.push(t));
       }
     }
   } catch (e) {}
 
-  // 2. Check custom stored training schedules created in Branch Management for THIS branch
+  // 2. Check custom stored training schedules created specifically for THIS branch
   try {
     const storedSchedules = localStorage.getItem('bama_training_schedules');
     if (storedSchedules) {
@@ -64,15 +62,12 @@ const getActiveShiftOptions = (branchName = '') => {
       if (Array.isArray(parsedSchedules)) {
         const matchedShifts = parsedSchedules.filter(s => {
           const sBranch = String(s.branch || s.branchName || '').toLowerCase().trim();
-          return sBranch === bStr || sBranch.includes(bStr) || bStr.includes(sBranch);
+          return sBranch === bStr || (bStr.length > 3 && sBranch.includes(bStr)) || (sBranch.length > 3 && bStr.includes(sBranch));
         });
 
         matchedShifts.forEach(s => {
-          if (s.name && s.time) {
-            results.push(`${s.name} (${s.time})`);
-          } else if (s.name || s.time) {
-            results.push(s.name || s.time);
-          }
+          const shiftStr = s.time ? (s.name && !s.name.includes(s.time) ? `${s.name} (${s.time})` : s.time) : s.name;
+          if (shiftStr) results.push(shiftStr);
         });
       }
     }
@@ -82,43 +77,8 @@ const getActiveShiftOptions = (branchName = '') => {
     return Array.from(new Set(results));
   }
 
-  // 3. Preset fallback defaults per branch if no custom timing was parsed
-  let targetKey = 'pulikkal';
-  if (bStr.includes('chungam')) targetKey = 'chungam';
-  else if (bStr.includes('mongam')) targetKey = 'mongam';
-  else if (bStr.includes('feroke')) targetKey = 'feroke';
 
-  if (targetKey === 'chungam') {
-    return [
-      "Evening Batch (5:30 PM - 7:30 PM)",
-      "Tue, Thu, Sat Batch (5:00 PM - 7:00 PM)",
-      "Kids Special Batch (4:00 PM - 5:00 PM)",
-      "Ladies Special Batch",
-      "Custom Shift / Flexible"
-    ];
-  }
-  if (targetKey === 'mongam') {
-    return [
-      "Morning Batch (6:00 AM - 7:30 AM)",
-      "Evening Batch (5:00 PM - 7:00 PM)",
-      "Mon, Wed, Fri Batch (5:00 PM - 7:00 PM)",
-      "Kids Special Batch (4:00 PM - 5:00 PM)",
-      "Custom Shift / Flexible"
-    ];
-  }
-  if (targetKey === 'pulikkal') {
-    return [
-      "Evening Batch (5:00 PM - 7:00 PM)",
-      "Morning Batch (6:00 AM - 7:30 AM)",
-      "Weekend Special Batch (Sat & Sun: 7:00 AM - 9:00 AM)",
-      "Kids Special Batch (4:00 PM - 5:00 PM)",
-      "Ladies Special Batch",
-      "Night / Late Evening Batch (7:00 PM - 8:30 PM)",
-      "Custom Shift / Flexible"
-    ];
-  }
-
-  return SHIFT_OPTIONS;
+  return ["Regular Dojo Batch (5:00 PM - 7:00 PM)"];
 };
 
 export default function StudentManagement() {
