@@ -102,16 +102,16 @@ export default function Home() {
 
   useEffect(() => {
     loadHomeBranches();
-    getCmsConfig().then(data => {
-      if (data) setCms(data);
-    });
+    let isMounted = true;
+    const fetchLatest = async () => {
+      const data = await getCmsConfig();
+      if (isMounted && data) setCms(data);
+    };
+    fetchLatest();
 
     const handleSync = () => {
       loadHomeBranches();
-      try {
-        const saved = localStorage.getItem('bama_cms_config');
-        if (saved) setCms(JSON.parse(saved));
-      } catch (e) {}
+      fetchLatest();
     };
 
     window.addEventListener('storage', handleSync);
@@ -119,6 +119,7 @@ export default function Home() {
     window.addEventListener('bama_branches_updated', loadHomeBranches);
     window.addEventListener('bama_data_updated', loadHomeBranches);
     return () => {
+      isMounted = false;
       window.removeEventListener('storage', handleSync);
       window.removeEventListener('cms_updated', handleSync);
       window.removeEventListener('bama_branches_updated', loadHomeBranches);

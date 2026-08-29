@@ -30,25 +30,23 @@ export default function Gallery() {
   });
 
   useEffect(() => {
-    getCmsConfig().then((data) => {
-      if (data && data.gallery && data.gallery.length > 0) {
+    let isMounted = true;
+    const fetchLatest = async () => {
+      const data = await getCmsConfig();
+      if (isMounted && data && data.gallery && data.gallery.length > 0) {
         setItems(data.gallery);
       }
-    });
+    };
+    fetchLatest();
 
     const handleSync = () => {
-      try {
-        const saved = localStorage.getItem('bama_cms_config');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.gallery && parsed.gallery.length > 0) setItems(parsed.gallery);
-        }
-      } catch (e) {}
+      fetchLatest();
     };
 
     window.addEventListener('storage', handleSync);
     window.addEventListener('cms_updated', handleSync);
     return () => {
+      isMounted = false;
       window.removeEventListener('storage', handleSync);
       window.removeEventListener('cms_updated', handleSync);
     };
