@@ -972,6 +972,8 @@ export default function StudentManagement() {
     const matchesShift = selectedShift === 'ALL' || cadetShift.toLowerCase().includes(selectedShift.toLowerCase());
 
     const cadetCat = s.category || (s.age <= 13 ? 'Kids' : s.age <= 17 ? 'Teens' : 'Adults');
+    const matchesCategory = selectedCategory === 'ALL' || cadetCat.toLowerCase() === selectedCategory.toLowerCase();
+
     const isSchool = (
       s.feeFrequency === 'QUARTERLY' || 
       s.billingPlan === 'SCHOOL_BATCH' || 
