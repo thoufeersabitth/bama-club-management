@@ -26,6 +26,38 @@ const calculateAgeFromDOB = (dobString) => {
   return Math.max(4, Math.min(age, 75));
 };
 
+export const NEXT_BELT_PROGRESSION = {
+  'White Belt': 'Yellow Belt',
+  'Yellow Belt': 'Orange Belt',
+  'Orange Belt': 'Green Belt',
+  'Green Belt': 'Blue Belt',
+  'Blue Belt': 'Purple Belt',
+  'Purple Belt': 'Brown Belt (4th Kyu)',
+  'Brown Belt (4th Kyu)': 'Brown Belt (3rd Kyu)',
+  'Brown Belt (3rd Kyu)': 'Brown Belt (2nd Kyu)',
+  'Brown Belt (2nd Kyu)': 'Brown Belt (1st Kyu)',
+  'Brown Belt (1st Kyu)': 'Black Belt (1st Dan)',
+  'Black Belt (1st Dan)': '2nd Dan Candidate'
+};
+
+export const getNextTargetBelt = (currentBelt) => {
+  if (!currentBelt) return 'Yellow Belt';
+  if (NEXT_BELT_PROGRESSION[currentBelt]) return NEXT_BELT_PROGRESSION[currentBelt];
+  const curr = String(currentBelt).toLowerCase();
+  if (curr.includes('white')) return 'Yellow Belt';
+  if (curr.includes('yellow')) return 'Orange Belt';
+  if (curr.includes('orange')) return 'Green Belt';
+  if (curr.includes('green')) return 'Blue Belt';
+  if (curr.includes('blue')) return 'Purple Belt';
+  if (curr.includes('purple')) return 'Brown Belt (4th Kyu)';
+  if (curr.includes('brown') && curr.includes('4')) return 'Brown Belt (3rd Kyu)';
+  if (curr.includes('brown') && curr.includes('3')) return 'Brown Belt (2nd Kyu)';
+  if (curr.includes('brown') && curr.includes('2')) return 'Brown Belt (1st Kyu)';
+  if (curr.includes('brown') && curr.includes('1')) return 'Black Belt (1st Dan)';
+  if (curr.includes('black') || curr.includes('dan')) return '2nd Dan Candidate';
+  return 'Yellow Belt';
+};
+
 // Helper to get dynamically active training shift options for a specific branch
 const getActiveShiftOptions = (branchName = '') => {
   if (!branchName) return [];
@@ -154,7 +186,6 @@ export default function StudentManagement() {
   const [promoExaminer, setPromoExaminer] = useState('Sensei Abdul Rahman (5th Dan)');
   const [promoCertNo, setPromoCertNo] = useState('');
   const [promoRemarks, setPromoRemarks] = useState('Promoted on merit via Academy Examination');
-
 
   // Inline Photo Resizer State for New Admission Form
   const [addPhotoState, setAddPhotoState] = useState({
@@ -1078,13 +1109,7 @@ export default function StudentManagement() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      const currentBelt = std.currentBelt || std.current_belt || 'White Belt';
-                      const nextBelt = getNextTargetBelt(currentBelt);
-                      setPromoPrevBelt(currentBelt);
-                      setPromoTargetBelt(nextBelt);
-                      setPromoteModalStudent(std);
-                    }}
+                    onClick={() => handleOpenPromoteModal(std)}
                     className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition cursor-pointer"
                   >
                     <Award className="w-3.5 h-3.5" />
@@ -2129,13 +2154,7 @@ export default function StudentManagement() {
                   <td className="py-4 px-5 text-right">
                     <div className="bg-gray-100/80 p-1 rounded-2xl border border-gray-200/80 inline-flex items-center gap-1 shadow-sm" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => {
-                          const currentBelt = std.currentBelt || std.current_belt || 'White Belt';
-                          const nextBelt = getNextTargetBelt(currentBelt);
-                          setPromoPrevBelt(currentBelt);
-                          setPromoTargetBelt(nextBelt);
-                          setPromoteModalStudent(std);
-                        }}
+                        onClick={() => handleOpenPromoteModal(std)}
                         title="Promote Belt Rank & Generate Certificate"
                         className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl border border-emerald-200 transition shadow-xs cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
                       >
