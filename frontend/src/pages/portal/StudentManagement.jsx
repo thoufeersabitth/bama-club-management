@@ -119,6 +119,7 @@ export default function StudentManagement() {
   const [selectedBelt, setSelectedBelt] = useState('ALL');
   const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [selectedShift, setSelectedShift] = useState('ALL');
+  const [selectedBillingPlan, setSelectedBillingPlan] = useState('ALL');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedTab, setSelectedTab] = useState('All');
   const [inspectorStudent, setInspectorStudent] = useState(null);
@@ -971,7 +972,15 @@ export default function StudentManagement() {
     const matchesShift = selectedShift === 'ALL' || cadetShift.toLowerCase().includes(selectedShift.toLowerCase());
 
     const cadetCat = s.category || (s.age <= 13 ? 'Kids' : s.age <= 17 ? 'Teens' : 'Adults');
-    const matchesCategory = selectedCategory === 'ALL' || cadetCat.toLowerCase() === selectedCategory.toLowerCase();
+    const isSchool = (
+      s.feeFrequency === 'QUARTERLY' || 
+      s.billingPlan === 'SCHOOL_BATCH' || 
+      s.billing_plan === 'SCHOOL_BATCH' || 
+      (s.shift && s.shift.toLowerCase().includes('school'))
+    );
+    let matchesPlan = true;
+    if (selectedBillingPlan === 'REGULAR') matchesPlan = !isSchool;
+    if (selectedBillingPlan === 'SCHOOL_BATCH') matchesPlan = isSchool;
 
     // Tab Filter
     const isInactive = s.status === 'Inactive';
@@ -983,7 +992,7 @@ export default function StudentManagement() {
     if (selectedTab === 'Inactive') matchesTab = isInactive;
     if (selectedTab === 'AdmissionFeePending') matchesTab = isAdmissionFeePending;
 
-    return matchesSearch && matchesBelt && matchesBranch && matchesShift && matchesCategory && matchesTab;
+    return matchesSearch && matchesBelt && matchesBranch && matchesShift && matchesCategory && matchesPlan && matchesTab;
   });
 
   // Pagination Calculations (10 per page)
@@ -2253,6 +2262,21 @@ export default function StudentManagement() {
               {getDynamicShiftOptions().map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Billing Plan Filter */}
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial min-w-[125px]">
+            <CreditCard className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+            <span className="text-[11px] whitespace-nowrap">Plan:</span>
+            <select
+              value={selectedBillingPlan}
+              onChange={(e) => setSelectedBillingPlan(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition shadow-sm truncate"
+            >
+              <option value="ALL">All Plans</option>
+              <option value="REGULAR">🥋 Regular Monthly</option>
+              <option value="SCHOOL_BATCH">🏫 School Batch (3-Mos)</option>
             </select>
           </div>
 
