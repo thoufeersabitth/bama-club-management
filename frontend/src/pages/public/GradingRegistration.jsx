@@ -142,35 +142,38 @@ export default function GradingRegistration() {
     }));
   }, [formData.target_belt]);
 
+  const [verifiedStudent, setVerifiedStudent] = useState(null);
+
+  const cleanDigits = (str) => String(str || '').replace(/\D/g, '');
+
   const selectStudentFromMultiple = (data) => {
     if (!data) return;
-    const currentBelt = data.current_belt || data.belt || 'White Belt';
+    const currentBelt = data.current_belt || data.belt || data.currentBelt || 'White Belt';
     const nextTarget = data.target_belt || getNextTargetBelt(currentBelt);
     const calcFee = getFeeForBelt(nextTarget);
 
-    setLookupMessage({ 
-      type: 'success', 
-      text: `✨ Selected B.A.M.A. Cadet: ${data.student_name || data.name} (#${data.admission_no || 'Cadet'}) | Present: ${currentBelt} ➔ Target: ${nextTarget}` 
-    });
+    setVerifiedStudent(data);
+    setLookupMessage(null);
 
     setFormData(prev => ({
       ...prev,
       student_id: data.student_id || data.id || '',
-      admission_no: data.admission_no || '',
+      admission_no: data.admission_no || data.admissionNo || '',
       student_name: data.student_name || data.name || '',
       gender: data.gender || 'Male',
-      dob: data.dob || '',
+      photo: data.photo || data.profile_photo || data.image || '',
+      dob: data.dob || data.dateOfBirth || '',
       age: data.age || 10,
-      guardian_name: data.guardian_name || data.parent_name || '',
+      guardian_name: data.guardian_name || data.guardianName || data.parent_name || '',
       guardian_relationship: data.relationship || 'Father',
       phone: data.phone || data.mobile || '',
       whatsapp: data.whatsapp || data.phone || data.mobile || '',
       address: data.address || '',
-      branch_name: data.branch_name || 'Pulikkal Main Dojo',
+      branch_name: data.branch_name || data.branch || (typeof data.branch === 'object' ? data.branch?.name : data.branch) || 'Pulikkal Branch (Head Office)',
       current_belt: currentBelt,
       target_belt: nextTarget,
       exam_fee: calcFee,
-      form_type: data.form_type || 'JKK_WHITE_TO_BROWN_4'
+      form_type: ['black', 'dan'].some(t => nextTarget.toLowerCase().includes(t)) ? 'JAPAN_DIRECT_BLACK_BELT' : ['brown-3', 'brown-2', 'brown-1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => nextTarget.toLowerCase().includes(t)) ? 'JKK_BROWN' : 'JKK_WHITE_TO_BROWN_4'
     }));
   };
 
@@ -184,68 +187,96 @@ export default function GradingRegistration() {
     setMultipleMatches([]);
 
     let matches = [];
+    const qDigits = cleanDigits(q);
 
     // 1. Try Backend API
     const urlsToTry = [
       `https://bama-club-backend.fly.dev/api/grading-registrations/lookup-student/?query=${encodeURIComponent(q)}`,
-      `https://bama-club-backend.fly.dev/api/students/?search=${encodeURIComponent(q)}`
+      `https://bama-club-backend.fly.dev/api/students/?search=${encodeURIComponent(q)}`,
+      `https://bama-club-backend.fly.dev/api/students/`
     ];
 
     for (const url of urlsToTry) {
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
         if (response.ok) {
           const resData = await response.json();
-          if (resData && (resData.found || resData.results?.length > 0)) {
-            const foundItems = resData.results || [resData];
-            foundItems.forEach(item => {
-              if (item.name || item.student_name) {
-                matches.push({
-                  ...item,
-                  student_name: item.student_name || item.name,
-                  admission_no: item.admission_no || item.admissionNo
-                });
+          const foundItems = resData.results || (Array.isArray(resData) ? resData : (resData.found ? [resData] : []));
+          foundItems.forEach(item => {
+            if (item.name || item.student_name) {
+              const itemPhone = cleanDigits(item.phone || item.whatsapp || item.mobile);
+              const itemAdm = String(item.admission_no || item.admissionNo || '').toLowerCase().trim();
+              const itemName = String(item.name || item.student_name || '').toLowerCase().trim();
+              const qLower = q.toLowerCase().trim();
+
+              const phoneMatches = qDigits.length >= 7 && (itemPhone.includes(qDigits) || (qDigits.length >= 10 && itemPhone.slice(-10) === qDigits.slice(-10)));
+              const admMatches = itemAdm && (itemAdm === qLower || itemAdm.includes(qLower));
+              const nameMatches = itemName && (itemName === qLower || itemName.includes(qLower));
+
+              if (phoneMatches || admMatches || nameMatches) {
+                if (!matches.some(m => (m.admission_no || m.admissionNo) === (item.admission_no || item.admissionNo) && (m.name || m.student_name) === (item.name || item.student_name))) {
+                  matches.push({
+                    ...item,
+                    student_name: item.student_name || item.name,
+                    admission_no: item.admission_no || item.admissionNo
+                  });
+                }
               }
-            });
-            break;
-          }
+            }
+          });
+          if (matches.length > 0) break;
         }
       } catch (e) {}
     }
 
-    // 2. Local Storage Search (Supports siblings under same phone number!)
+    // 2. Local Storage Search
     try {
-      const localRaw = localStorage.getItem('bama_students') || localStorage.getItem('bama_cadets');
+      const localRaw = localStorage.getItem('bama_cadets_roster') || localStorage.getItem('bama_students') || localStorage.getItem('bama_cadets');
       if (localRaw) {
         const list = JSON.parse(localRaw);
-        const qClean = q.toLowerCase();
-        const foundList = list.filter(s => 
-          (s.admission_no && String(s.admission_no).toLowerCase().includes(qClean)) ||
-          (s.student_name && String(s.student_name).toLowerCase().includes(qClean)) ||
-          (s.name && String(s.name).toLowerCase().includes(qClean)) ||
-          (s.phone && String(s.phone).includes(qClean)) ||
-          (s.mobile && String(s.mobile).includes(qClean))
-        );
-        foundList.forEach(item => {
-          if (!matches.some(m => m.admission_no === item.admission_no || m.student_name === (item.student_name || item.name))) {
-            matches.push(item);
-          }
-        });
+        if (Array.isArray(list)) {
+          list.forEach(s => {
+            const sPhone = cleanDigits(s.phone || s.whatsapp || s.mobile);
+            const sAdm = String(s.admission_no || s.admissionNo || '').toLowerCase().trim();
+            const sName = String(s.name || s.student_name || '').toLowerCase().trim();
+            const qLower = q.toLowerCase().trim();
+
+            const phoneMatches = qDigits.length >= 7 && (sPhone.includes(qDigits) || (qDigits.length >= 10 && sPhone.slice(-10) === qDigits.slice(-10)));
+            const admMatches = sAdm && (sAdm === qLower || sAdm.includes(qLower));
+            const nameMatches = sName && (sName === qLower || sName.includes(qLower));
+
+            if (phoneMatches || admMatches || nameMatches) {
+              if (!matches.some(m => (m.admission_no || m.admissionNo) === (s.admission_no || s.admissionNo) && (m.name || m.student_name) === (s.name || s.student_name))) {
+                matches.push({
+                  ...s,
+                  student_name: s.name || s.student_name,
+                  admission_no: s.admission_no || s.admissionNo
+                });
+              }
+            }
+          });
+        }
       }
     } catch (e) {}
 
-    if (matches.length > 0) {
-      if (matches.length > 1) {
-        setMultipleMatches(matches);
-        setLookupMessage({
-          type: 'success',
-          text: `👨‍👩‍👧‍👦 Found ${matches.length} Cadets under this contact (${q})! Click to select student below:`
-        });
-      }
+    if (matches.length === 1) {
+      setMultipleMatches([]);
       selectStudentFromMultiple(matches[0]);
+      setVerifiedStudent(matches[0]);
+    } else if (matches.length > 1) {
+      setMultipleMatches(matches);
+      setVerifiedStudent(null);
+      setLookupMessage({
+        type: 'multiple',
+        text: `👨‍👩‍👧‍👦 Found ${matches.length} Registered Cadets under this contact (${q}). Please select cadet below:`
+      });
     } else {
       setMultipleMatches([]);
-      setLookupMessage({ type: 'error', text: `ℹ️ No cadet record found matching '${q}'. Fill details manually below.` });
+      setVerifiedStudent(null);
+      setLookupMessage({
+        type: 'error',
+        text: `❌ No registered cadet found with '${q}'. Only enrolled active students of B.A.M.A. can apply for Belt Grading Exams. Please check the number or contact the dojo office: +91 95440 85442.`
+      });
     }
 
     setIsSearching(false);
@@ -393,163 +424,250 @@ export default function GradingRegistration() {
           </p>
         </div>
 
-        {/* Quick Student Auto-Lookup Bar (Instant 10-Digit Phone Auto-Fill) */}
-        <div className="bg-gradient-to-r from-[#121526] via-[#170E1A] to-[#121526] rounded-3xl p-6 border border-amber-400/40 shadow-2xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-black text-amber-400 uppercase tracking-wider">
-              <Search className="w-4 h-4 text-amber-400" />
-              <span>1. ENTER PARENT PHONE NO OR ADMISSION NO (INSTANT AUTO-FILL)</span>
-            </div>
-            <span className="text-[10px] font-mono text-gray-400">Type 10-digit Phone</span>
-          </div>
-
-          <form onSubmit={handleStudentSearch} className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={handleSearchInputChange}
-              placeholder="Type Parent Phone (e.g. 9876543210) or Admission No..."
-              className="flex-1 px-4 py-3.5 bg-black/90 border border-amber-500/50 rounded-xl text-white text-sm focus:border-amber-400 focus:outline-none placeholder-gray-500 font-mono shadow-inner"
-            />
-            <button
-              type="submit"
-              disabled={isSearching}
-              className="px-6 py-3.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-            >
-              {isSearching ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              <span>AUTO-FILL DATA</span>
-            </button>
-          </form>
-
-          {lookupMessage && (
-            <div className={`p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 animate-fadeIn ${
-              lookupMessage.type === 'success' ? 'bg-green-950/90 text-green-300 border border-green-700 shadow-md' : 'bg-red-950/90 text-red-300 border border-red-700'
-            }`}>
-              {lookupMessage.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />}
-              <span>{lookupMessage.text}</span>
-            </div>
-          )}
-
-          {/* Multiple Siblings Selector Chips (When phone matches 2+ children) */}
-          {multipleMatches && multipleMatches.length > 1 && (
-            <div className="bg-amber-950/40 border border-amber-500/50 p-3.5 rounded-2xl space-y-2 animate-fadeIn">
-              <span className="text-xs font-black text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
-                <span>👨‍👩‍👧‍👦</span>
-                <span>Select Child / Cadet to Auto-Fill:</span>
-              </span>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {multipleMatches.map((m, idx) => {
-                  const isSelected = formData.admission_no === m.admission_no || formData.student_name === (m.student_name || m.name);
-                  return (
-                    <button
-                      key={m.admission_no || m.id || idx}
-                      type="button"
-                      onClick={() => selectStudentFromMultiple(m)}
-                      className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-2 border shadow-sm ${
-                        isSelected
-                          ? 'bg-amber-500 text-black border-amber-400 font-black scale-102 shadow-amber-500/25'
-                          : 'bg-black/70 text-gray-200 border-gray-700 hover:bg-black hover:border-amber-400'
-                      }`}
-                    >
-                      <span>🥋 {m.student_name || m.name}</span>
-                      <span className="text-[10px] font-mono opacity-80">
-                        (#{m.admission_no || 'Cadet'} • {m.current_belt || m.belt || 'White Belt'})
-                      </span>
-                    </button>
-                  );
-                })}
+        {/* STEP 1: PHONE VERIFICATION & SIBLING SELECTION GATE */}
+        {!verifiedStudent ? (
+          <div className="bg-gradient-to-b from-[#121526] via-[#170E1A] to-[#0D0F18] rounded-3xl p-6 sm:p-10 border border-amber-500/40 shadow-2xl space-y-6">
+            <div className="text-center space-y-2 max-w-xl mx-auto">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-amber-600 text-white rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-red-600/30 border border-amber-400/40">
+                <Shield className="w-8 h-8 text-amber-200" />
               </div>
-            </div>
-          )}
-
-          {/* 3-WAY FORM CATEGORY SELECTOR TABS (Another Method From Side) */}
-          <div className="pt-3 border-t border-gray-800/80 space-y-2">
-            <span className="text-[10px] font-bold text-amber-400 uppercase font-mono block">OR CHOOSE OFFICIAL FORM CATEGORY DIRECTLY:</span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, target_belt: 'Yellow Belt', form_type: 'JKK_WHITE_TO_BROWN_4' }))}
-                className={`px-3.5 py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer border ${
-                  formData.form_type === 'JKK_WHITE_TO_BROWN_4' ? 'bg-emerald-600 text-white border-emerald-400 font-black shadow-lg scale-[1.02]' : 'bg-black/60 text-gray-400 border-gray-800 hover:text-white'
-                }`}
-              >
-                <span>🥋 JKA Kyu Form (White to Brown-4)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, target_belt: 'Brown Belt (3rd Kyu)', form_type: 'JKK_BROWN' }))}
-                className={`px-3.5 py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer border ${
-                  formData.form_type === 'JKK_BROWN' ? 'bg-amber-600 text-white border-amber-400 font-black shadow-lg scale-[1.02]' : 'bg-black/60 text-gray-400 border-gray-800 hover:text-white'
-                }`}
-              >
-                <span>📜 JKA Kyu Form (Brown 3, 2, 1)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, target_belt: 'Black Belt (1st Dan)', form_type: 'JAPAN_DIRECT_BLACK_BELT' }))}
-                className={`px-3.5 py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer border ${
-                  formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' ? 'bg-red-700 text-white border-red-500 font-black shadow-lg scale-[1.02]' : 'bg-black/60 text-gray-400 border-gray-800 hover:text-white'
-                }`}
-              >
-                <span>🇯🇵 Japan Direct Black Belt Form</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic Form Type Indicator Badge */}
-        <div className="bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-4 sm:p-5 border border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-          <div className="flex items-center gap-3">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg border ${
-              formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
-                ? 'bg-red-950 text-red-400 border-red-700'
-                : formData.form_type === 'JKK_BROWN'
-                ? 'bg-amber-950 text-amber-400 border-amber-600'
-                : 'bg-emerald-950 text-emerald-400 border-emerald-700'
-            }`}>
-              {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN' ? (
-                <span className="font-serif font-black text-xl">日</span>
-              ) : formData.form_type === 'JKK_BROWN' ? (
-                <FileText className="w-6 h-6 text-amber-400" />
-              ) : (
-                <Shield className="w-6 h-6 text-emerald-400" />
-              )}
-            </div>
-            <div>
-              <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">SELECTED OFFICIAL FORM FORMAT</span>
-              <h3 className="text-sm sm:text-base font-black text-white uppercase">
-                {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
-                  ? '🇯🇵 JAPAN DIRECT BLACK BELT & DAN EXAMINATION FORM'
-                  : formData.form_type === 'JKK_BROWN'
-                  ? '📜 JKA KYU REGISTRATION FORM (Brown Kyu)'
-                  : '🥋 JKA KYU EXAMINATION FORM'}
-              </h3>
-              <p className="text-[11px] text-gray-400 font-medium mt-0.5">
-                {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
-                  ? 'Official JKA Japan Dan & Senior Black Belt Grading Application'
-                  : formData.form_type === 'JKK_BROWN'
-                  ? 'Official Kyu Registration for Brown 3, Brown 2 & Brown 1 Ranks'
-                  : 'Official Kyu Examination for White, Yellow, Orange, Green, Blue & Purple Belts'}
+              <span className="px-3 py-1 rounded-full bg-red-950/90 text-amber-400 border border-red-800 text-[10px] font-black uppercase tracking-widest font-mono inline-block">
+                STEP 1 OF 2 • SECURE CADET VERIFICATION
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                Enter Registered Phone Number
+              </h2>
+              <p className="text-xs text-gray-400">
+                Only active enrolled students across all B.A.M.A. dojo branches are eligible for belt examinations. Enter your registered phone number or admission number below to unlock your exam application.
               </p>
             </div>
-          </div>
 
-          <span className={`px-4 py-1.5 rounded-full text-xs font-black font-mono uppercase tracking-wider shadow-md ${
-            formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
-              ? 'bg-red-600 text-white'
-              : formData.form_type === 'JKK_BROWN'
-              ? 'bg-amber-500 text-black'
-              : 'bg-emerald-600 text-white'
-          }`}>
-            {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
-              ? 'Senior Dan / Black Belt'
-              : formData.form_type === 'JKK_BROWN'
-              ? 'Brown 3, 2, 1 Kyu Level'
-              : 'Kyu 10 to Kyu 4 Level'}
-          </span>
-        </div>
+            <form onSubmit={handleStudentSearch} className="max-w-xl mx-auto space-y-3">
+              <div className="relative">
+                <Phone className="w-5 h-5 text-amber-500 absolute left-4 top-4" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={handleSearchInputChange}
+                  placeholder="Enter 10-digit Parent Phone (e.g. 9544085442) or Admission No..."
+                  className="w-full pl-12 pr-4 py-4 bg-black/90 border-2 border-amber-500/60 rounded-2xl text-white text-base focus:border-amber-400 focus:outline-none placeholder-gray-500 font-mono shadow-inner tracking-wider"
+                  autoFocus
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSearching || !searchQuery.trim()}
+                className="w-full py-4 bg-gradient-to-r from-red-600 via-amber-600 to-red-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-xl shadow-red-600/30 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer transition transform active:scale-98"
+              >
+                {isSearching ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    <span>Verifying Cadet Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-5 h-5" />
+                    <span>Verify & Continue ➔</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Error Message Alert */}
+            {lookupMessage && lookupMessage.type === 'error' && (
+              <div className="max-w-xl mx-auto p-4 bg-rose-950/90 border border-rose-600/80 rounded-2xl text-xs space-y-2 text-rose-200 animate-fadeIn shadow-lg">
+                <div className="flex items-center gap-2 font-black text-rose-400">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <span>Access Restricted: Cadet Not Found!</span>
+                </div>
+                <p className="leading-relaxed text-gray-300">
+                  {lookupMessage.text}
+                </p>
+                <div className="pt-2 border-t border-rose-900 flex items-center justify-between">
+                  <span className="text-[11px] text-gray-400">Academy Office Contact:</span>
+                  <a href="tel:+919544085442" className="text-amber-400 font-mono font-bold hover:underline">
+                    📞 +91 95440 85442
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* SIBLING / MULTI-CADET SELECTION CARDS */}
+            {multipleMatches && multipleMatches.length > 1 && (
+              <div className="space-y-4 pt-4 border-t border-gray-800 animate-fadeIn">
+                <div className="text-center space-y-1">
+                  <span className="text-sm font-black text-amber-400 flex items-center justify-center gap-2">
+                    <span>👨‍👩‍👧‍👦</span>
+                    <span>Multiple Cadets Found Under This Phone Number!</span>
+                  </span>
+                  <p className="text-xs text-gray-400">
+                    Please select which cadet is registering for the Belt Grading Examination:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {multipleMatches.map((m, idx) => {
+                    const cBelt = m.current_belt || m.belt || 'White Belt';
+                    const tBelt = m.target_belt || getNextTargetBelt(cBelt);
+                    const photoUrl = m.photo || m.profile_photo || m.image;
+
+                    return (
+                      <div
+                        key={m.admission_no || m.id || idx}
+                        onClick={() => selectStudentFromMultiple(m)}
+                        className="bg-black/80 hover:bg-[#151928] border-2 border-amber-500/40 hover:border-amber-400 rounded-3xl p-5 space-y-4 cursor-pointer transition transform hover:-translate-y-1 shadow-xl group flex flex-col justify-between"
+                      >
+                        <div className="flex items-center gap-3.5">
+                          {photoUrl ? (
+                            <img
+                              src={photoUrl}
+                              alt={m.student_name || m.name}
+                              className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400/60 shadow-md flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black text-xl flex items-center justify-center shadow-md flex-shrink-0 border border-amber-300/40">
+                              {(m.student_name || m.name || 'C').charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="space-y-1 min-w-0">
+                            <h3 className="text-base font-black text-white group-hover:text-amber-400 transition truncate">
+                              {m.student_name || m.name}
+                            </h3>
+                            <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-mono">
+                              <span className="px-1.5 py-0.2 rounded bg-gray-900 border border-gray-800">
+                                #{m.admission_no || m.admissionNo || 'Cadet'}
+                              </span>
+                              <span className="truncate">
+                                {m.branch_name || m.branch || 'Dojo Branch'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Belt Progression Pill */}
+                        <div className="p-3 bg-gray-900/90 rounded-2xl border border-gray-800 space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-gray-400 font-medium">Current Belt:</span>
+                            <span className="font-bold text-gray-200">{cBelt}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-800">
+                            <span className="text-amber-400 font-bold">Target Belt:</span>
+                            <span className="font-black text-amber-300 font-mono">➔ {tBelt}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="w-full py-2.5 bg-amber-500 group-hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider rounded-xl transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <span>Register {m.student_name || m.name} ➔</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* STEP 2: VERIFIED REGISTRATION APPLICATION FORM */
+          <>
+            {/* Top Verified Cadet Banner */}
+            <div className="bg-gradient-to-r from-emerald-950 via-[#0A1A12] to-emerald-950 rounded-3xl p-4 sm:p-5 border-2 border-emerald-500/80 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn">
+              <div className="flex items-center gap-3.5">
+                {formData.photo ? (
+                  <img
+                    src={formData.photo}
+                    alt={formData.student_name}
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-400 shadow-md flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white font-black text-xl flex items-center justify-center shadow-md flex-shrink-0">
+                    {formData.student_name ? formData.student_name.charAt(0).toUpperCase() : 'C'}
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-black font-black text-[9px] uppercase tracking-wider">
+                      ✓ VERIFIED CADET
+                    </span>
+                    <span className="text-gray-400 font-mono text-[10px]">
+                      #{formData.admission_no}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-white">{formData.student_name}</h3>
+                  <p className="text-xs text-emerald-300 font-medium">
+                    {formData.branch_name} • Belt Progression: <strong className="text-white">{formData.current_belt}</strong> ➔ <strong className="text-amber-300 font-black">{formData.target_belt}</strong>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setVerifiedStudent(null);
+                  setMultipleMatches([]);
+                  setLookupMessage(null);
+                }}
+                className="px-4 py-2 bg-gray-900 hover:bg-black text-amber-400 hover:text-amber-300 border border-amber-500/40 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Change Student / Search Again</span>
+              </button>
+            </div>
+
+            {/* Dynamic Form Type Indicator Badge */}
+            <div className="bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-4 sm:p-5 border border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg border ${
+                  formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
+                    ? 'bg-red-950 text-red-400 border-red-700'
+                    : formData.form_type === 'JKK_BROWN'
+                    ? 'bg-amber-950 text-amber-400 border-amber-600'
+                    : 'bg-emerald-950 text-emerald-400 border-emerald-700'
+                }`}>
+                  {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN' ? (
+                    <span className="font-serif font-black text-xl">日</span>
+                  ) : formData.form_type === 'JKK_BROWN' ? (
+                    <FileText className="w-6 h-6 text-amber-400" />
+                  ) : (
+                    <Shield className="w-6 h-6 text-emerald-400" />
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">SELECTED OFFICIAL FORM FORMAT</span>
+                  <h3 className="text-sm sm:text-base font-black text-white uppercase">
+                    {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
+                      ? '🇯🇵 JAPAN DIRECT BLACK BELT & DAN EXAMINATION FORM'
+                      : formData.form_type === 'JKK_BROWN'
+                      ? '📜 JKA KYU REGISTRATION FORM (Brown Kyu)'
+                      : '🥋 JKA KYU EXAMINATION FORM'}
+                  </h3>
+                  <p className="text-[11px] text-gray-400 font-medium mt-0.5">
+                    {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
+                      ? 'Official JKA Japan Dan & Senior Black Belt Grading Application'
+                      : formData.form_type === 'JKK_BROWN'
+                      ? 'Official Kyu Registration for Brown 3, Brown 2 & Brown 1 Ranks'
+                      : 'Official Kyu Examination for White, Yellow, Orange, Green, Blue & Purple Belts'}
+                  </p>
+                </div>
+              </div>
+
+              <span className={`px-4 py-1.5 rounded-full text-xs font-black font-mono uppercase tracking-wider shadow-md ${
+                formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
+                  ? 'bg-red-600 text-white'
+                  : formData.form_type === 'JKK_BROWN'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-emerald-600 text-white'
+              }`}>
+                {formData.form_type === 'JAPAN_DIRECT_BLACK_BELT' || formData.form_type === 'JKA_JAPAN'
+                  ? 'Senior Dan / Black Belt'
+                  : formData.form_type === 'JKK_BROWN'
+                  ? 'Brown 3, 2, 1 Kyu Level'
+                  : 'Kyu 10 to Kyu 4 Level'}
+              </span>
+            </div>
 
         {/* Main Application Form */}
         <form onSubmit={handleSubmit} className="bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-6 sm:p-8 border border-gray-800 shadow-2xl space-y-8">
@@ -1077,6 +1195,8 @@ export default function GradingRegistration() {
             <span>SUBMIT EXAMINATION REGISTRATION →</span>
           </button>
         </form>
+        </>
+        )}
 
       </div>
 
