@@ -104,21 +104,35 @@ export default function BranchManagement() {
   };
 
   useEffect(() => {
-    fetchBranches().then(data => {
-      if (data && data.length > 0) {
-        setBranches(data);
-      } else {
-        setBranches(INITIAL_BRANCHES);
-      }
-    });
+    const loadAll = () => {
+      fetchBranches().then(data => {
+        if (data && data.length > 0) {
+          setBranches(data);
+        } else {
+          setBranches(INITIAL_BRANCHES);
+        }
+      });
 
-    fetchTrainingSchedules().then(schs => {
-      if (schs && schs.length > 0) {
-        setSchedules(schs);
-      }
-    });
+      fetchTrainingSchedules().then(schs => {
+        if (schs && schs.length > 0) {
+          setSchedules(schs);
+        }
+      });
 
-    fetchStudents().then(stds => setStudentsList(stds || []));
+      fetchStudents().then(stds => setStudentsList(stds || []));
+    };
+
+    loadAll();
+    window.addEventListener('bama_data_updated', loadAll);
+    window.addEventListener('bama_branches_updated', loadAll);
+    window.addEventListener('bama_schedules_updated', loadAll);
+    window.addEventListener('storage', loadAll);
+    return () => {
+      window.removeEventListener('bama_data_updated', loadAll);
+      window.removeEventListener('bama_branches_updated', loadAll);
+      window.removeEventListener('bama_schedules_updated', loadAll);
+      window.removeEventListener('storage', loadAll);
+    };
   }, []);
 
   const resetForm = () => {

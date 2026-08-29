@@ -401,7 +401,8 @@ export const fetchStudents = async (params = {}) => {
     const url = new URL('https://bama-club-backend.fly.dev/api/students/');
     url.searchParams.set('_t', Date.now().toString());
     const res = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
     });
 
     if (res.ok) {
