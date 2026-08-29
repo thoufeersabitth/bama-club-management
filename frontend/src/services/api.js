@@ -822,18 +822,59 @@ export const createBranchBackend = async (branchData) => {
       name: branchData.name || 'New Dojo Branch',
       code: branchData.code || `BAMA-DOJO-${Math.floor(10 + Math.random() * 90)}`,
       address: branchData.address || '',
-      phone: branchData.phone || '+91 9544085442',
-      whatsapp: branchData.whatsapp || branchData.phone || '+91 9544085442',
+      phone: branchData.phone || '+91 95440 85442',
+      whatsapp: branchData.whatsapp || branchData.phone || '+91 95440 85442',
       email: branchData.email || '',
       branch_head: branchData.branch_head || branchData.head || 'Sensei Abdul Rahman (5th Dan)',
-      is_head_office: !!branchData.isHeadOffice,
+      is_head_office: !!branchData.isHeadOffice || !!branchData.is_head_office,
       timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
       status: branchData.status || 'Active'
     };
-    const res = await api.post('/branches/', payload);
-    return res.data;
+    const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
   } catch (err) {
-    return branchData;
+    console.error('Failed to create branch backend:', err);
+  }
+  return branchData;
+};
+
+export const updateBranchBackend = async (branchId, branchData) => {
+  try {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/${branchId}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(branchData)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.error('Failed to update branch backend:', err);
+  }
+  return branchData;
+};
+
+export const deleteBranchBackend = async (branchId) => {
+  try {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/${branchId}/`, {
+      method: 'DELETE'
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to delete branch backend:', err);
+    return false;
   }
 };
 

@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchStudents, createBranchBackend, openWhatsApp } from '../../services/api';
+import { fetchBranches, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
 
 const INITIAL_TRAINING_SCHEDULES = [
@@ -192,14 +192,16 @@ export default function BranchManagement() {
 
     let updatedList = [];
     if (editBranch) {
-      updatedList = branches.map(b => b.id === editBranch.id ? {
-        ...b,
+      const updatedItem = {
+        ...editBranch,
         ...formData,
         facilities: facilityArray,
         image: photoUrl,
         img: photoUrl,
         photo: photoUrl
-      } : b);
+      };
+      updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
+      updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
     } else {
       const newB = {
         id: `branch-${Date.now()}`,
@@ -280,6 +282,7 @@ export default function BranchManagement() {
     if (window.confirm('Are you sure you want to delete this Branch Dojo?')) {
       const updatedList = branches.filter(b => b.id !== id);
       setBranches(updatedList);
+      deleteBranchBackend(id).catch(() => {});
       localStorage.setItem('bama_custom_branches', JSON.stringify(updatedList));
       window.dispatchEvent(new Event('bama_branches_updated'));
       window.dispatchEvent(new Event('bama_data_updated'));
