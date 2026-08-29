@@ -3761,45 +3761,57 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Default Fee Billing Cycle */}
-              <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-xl space-y-1.5 shadow-xs">
-                <label className="text-purple-950 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-purple-600" /> Default Academy Billing Cycle</span>
-                  <span className="text-purple-700 text-[11px] font-black">
-                    {globalFeeSettings.defaultFeeFrequency === 'MONTHLY' ? '🥋 Monthly' : '🏫 School Batch (3 Mos)'}
-                  </span>
-                </label>
-                <select
-                  value={globalFeeSettings.defaultFeeFrequency || 'MONTHLY'}
-                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultFeeFrequency: e.target.value })}
-                  className="w-full bg-white border border-purple-300 rounded-lg px-3 py-1.5 text-gray-900 font-bold text-xs focus:outline-none focus:border-purple-500 cursor-pointer"
-                >
-                  <option value="MONTHLY">🥋 Regular Dojo (Monthly - Default: ₹{globalFeeSettings.defaultMonthlyFee}/Month)</option>
-                  <option value="QUARTERLY">🏫 School Batch (Every 3 Months - Default: ₹{globalFeeSettings.defaultMonthlyFee} for 3 Months)</option>
-                </select>
-              </div>
-
-              {/* Global Default Monthly Cadet Fee */}
+              {/* Global Default Monthly Cadet Fee (Regular Dojo) */}
               <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2 shadow-xs">
                 <label className="text-emerald-950 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Default Monthly Cadet Fee (₹)</span>
-                  <span className="text-emerald-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultMonthlyFee} / Month</span>
+                  <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Regular Dojo Monthly Fee (₹ / Month)</span>
+                  <span className="text-emerald-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultMonthlyFee || 500} / Month</span>
                 </label>
                 <input
                   type="number"
-                  value={globalFeeSettings.defaultMonthlyFee}
+                  value={globalFeeSettings.defaultMonthlyFee || 500}
                   onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultMonthlyFee: parseInt(e.target.value) || 0 })}
                   className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-emerald-500"
                 />
                 <div className="flex flex-wrap gap-1 pt-0.5">
-                  {[500, 600, 700, 800, 1000, 1200, 1500, 2000].map(amt => (
+                  {[500, 600, 700, 800, 1000, 1200, 1500].map(amt => (
                     <button
                       key={amt}
                       type="button"
                       onClick={() => setGlobalFeeSettings({ ...globalFeeSettings, defaultMonthlyFee: amt })}
                       className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
-                        globalFeeSettings.defaultMonthlyFee === amt
+                        (globalFeeSettings.defaultMonthlyFee || 500) === amt
                           ? 'bg-emerald-600 text-white shadow'
+                          : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
+                      }`}
+                    >
+                      ₹{amt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* School Batch 3-Month Term Fee */}
+              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 shadow-xs">
+                <label className="text-blue-950 font-black text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-blue-600" /> School Batch Term Fee (₹ / 3 Months)</span>
+                  <span className="text-blue-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultSchoolBatchFee || 500} / 3 Mos</span>
+                </label>
+                <input
+                  type="number"
+                  value={globalFeeSettings.defaultSchoolBatchFee || 500}
+                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultSchoolBatchFee: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-white border border-blue-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-blue-500"
+                />
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {[500, 600, 750, 900, 1200, 1500].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setGlobalFeeSettings({ ...globalFeeSettings, defaultSchoolBatchFee: amt })}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
+                        (globalFeeSettings.defaultSchoolBatchFee || 500) === amt
+                          ? 'bg-blue-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
                     >
