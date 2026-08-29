@@ -823,9 +823,9 @@ export default function StudentManagement() {
       admission_fee: admissionFeeAmt,
       admissionFeePaid: isAdmissionPaid,
       admission_fee_paid: isAdmissionPaid,
-      feeFrequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'QUARTERLY',
-      fee_frequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'QUARTERLY',
-      feeCycleMonths: (editingStudent.feeFrequency || editingStudent.fee_frequency) === 'MONTHLY' ? 1 : 3,
+      feeFrequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY',
+      fee_frequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY',
+      feeCycleMonths: (editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY') === 'MONTHLY' ? 1 : 3,
       feeAmount: feeAmt,
       fee_amount: feeAmt,
       pendingAmount: pending,
@@ -2697,23 +2697,52 @@ export default function StudentManagement() {
               </div>
 
               {/* Fee Billing Frequency Field */}
-              <div className="p-4 bg-blue-50/80 border-2 border-blue-200/90 rounded-2xl space-y-2.5 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <label className="text-blue-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                      <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Frequency *
-                    </label>
-                    <p className="text-[10px] text-blue-700/80">Select whether cadet pays once in 3 months (Quarterly) or every month.</p>
+              <div className="p-4 bg-blue-50/80 border-2 border-blue-200/90 rounded-2xl space-y-3 shadow-sm">
+                <div>
+                  <label className="text-blue-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Frequency Plan *
+                  </label>
+                  <p className="text-[10px] text-blue-700/80 mt-0.5">Select whether cadet pays once in 3 months (School Batch) or every month (Regular Dojo).</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div 
+                    onClick={() => setFormData({ ...formData, feeFrequency: 'MONTHLY' })}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-center gap-2.5 ${
+                      (formData.feeFrequency || 'MONTHLY') === 'MONTHLY'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      (formData.feeFrequency || 'MONTHLY') === 'MONTHLY' ? 'border-white bg-white' : 'border-gray-400'
+                    }`}>
+                      {(formData.feeFrequency || 'MONTHLY') === 'MONTHLY' && <div className="w-2 h-2 rounded-full bg-blue-600" />}
+                    </div>
+                    <div>
+                      <span className="font-black text-xs block">🥋 Regular Dojo</span>
+                      <span className={`text-[10px] block ${ (formData.feeFrequency || 'MONTHLY') === 'MONTHLY' ? 'text-blue-100' : 'text-gray-500' }`}>Monthly (₹{formData.feeAmount}/Month)</span>
+                    </div>
                   </div>
 
-                  <select
-                    value={formData.feeFrequency || 'MONTHLY'}
-                    onChange={(e) => setFormData({ ...formData, feeFrequency: e.target.value })}
-                    className="bg-white border-2 border-blue-400 rounded-xl px-3 py-1.5 text-blue-950 font-black text-xs focus:outline-none focus:border-blue-600 cursor-pointer shadow-sm"
+                  <div 
+                    onClick={() => setFormData({ ...formData, feeFrequency: 'QUARTERLY' })}
+                    className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-center gap-2.5 ${
+                      formData.feeFrequency === 'QUARTERLY'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                    }`}
                   >
-                    <option value="MONTHLY">🥋 Regular Dojo (Monthly - ₹{formData.feeAmount}/Month)</option>
-                    <option value="QUARTERLY">🏫 School Batch (Every 3 Months - ₹{formData.feeAmount} for 3 Mos)</option>
-                  </select>
+                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                      formData.feeFrequency === 'QUARTERLY' ? 'border-white bg-white' : 'border-gray-400'
+                    }`}>
+                      {formData.feeFrequency === 'QUARTERLY' && <div className="w-2 h-2 rounded-full bg-blue-600" />}
+                    </div>
+                    <div>
+                      <span className="font-black text-xs block">🏫 School Batch</span>
+                      <span className={`text-[10px] block ${ formData.feeFrequency === 'QUARTERLY' ? 'text-blue-100' : 'text-gray-500' }`}>Every 3 Months (₹{formData.feeAmount} for 3 Mos)</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Live Multi-Month Coverage Notice */}
@@ -2727,7 +2756,7 @@ export default function StudentManagement() {
                         <span>Covered Period upon Paying <strong>₹{formData.feeAmount}</strong>:</span>
                       </span>
                       <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md text-[10px]">
-                        {covered.join(' + ')} ({covered.length} Months Free of Dues)
+                        {covered.join(' + ')} ({covered.length === 1 ? '1 Month Cleared' : `${covered.length} Months Term Cleared`})
                       </span>
                     </div>
                   );
@@ -3099,23 +3128,60 @@ export default function StudentManagement() {
               </div>
 
               {/* Row 4.5: Fee Billing Frequency Selector */}
-              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2.5">
                 <label className="text-blue-900 font-bold text-xs flex items-center gap-1.5 uppercase tracking-wider">
                   <Clock className="w-4 h-4 text-blue-600" /> Fee Billing Plan *
                 </label>
-                <select
-                  value={editingStudent.fee_frequency || editingStudent.feeFrequency || 'MONTHLY'}
-                  onChange={(e) => setEditingStudent({
-                    ...editingStudent,
-                    feeFrequency: e.target.value,
-                    fee_frequency: e.target.value,
-                    feeCycleMonths: e.target.value === 'MONTHLY' ? 1 : 3
-                  })}
-                  className="w-full bg-white border border-blue-300 rounded-xl px-3.5 py-2.5 text-blue-950 font-bold text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
-                >
-                  <option value="MONTHLY">🥋 Regular Dojo (Monthly - ₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500}/Month)</option>
-                  <option value="QUARTERLY">🏫 School Batch (Every 3 Months - ₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500} covers 3 Mos)</option>
-                </select>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div 
+                    onClick={() => setEditingStudent({
+                      ...editingStudent,
+                      feeFrequency: 'MONTHLY',
+                      fee_frequency: 'MONTHLY',
+                      feeCycleMonths: 1
+                    })}
+                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition flex items-center gap-2 ${
+                      (editingStudent.fee_frequency || editingStudent.feeFrequency || 'MONTHLY') === 'MONTHLY'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                      (editingStudent.fee_frequency || editingStudent.feeFrequency || 'MONTHLY') === 'MONTHLY' ? 'border-white bg-white' : 'border-gray-400'
+                    }`}>
+                      {(editingStudent.fee_frequency || editingStudent.feeFrequency || 'MONTHLY') === 'MONTHLY' && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
+                    </div>
+                    <div>
+                      <span className="font-bold text-xs block">🥋 Regular Dojo</span>
+                      <span className={`text-[10px] block ${ (editingStudent.fee_frequency || editingStudent.feeFrequency || 'MONTHLY') === 'MONTHLY' ? 'text-blue-100' : 'text-gray-500' }`}>Monthly (₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500}/Month)</span>
+                    </div>
+                  </div>
+
+                  <div 
+                    onClick={() => setEditingStudent({
+                      ...editingStudent,
+                      feeFrequency: 'QUARTERLY',
+                      fee_frequency: 'QUARTERLY',
+                      feeCycleMonths: 3
+                    })}
+                    className={`p-2.5 rounded-xl border-2 cursor-pointer transition flex items-center gap-2 ${
+                      (editingStudent.fee_frequency || editingStudent.feeFrequency) === 'QUARTERLY'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center ${
+                      (editingStudent.fee_frequency || editingStudent.feeFrequency) === 'QUARTERLY' ? 'border-white bg-white' : 'border-gray-400'
+                    }`}>
+                      {(editingStudent.fee_frequency || editingStudent.feeFrequency) === 'QUARTERLY' && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
+                    </div>
+                    <div>
+                      <span className="font-bold text-xs block">🏫 School Batch</span>
+                      <span className={`text-[10px] block ${ (editingStudent.fee_frequency || editingStudent.feeFrequency) === 'QUARTERLY' ? 'text-blue-100' : 'text-gray-500' }`}>Every 3 Mos (₹{editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500} for 3 Mos)</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Row 5: Monthly Fee Field & Presets */}
