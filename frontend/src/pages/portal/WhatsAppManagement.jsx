@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award, Settings, Smartphone } from 'lucide-react';
+import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award, Settings, Smartphone, Trash2 } from 'lucide-react';
 import { WHATSAPP_TEMPLATES, SAMPLE_STUDENTS } from '../../services/initialData';
 import { fetchStudents, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -18,10 +18,34 @@ export default function WhatsAppManagement() {
   const [queueIndex, setQueueIndex] = useState(0);
   const [sentStudentIds, setSentStudentIds] = useState([]);
 
-  const [sentLogs, setSentLogs] = useState([
-    { id: 1, student: 'Fathima Riya', phone: '+91 94471 33445', template: 'Monthly Fee Due Reminder', time: '10:15 AM Today', status: 'Delivered' },
-    { id: 2, student: 'Adithya Suresh', phone: '+91 98460 11223', template: 'Fee Payment Receipt', time: 'Yesterday', status: 'Delivered' }
-  ]);
+  const [sentLogs, setSentLogs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_whatsapp_sent_logs');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [
+      { id: 'log-1', student: 'Fathima Riya', phone: '+91 94471 33445', template: 'Monthly Fee Due Reminder', time: '10:15 AM Today', status: 'Delivered' },
+      { id: 'log-2', student: 'Adithya Suresh', phone: '+91 98460 11223', template: 'Fee Payment Receipt', time: 'Yesterday', status: 'Delivered' }
+    ];
+  });
+
+  const saveLogs = (logs) => {
+    setSentLogs(logs);
+    try {
+      localStorage.setItem('bama_whatsapp_sent_logs', JSON.stringify(logs));
+    } catch (e) {}
+  };
+
+  const handleDeleteLog = (id) => {
+    const updated = sentLogs.filter(l => l.id !== id);
+    saveLogs(updated);
+  };
+
+  const handleClearAllLogs = () => {
+    if (window.confirm('Are you sure you want to clear all recent WhatsApp dispatch activity logs?')) {
+      saveLogs([]);
+    }
+  };
 
   const handleChannelChange = (newChan) => {
     setActiveChannel(newChan);
@@ -132,17 +156,15 @@ export default function WhatsAppManagement() {
       channel: channelOverride || activeChannel
     });
 
-    setSentLogs(prev => [
-      {
-        id: Date.now(),
-        student: std.name,
-        phone: std.whatsapp || std.phone,
-        template: selectedTemplate?.name || 'Custom Message',
-        time: 'Just Now',
-        status: 'Dispatched'
-      },
-      ...prev
-    ]);
+    const newLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      student: std.name || 'Cadet',
+      phone: std.whatsapp || std.phone || 'N/A',
+      template: selectedTemplate?.name || 'Custom Message',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' Today',
+      status: 'Delivered'
+    };
+    saveLogs([newLog, ...sentLogs.slice(0, 49)]);
   };
 
   // Step-by-Step Pro Max Queue Button Action
@@ -377,27 +399,56 @@ export default function WhatsAppManagement() {
             </div>
           </div>
 
-          {/* Recent Dispatch Activity Logs */}
+          {/* 3. Recent Dispatch Activity Logs */}
           <div className="bg-white rounded-3xl p-6 border border-gray-200/90 space-y-4 shadow-xl">
-            <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-              <Bell className="w-4 h-4 text-amber-600" /> Recent Dispatch Activity Logs
-            </h3>
-            <div className="divide-y divide-gray-100 text-xs">
-              {sentLogs.map((log) => (
-                <div key={log.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <strong className="text-gray-900 font-bold block">{log.student} ({log.phone})</strong>
-                    <span className="text-[10px] text-gray-500 font-medium">{log.template}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] bg-emerald-50 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-200 block shadow-xs">
-                      {log.status}
-                    </span>
-                    <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">{log.time}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center shadow-xs">3</span>
+                <span>Recent Dispatch Activity Logs ({sentLogs.length})</span>
+              </h3>
+              {sentLogs.length > 0 && (
+                <button
+                  onClick={handleClearAllLogs}
+                  className="text-[10px] font-black text-red-600 hover:text-white hover:bg-red-600 px-2.5 py-1 rounded-lg border border-red-200 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                  title="Clear all activity logs"
+                >
+                  <Trash2 className="w-3 h-3" /> Clear All
+                </button>
+              )}
             </div>
+
+            {sentLogs.length === 0 ? (
+              <div className="py-8 text-center text-gray-400 text-xs font-medium space-y-1 bg-gray-50/60 rounded-2xl border border-dashed border-gray-200">
+                <Bell className="w-6 h-6 text-gray-300 mx-auto" />
+                <p>No recent dispatch activity logs.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100 text-xs max-h-72 overflow-y-auto pr-1">
+                {sentLogs.map((log) => (
+                  <div key={log.id} className="py-3 flex items-center justify-between gap-3 group">
+                    <div className="min-w-0 flex-1">
+                      <strong className="text-gray-900 font-bold block truncate">{log.student} ({log.phone})</strong>
+                      <span className="text-[10px] text-gray-500 font-medium truncate block">{log.template}</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <span className="text-[10px] bg-emerald-50 text-emerald-800 font-black px-2.5 py-0.5 rounded-full border border-emerald-200 block shadow-xs">
+                          {log.status}
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-mono mt-0.5 block">{log.time}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteLog(log.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-transparent hover:border-red-200 transition cursor-pointer"
+                        title="Delete log entry"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
