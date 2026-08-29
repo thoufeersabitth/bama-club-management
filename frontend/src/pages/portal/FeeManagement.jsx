@@ -317,6 +317,7 @@ export default function FeeManagement() {
     const cadetName = std.name || 'Student';
 
     let text = '';
+    const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
     if (selectedStatus === 'AdmissionPending' || (admPendingAmt > 0 && pendingAmt === 0)) {
       text = 
         `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
@@ -324,8 +325,8 @@ export default function FeeManagement() {
         `Cadet Name: *${cadetName}* (${std.admissionNo || std.admission_no || ''})\n` +
         `Branch Dojo: *${std.branch || 'Head Office Dojo'}*\n` +
         `Shift: *${std.shift || 'Evening Batch'}*\n` +
-        `Admission Fee Total: *₹${std.admissionFee || 1000}*\n` +
-        `Admission Fee Dues: *₹${admPendingAmt}*\n\n` +
+        `Admission Fee: *${isAdmFree ? '🎁 FREE / WAIVED (₹0)' : `₹${std.admissionFee || 1000}`}*\n` +
+        (isAdmFree ? '' : `Admission Fee Dues: *₹${admPendingAmt}*\n\n`) +
         `Dear Parent (${parentName}), kindly settle the pending admission/registration fee at the academy office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
     } else {
       text = 
@@ -334,9 +335,9 @@ export default function FeeManagement() {
         `Cadet Name: *${cadetName}* (${std.admissionNo || std.admission_no || ''})\n` +
         `Shift: *${std.shift || 'Evening Batch'}*\n` +
         `Month: *${fee.month || 'August'} ${fee.year || 2026}*\n` +
-        `Total Fee: *₹${totalAmt}*\n` +
+        `Total Monthly Fee: *₹${totalAmt}*\n` +
         `Pending Monthly Dues: *₹${pendingAmt}*` +
-        (admPendingAmt > 0 ? `\nAdmission Fee Dues: *₹${admPendingAmt}*` : '') +
+        (!isAdmFree && admPendingAmt > 0 ? `\nAdmission Fee Dues: *₹${admPendingAmt}*` : isAdmFree ? `\nAdmission Fee: *🎁 FREE / WAIVED*` : '') +
         `\n\nDear Parent (${parentName}), kindly settle the fee dues at office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
     }
 
@@ -1032,15 +1033,29 @@ export default function FeeManagement() {
                       <span className={pendingAmt > 0 ? 'text-rose-600 font-black' : 'text-gray-400 font-bold'}>Due: ₹{pendingAmt}</span>
                     </td>
                     <td className="py-4 px-5 font-mono">
-                      {admPendingAmt > 0 ? (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
-                          Due: ₹{admPendingAmt}
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          Paid ₹{std.admissionFee || 1000}
-                        </span>
-                      )}
+                      {(() => {
+                        const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
+                        if (isAdmFree) {
+                          return (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              🎁 FREE / WAIVED
+                            </span>
+                          );
+                        }
+                        if (admPendingAmt > 0) {
+                          return (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                              Due: ₹{admPendingAmt}
+                            </span>
+                          );
+                        }
+                        const feeAmt = std.admissionFee !== undefined ? std.admissionFee : (std.admission_fee !== undefined ? std.admission_fee : 1000);
+                        return (
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Paid ₹{feeAmt}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-4 px-5">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-black flex items-center gap-1 w-fit ${
