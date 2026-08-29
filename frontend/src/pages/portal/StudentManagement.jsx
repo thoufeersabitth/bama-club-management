@@ -970,6 +970,8 @@ export default function StudentManagement() {
   const totalPages = Math.ceil(filteredStudents.length / itemsPerPage) || 1;
   const indexOfLastStudent = Math.min(currentPage * itemsPerPage, filteredStudents.length);
   const indexOfFirstStudent = (currentPage - 1) * itemsPerPage;
+  const currentPaginatedStudents = filteredStudents.slice(indexOfFirstStudent, indexOfLastStudent);
+
   const renderPromoteModal = () => {
     return (
       <>
