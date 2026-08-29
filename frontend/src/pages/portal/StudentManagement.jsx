@@ -660,6 +660,17 @@ export default function StudentManagement() {
       setStudents(updatedList);
       saveStoredStudents(updatedList);
 
+      setDetailStudent(prev => {
+        if (prev && (prev.id === promoteModalStudent.id || prev.admissionNo === promoteModalStudent.admissionNo || prev.admission_no === promoteModalStudent.admission_no)) {
+          return {
+            ...prev,
+            currentBelt: promoTargetBelt,
+            current_belt: promoTargetBelt
+          };
+        }
+        return prev;
+      });
+
       const parentName = promoteModalStudent.guardianName || promoteModalStudent.guardian_name || 'Parent';
       const cadetName = promoteModalStudent.name;
       const phone = (promoteModalStudent.whatsapp || promoteModalStudent.phone || '').replace(/[^0-9]/g, '');
@@ -1065,6 +1076,20 @@ export default function StudentManagement() {
                   <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black uppercase">
                     🥋 {std.currentBelt || std.current_belt || 'White Belt'}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentBelt = std.currentBelt || std.current_belt || 'White Belt';
+                      const nextBelt = getNextTargetBelt(currentBelt);
+                      setPromoPrevBelt(currentBelt);
+                      setPromoTargetBelt(nextBelt);
+                      setPromoteModalStudent(std);
+                    }}
+                    className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition cursor-pointer"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    <span>Promote Belt ➔</span>
+                  </button>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
                     Active
                   </span>
@@ -2103,6 +2128,20 @@ export default function StudentManagement() {
                   </td>
                   <td className="py-4 px-5 text-right">
                     <div className="bg-gray-100/80 p-1 rounded-2xl border border-gray-200/80 inline-flex items-center gap-1 shadow-sm" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => {
+                          const currentBelt = std.currentBelt || std.current_belt || 'White Belt';
+                          const nextBelt = getNextTargetBelt(currentBelt);
+                          setPromoPrevBelt(currentBelt);
+                          setPromoTargetBelt(nextBelt);
+                          setPromoteModalStudent(std);
+                        }}
+                        title="Promote Belt Rank & Generate Certificate"
+                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl border border-emerald-200 transition shadow-xs cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
+                      >
+                        <Award className="w-3.5 h-3.5" />
+                        <span>Promote</span>
+                      </button>
                       <button
                         onClick={() => setDetailStudent(std)}
                         title="Inspect 360° Cadet Profile & Full Fee Breakdown"

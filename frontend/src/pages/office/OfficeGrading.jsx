@@ -850,12 +850,11 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
 
     if (examStatus === 'Passed') {
       const isFeePaid = c.payment_status?.includes('Paid');
-      if (!isFeePaid) {
-        setPendingFeeCandidate(c);
-        return;
-      }
+      const confirmMsg = isFeePaid
+        ? `🏆 Are you sure you want to mark ${c.student_name} as "PASSED & BELT PROMOTED"?\n\nThis will permanently update their belt rank from ${c.current_belt} to ${c.target_belt} in the Academy Database!`
+        : `🏆 Cadet ${c.student_name} has Exam Fee (₹${c.exam_fee}) as Pending.\n\nDo you want to VERIFY FEE AS PAID and PROMOTE BELT from ${c.current_belt} to ${c.target_belt} in the Academy Database?`;
 
-      if (!window.confirm(`🏆 Are you sure you want to mark ${c.student_name} as "PASSED & BELT PROMOTED"?\n\nThis will permanently update their belt rank from ${c.current_belt} to ${c.target_belt} in the Academy Database!`)) return;
+      if (!window.confirm(confirmMsg)) return;
     }
 
     setIsLoading(true);
