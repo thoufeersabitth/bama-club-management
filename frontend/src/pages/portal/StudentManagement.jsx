@@ -1239,6 +1239,8 @@ export default function StudentManagement() {
   const renderDetailView = () => {
     if (!detailStudent) return null;
     const std = detailStudent;
+    const stdProg = std.program || std.course || std.discipline || 'Karate (Shotokan)';
+    const isKarate = stdProg.toLowerCase().includes('karate');
     const rawMonthlyRate = parseFloat(std.feeAmount ?? std.fee_amount ?? globalFeeSettings?.defaultMonthlyFee ?? 500);
     const monthlyRate = (isNaN(rawMonthlyRate) || rawMonthlyRate < 100) 
       ? (parseFloat(globalFeeSettings?.defaultMonthlyFee) || 500) 
@@ -1371,17 +1373,35 @@ export default function StudentManagement() {
                   <h1 className="text-xl sm:text-2xl font-black text-gray-900 capitalize tracking-tight">
                     {std.name}
                   </h1>
-                  <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black uppercase">
-                    🥋 {std.currentBelt || std.current_belt || 'White Belt'}
+
+                  {/* Course / Program Badge */}
+                  <span className="px-2.5 py-0.5 rounded-lg bg-red-50 text-red-900 border border-red-200 text-xs font-black">
+                    {stdProg.toLowerCase().includes('boxing') && !stdProg.toLowerCase().includes('kick') ? '🥊 Boxing' :
+                     stdProg.toLowerCase().includes('kick') ? '💥 Kick Boxing' :
+                     stdProg.toLowerCase().includes('fitness') ? '🏋️‍♂️ Fitness Training' :
+                     stdProg.toLowerCase().includes('defense') ? '🛡️ Self Defense' :
+                     stdProg.toLowerCase().includes('ladies') ? '🧕 Ladies Special Batch' :
+                     stdProg.toLowerCase().includes('personal') ? '👑 Personal Training (1-on-1)' :
+                     '🥋 Karate (Shotokan)'}
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenPromoteModal(std)}
-                    className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition cursor-pointer"
-                  >
-                    <Award className="w-3.5 h-3.5" />
-                    <span>Promote Belt ➔</span>
-                  </button>
+
+                  {/* Belt Badge & Promote Button - ONLY FOR KARATE CADETS */}
+                  {isKarate && (
+                    <>
+                      <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black uppercase">
+                        🥋 {std.currentBelt || std.current_belt || 'White Belt'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPromoteModal(std)}
+                        className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm transition cursor-pointer"
+                      >
+                        <Award className="w-3.5 h-3.5" />
+                        <span>Promote Belt ➔</span>
+                      </button>
+                    </>
+                  )}
+
                   <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
                     Active
                   </span>
@@ -1425,6 +1445,11 @@ export default function StudentManagement() {
               </h3>
 
               <div className="space-y-2.5 font-medium">
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Enrolled Course:</span>
+                  <strong className="text-red-700 font-black flex items-center gap-1">{stdProg}</strong>
+                </div>
+
                 <div className="flex justify-between border-b border-gray-50 pb-2">
                   <span className="text-gray-500">Parent / Guardian:</span>
                   <strong className="text-gray-900 font-black">{std.guardianName || std.guardian_name || 'N/A'}</strong>
@@ -2406,9 +2431,31 @@ export default function StudentManagement() {
                     </div>
                   </td>
                   <td className="py-4 px-5">
-                    <span className="px-3.5 py-1.5 rounded-full bg-gray-100/90 border border-gray-200 text-gray-800 font-bold text-xs inline-flex items-center gap-1 shadow-sm">
-                      🥋 {std.currentBelt || std.current_belt || 'White Belt'}
-                    </span>
+                    {(() => {
+                      const stdProg = std.program || std.course || std.discipline || 'Karate (Shotokan)';
+                      const isKarate = stdProg.toLowerCase().includes('karate');
+                      const beltName = std.currentBelt || std.current_belt || 'White Belt';
+                      
+                      if (isKarate) {
+                        return (
+                          <span className="px-3 py-1 rounded-full bg-gray-100/90 border border-gray-200 text-gray-800 font-bold text-xs inline-flex items-center gap-1 shadow-xs">
+                            🥋 {beltName}
+                          </span>
+                        );
+                      }
+                      
+                      return (
+                        <span className="px-2.5 py-1 rounded-lg bg-red-50 text-red-800 border border-red-200 font-bold text-[11px] inline-flex items-center gap-1 shadow-xs">
+                          {stdProg.toLowerCase().includes('boxing') && !stdProg.toLowerCase().includes('kick') ? '🥊 Boxing' :
+                           stdProg.toLowerCase().includes('kick') ? '💥 Kick Boxing' :
+                           stdProg.toLowerCase().includes('fitness') ? '🏋️ Fitness' :
+                           stdProg.toLowerCase().includes('defense') ? '🛡️ Self Defense' :
+                           stdProg.toLowerCase().includes('ladies') ? '🧕 Ladies Batch' :
+                           stdProg.toLowerCase().includes('personal') ? '👑 Personal Training' :
+                           stdProg}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="py-4 px-5">
                     <span className="px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-900 font-bold text-[11px] inline-block shadow-sm">
@@ -2455,14 +2502,21 @@ export default function StudentManagement() {
                   </td>
                   <td className="py-4 px-5 text-right">
                     <div className="bg-gray-100/80 p-1 rounded-2xl border border-gray-200/80 inline-flex items-center gap-1 shadow-sm" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => handleOpenPromoteModal(std)}
-                        title="Promote Belt Rank & Generate Certificate"
-                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl border border-emerald-200 transition shadow-xs cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
-                      >
-                        <Award className="w-3.5 h-3.5" />
-                        <span>Promote</span>
-                      </button>
+                      {(() => {
+                        const stdProg = std.program || std.course || std.discipline || 'Karate (Shotokan)';
+                        const isKarate = stdProg.toLowerCase().includes('karate');
+                        if (!isKarate) return null;
+                        return (
+                          <button
+                            onClick={() => handleOpenPromoteModal(std)}
+                            title="Promote Belt Rank & Generate Certificate"
+                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl border border-emerald-200 transition shadow-xs cursor-pointer inline-flex items-center gap-1 text-[11px] font-black"
+                          >
+                            <Award className="w-3.5 h-3.5" />
+                            <span>Promote</span>
+                          </button>
+                        );
+                      })()}
                       <button
                         onClick={() => setDetailStudent(std)}
                         title="Inspect 360° Cadet Profile & Full Fee Breakdown"
