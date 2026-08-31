@@ -26,6 +26,29 @@ const calculateAgeFromDOB = (dobString) => {
   return Math.max(4, Math.min(age, 75));
 };
 
+export const resolveStudentProgram = (st) => {
+  if (!st) return 'Karate (Shotokan)';
+  const explicit = st.program || st.course || st.discipline;
+  if (explicit && String(explicit).trim() !== '' && explicit !== 'undefined' && explicit !== 'null') {
+    return explicit;
+  }
+
+  const shiftStr = String(st.shift || '').toLowerCase();
+  if (shiftStr.includes('personal')) return 'Personal Training (1-on-1)';
+  if (shiftStr.includes('ladies')) return 'Ladies Special Batch';
+  if (shiftStr.includes('kick')) return 'Kick Boxing';
+  if (shiftStr.includes('box')) return 'Boxing';
+  if (shiftStr.includes('fitness')) return 'Fitness Training';
+  if (shiftStr.includes('defense')) return 'Self Defense';
+  if (shiftStr.includes('karate')) return 'Karate (Shotokan)';
+
+  const rawBelt = String(st.currentBelt || st.current_belt || '').toLowerCase().trim();
+  const hasRealBelt = rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt);
+  if (hasRealBelt) return 'Karate (Shotokan)';
+
+  return 'Karate (Shotokan)';
+};
+
 export const NEXT_BELT_PROGRESSION = {
   'White Belt': 'Yellow Belt',
   'Yellow Belt': 'Orange Belt',
@@ -491,8 +514,17 @@ export default function StudentManagement() {
       ? getCoveredMonthsFromDate(formData.joiningDate, feeFreq) 
       : [];
 
+    const selProg = formData.program || 'Karate (Shotokan)';
+    const isKarateProg = selProg.toLowerCase().includes('karate');
+    const selBelt = isKarateProg ? (formData.currentBelt || 'White Belt') : 'No Belt';
+
     const newStudentData = {
       ...formData,
+      program: selProg,
+      course: selProg,
+      discipline: selProg,
+      currentBelt: selBelt,
+      current_belt: selBelt,
       name: trimmedName,
       guardianName: trimmedGuardian,
       guardian_name: trimmedGuardian,
@@ -532,7 +564,8 @@ export default function StudentManagement() {
 
     try {
       const saved = await createStudent(newStudentData);
-      const updatedList = [saved, ...students];
+      const finalSaved = { ...newStudentData, ...saved, program: selProg, course: selProg, discipline: selProg, currentBelt: selBelt, current_belt: selBelt };
+      const updatedList = [finalSaved, ...students];
       setStudents(updatedList);
       saveStoredStudents(updatedList);
 
@@ -1267,10 +1300,10 @@ export default function StudentManagement() {
   const renderDetailView = () => {
     if (!detailStudent) return null;
     const std = detailStudent;
+    const stdProg = resolveStudentProgram(std);
+    const isKarate = stdProg.toLowerCase().includes('karate');
     const rawBelt = String(std.currentBelt || std.current_belt || '').trim();
     const hasRealBelt = Boolean(rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt.toLowerCase()));
-    const stdProg = std.program || std.course || std.discipline || (hasRealBelt ? 'Karate (Shotokan)' : 'Karate (Shotokan)');
-    const isKarate = stdProg.toLowerCase().includes('karate');
     const canPromote = isKarate && hasRealBelt;
     const rawMonthlyRate = parseFloat(std.feeAmount ?? std.fee_amount ?? globalFeeSettings?.defaultMonthlyFee ?? 500);
     const monthlyRate = (isNaN(rawMonthlyRate) || rawMonthlyRate < 100) 
@@ -2497,10 +2530,10 @@ export default function StudentManagement() {
                   </td>
                   <td className="py-4 px-5">
                     {(() => {
+                      const stdProg = resolveStudentProgram(std);
+                      const isKarate = stdProg.toLowerCase().includes('karate');
                       const rawBelt = String(std.currentBelt || std.current_belt || '').trim();
                       const hasRealBelt = Boolean(rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt.toLowerCase()));
-                      const stdProg = std.program || std.course || std.discipline || (hasRealBelt ? 'Karate (Shotokan)' : 'Karate (Shotokan)');
-                      const isKarate = stdProg.toLowerCase().includes('karate');
                       const canPromote = isKarate && hasRealBelt;
                       
                       if (canPromote) {
@@ -2570,10 +2603,10 @@ export default function StudentManagement() {
                   <td className="py-4 px-5 text-right">
                     <div className="bg-gray-100/80 p-1 rounded-2xl border border-gray-200/80 inline-flex items-center gap-1 shadow-sm" onClick={(e) => e.stopPropagation()}>
                       {(() => {
+                        const stdProg = resolveStudentProgram(std);
+                        const isKarate = stdProg.toLowerCase().includes('karate');
                         const rawBelt = String(std.currentBelt || std.current_belt || '').trim();
                         const hasRealBelt = Boolean(rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt.toLowerCase()));
-                        const stdProg = std.program || std.course || std.discipline || 'Karate (Shotokan)';
-                        const isKarate = stdProg.toLowerCase().includes('karate');
                         const canPromote = isKarate && hasRealBelt;
                         if (!canPromote) return null;
                         return (

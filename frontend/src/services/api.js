@@ -217,7 +217,10 @@ export const getStoredStudents = () => {
               branch_id: branchId,
               branch_name: normBranch,
               branchName: normBranch,
-              dojo_branch: normBranch
+              dojo_branch: normBranch,
+              program: st.program || st.course || st.discipline || 'Karate (Shotokan)',
+              course: st.program || st.course || st.discipline || 'Karate (Shotokan)',
+              discipline: st.program || st.course || st.discipline || 'Karate (Shotokan)'
             };
           });
           return cleaned;
@@ -295,7 +298,10 @@ export const saveStoredStudents = (students) => {
         branch_id: branchId,
         branch_name: normBranch,
         branchName: normBranch,
-        dojo_branch: normBranch
+        dojo_branch: normBranch,
+        program: st.program || st.course || st.discipline || 'Karate (Shotokan)',
+        course: st.program || st.course || st.discipline || 'Karate (Shotokan)',
+        discipline: st.program || st.course || st.discipline || 'Karate (Shotokan)'
       };
     });
     const cleaned = filterOutDummyCadets(normalized);
@@ -465,7 +471,10 @@ export const fetchStudents = async (params = {}) => {
             branch_id: sBranchId,
             branch_name: sBranchName,
             branchName: sBranchName,
-            dojo_branch: sBranchName
+            dojo_branch: sBranchName,
+            program: s.program || s.course || s.discipline || 'Karate (Shotokan)',
+            course: s.program || s.course || s.discipline || 'Karate (Shotokan)',
+            discipline: s.program || s.course || s.discipline || 'Karate (Shotokan)'
           };
         });
 
@@ -513,6 +522,9 @@ export const createStudent = async (data) => {
     gender: data.gender || 'Male',
     blood_group: (data.bloodGroup || data.blood_group || 'O+').slice(0, 20),
     current_belt: data.currentBelt || data.current_belt || 'White Belt',
+    program: data.program || data.course || data.discipline || 'Karate (Shotokan)',
+    course: data.program || data.course || data.discipline || 'Karate (Shotokan)',
+    discipline: data.program || data.course || data.discipline || 'Karate (Shotokan)',
     branch: branchVal,
     shift: data.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
     admission_fee: admFee,
