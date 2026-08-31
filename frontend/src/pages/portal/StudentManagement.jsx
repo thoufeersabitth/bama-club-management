@@ -7,7 +7,7 @@ import {
   DollarSign, AlertCircle, Clock, Printer, Briefcase
 } from 'lucide-react';
 import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate } from '../../services/api';
-import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
+import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 const FIXED_AVATAR_DIM = 300;
@@ -118,6 +118,7 @@ export default function StudentManagement() {
   const [search, setSearch] = useState('');
   const [selectedBelt, setSelectedBelt] = useState('ALL');
   const [selectedBranch, setSelectedBranch] = useState('ALL');
+  const [selectedProgram, setSelectedProgram] = useState('ALL');
   const [selectedShift, setSelectedShift] = useState('ALL');
   const [selectedBillingPlan, setSelectedBillingPlan] = useState('ALL');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -226,6 +227,7 @@ export default function StudentManagement() {
   // Form State containing all student fields including Shift Batch & Admission Fee = 1000 & Custom Paid Amount Inputs
   const [formData, setFormData] = useState({
     name: '',
+    program: 'Karate (Shotokan)',
     photo: '',
     guardianName: '',
     occupation: '',
@@ -997,6 +999,12 @@ export default function StudentManagement() {
     if (selectedBillingPlan === 'REGULAR') matchesPlan = !isSchool;
     if (selectedBillingPlan === 'SCHOOL_BATCH') matchesPlan = isSchool;
 
+    // Program / Course Discipline Filter
+    const cadetProg = s.program || s.course || s.discipline || 'Karate (Shotokan)';
+    const matchesProgram = selectedProgram === 'ALL' || 
+      cadetProg.toLowerCase().includes(selectedProgram.toLowerCase()) || 
+      selectedProgram.toLowerCase().includes(cadetProg.toLowerCase());
+
     // Tab Filter
     const isInactive = s.status === 'Inactive';
     const totalAdmFee = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
@@ -1007,7 +1015,7 @@ export default function StudentManagement() {
     if (selectedTab === 'Inactive') matchesTab = isInactive;
     if (selectedTab === 'AdmissionFeePending') matchesTab = isAdmissionFeePending;
 
-    return matchesSearch && matchesBelt && matchesBranch && matchesShift && matchesCategory && matchesPlan && matchesTab;
+    return matchesSearch && matchesBelt && matchesBranch && matchesProgram && matchesShift && matchesCategory && matchesPlan && matchesTab;
   });
 
   // Pagination Calculations (10 per page)
@@ -2266,6 +2274,22 @@ export default function StudentManagement() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 font-bold text-gray-700 w-full sm:w-auto">
+          {/* Course / Program Filter */}
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial min-w-[125px]">
+            <Award className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+            <span className="text-[11px] whitespace-nowrap">Course:</span>
+            <select
+              value={selectedProgram}
+              onChange={(e) => setSelectedProgram(e.target.value)}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition shadow-sm truncate"
+            >
+              <option value="ALL">All Disciplines</option>
+              {PROGRAM_OPTIONS.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Shift Batch Filter */}
           <div className="flex items-center gap-1.5 flex-1 sm:flex-initial min-w-[120px]">
             <Clock className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
@@ -2742,7 +2766,56 @@ export default function StudentManagement() {
                 </div>
               </div>
 
+              {/* Row 3: Enrolled Course, Belt Level, DOB & Age */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5 text-red-600" /> Course / Discipline *
+                  </label>
+                  <select
+                    value={formData.program || 'Karate (Shotokan)'}
+                    onChange={(e) => {
+                      const prog = e.target.value;
+                      const isKarate = prog === 'Karate (Shotokan)';
+                      const shifts = getDynamicShiftOptions(formData.branch, prog);
+                      setFormData(prev => ({
+                        ...prev,
+                        program: prog,
+                        currentBelt: isKarate ? (prev.currentBelt === 'No Belt' ? 'White Belt' : prev.currentBelt) : 'No Belt',
+                        shift: shifts.length > 0 ? shifts[0] : prev.shift
+                      }));
+                    }}
+                    className="w-full bg-red-50/60 border border-red-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition"
+                  >
+                    {PROGRAM_OPTIONS.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(!formData.program || formData.program === 'Karate (Shotokan)') ? (
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1">Belt Level *</label>
+                    <select
+                      value={formData.currentBelt}
+                      onChange={(e) => setFormData({ ...formData, currentBelt: e.target.value })}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-xs focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition"
+                    >
+                      {BELT_LEVELS.map(b => (
+                        <option key={b.name} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-gray-400 font-bold mb-1">Belt Level</label>
+                    <div className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-500 font-semibold text-xs flex items-center justify-between">
+                      <span>No Belt Required</span>
+                      <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-mono">N/A</span>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-red-600" /> Date of Birth *
@@ -2774,59 +2847,49 @@ export default function StudentManagement() {
                     className="w-full bg-emerald-50/80 border border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 transition"
                   />
                 </div>
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1">Belt Level</label>
-                  <select
-                    value={formData.currentBelt}
-                    onChange={(e) => setFormData({ ...formData, currentBelt: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition"
-                  >
-                    {BELT_LEVELS.map(b => (
-                      <option key={b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 text-red-600">Branch Dojo *</label>
-                  <select
-                    required
-                    disabled={isInstructor}
-                    value={formData.branch_id || formData.branch}
-                    onChange={async (e) => {
-                      const selVal = e.target.value;
-                      const matchedB = branchesList.find(b => b.id === selVal || b.name === selVal);
-                      const bId = matchedB?.id || selVal;
-                      const bName = matchedB?.name || selVal;
-                      const branchShifts = getActiveShiftOptions(bName);
-                      const defaultShift = branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
-                      
-                      const feeInfo = await getApplicableFees(bId);
-                      setFormData(prev => ({
-                        ...prev,
-                        branch: bName,
-                        branch_id: bId,
-                        branch_name: bName,
-                        shift: defaultShift,
-                        admissionFee: feeInfo.admissionFee,
-                        admissionFeePaidAmount: feeInfo.admissionFee,
-                        feeAmount: feeInfo.monthlyFee,
-                        initialPaidAmount: feeInfo.monthlyFee
-                      }));
-                    }}
-                    className="w-full bg-gray-50 border-2 border-red-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 disabled:opacity-50 cursor-pointer transition"
-                  >
-                    <option value="">-- Select Dojo Branch * --</option>
-                    {branchesList.map(b => (
-                      <option key={b.id || b.name} value={b.id || b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
+              </div>
+
+              {/* Row 3.5: Branch Dojo Selector */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1 text-red-600">Branch Dojo *</label>
+                <select
+                  required
+                  disabled={isInstructor}
+                  value={formData.branch_id || formData.branch}
+                  onChange={async (e) => {
+                    const selVal = e.target.value;
+                    const matchedB = branchesList.find(b => b.id === selVal || b.name === selVal);
+                    const bId = matchedB?.id || selVal;
+                    const bName = matchedB?.name || selVal;
+                    const branchShifts = getDynamicShiftOptions(bName, formData.program);
+                    const defaultShift = branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
+                    
+                    const feeInfo = await getApplicableFees(bId);
+                    setFormData(prev => ({
+                      ...prev,
+                      branch: bName,
+                      branch_id: bId,
+                      branch_name: bName,
+                      shift: defaultShift,
+                      admissionFee: feeInfo.admissionFee,
+                      admissionFeePaidAmount: feeInfo.admissionFee,
+                      feeAmount: feeInfo.monthlyFee,
+                      initialPaidAmount: feeInfo.monthlyFee
+                    }));
+                  }}
+                  className="w-full bg-gray-50 border-2 border-red-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 disabled:opacity-50 cursor-pointer transition"
+                >
+                  <option value="">-- Select Dojo Branch * --</option>
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.id || b.name}>{b.name}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Training Shift Batch Selector Field */}
               <div className="p-3.5 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2">
                 <label className="text-amber-800 font-bold text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                  <Clock className="w-4 h-4 text-amber-600" /> Training Shift / Batch *
+                  <Clock className="w-4 h-4 text-amber-600" /> Training Shift / Batch ({formData.program || 'Course'}) *
                 </label>
                 <select
                   value={formData.shift}
@@ -2836,7 +2899,7 @@ export default function StudentManagement() {
                   {!formData.branch ? (
                     <option value="">-- Select Dojo Branch First --</option>
                   ) : (
-                    getActiveShiftOptions(formData.branch).map(s => (
+                    getDynamicShiftOptions(formData.branch, formData.program).map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))
                   )}
@@ -3322,8 +3385,58 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Row 3: DOB & Age & Belt Level & Branch */}
+              {/* Row 3: Course, Belt Level, DOB & Age */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5 text-blue-600" /> Course / Discipline *
+                  </label>
+                  <select
+                    value={editingStudent.program || editingStudent.course || 'Karate (Shotokan)'}
+                    onChange={(e) => {
+                      const prog = e.target.value;
+                      const isKarate = prog === 'Karate (Shotokan)';
+                      const shifts = getDynamicShiftOptions(editingStudent.branch || editingStudent.branch_name, prog);
+                      setEditingStudent({
+                        ...editingStudent,
+                        program: prog,
+                        course: prog,
+                        currentBelt: isKarate ? (editingStudent.currentBelt === 'No Belt' ? 'White Belt' : editingStudent.currentBelt) : 'No Belt',
+                        current_belt: isKarate ? (editingStudent.current_belt === 'No Belt' ? 'White Belt' : editingStudent.current_belt) : 'No Belt',
+                        shift: shifts.length > 0 ? shifts[0] : editingStudent.shift
+                      });
+                    }}
+                    className="w-full bg-blue-50/60 border border-blue-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer transition"
+                  >
+                    {PROGRAM_OPTIONS.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {(!editingStudent.program || editingStudent.program === 'Karate (Shotokan)') ? (
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1">Belt Level *</label>
+                    <select
+                      value={editingStudent.currentBelt || editingStudent.current_belt || 'White Belt'}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, currentBelt: e.target.value, current_belt: e.target.value })}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 text-xs focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer transition"
+                    >
+                      {BELT_LEVELS.map(b => (
+                        <option key={b.name} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-gray-400 font-bold mb-1">Belt Level</label>
+                    <div className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-500 font-semibold text-xs flex items-center justify-between">
+                      <span>No Belt Required</span>
+                      <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-mono">N/A</span>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date of Birth *
@@ -3355,33 +3468,23 @@ export default function StudentManagement() {
                     className="w-full bg-emerald-50/80 border border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 transition"
                   />
                 </div>
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1">Belt Level</label>
-                  <select
-                    value={editingStudent.currentBelt || editingStudent.current_belt || 'White Belt'}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, currentBelt: e.target.value, current_belt: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer transition"
-                  >
-                    {BELT_LEVELS.map(b => (
-                      <option key={b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 truncate flex items-center justify-between">
-                    <span>Branch Dojo *</span>
-                    <span className="text-[9px] text-amber-800 font-black bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-300 ml-1">🔒 Locked</span>
-                  </label>
-                  <select
-                    disabled={true}
-                    value={editingStudent.branch || editingStudent.branch_name || 'Pulikkal Branch (Head Office)'}
-                    className="w-full bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-700 font-bold text-xs cursor-not-allowed transition truncate"
-                  >
-                    {branchesList.map(b => (
-                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
+              </div>
+
+              {/* Row 3.5: Branch Dojo */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1 truncate flex items-center justify-between">
+                  <span>Branch Dojo *</span>
+                  <span className="text-[9px] text-amber-800 font-black bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-300 ml-1">🔒 Locked</span>
+                </label>
+                <select
+                  disabled={true}
+                  value={editingStudent.branch || editingStudent.branch_name || 'Pulikkal Branch (Head Office)'}
+                  className="w-full bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-700 font-bold text-xs cursor-not-allowed transition truncate"
+                >
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Clean Full-Width Branch Locked Info Banner */}
@@ -3393,14 +3496,14 @@ export default function StudentManagement() {
               {/* Row 4: Training Shift Batch Field */}
               <div className="p-3.5 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2">
                 <label className="text-amber-800 font-bold text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                  <Clock className="w-4 h-4 text-amber-600" /> Training Shift / Batch *
+                  <Clock className="w-4 h-4 text-amber-600" /> Training Shift / Batch ({editingStudent.program || editingStudent.course || 'Course'}) *
                 </label>
                 <select
-                  value={editingStudent.shift || (getActiveShiftOptions(editingStudent.branch || editingStudent.branch_name)[0] || 'General Training Batch (Regular)')}
+                  value={editingStudent.shift || (getDynamicShiftOptions(editingStudent.branch || editingStudent.branch_name, editingStudent.program)[0] || 'General Training Batch (Regular)')}
                   onChange={(e) => setEditingStudent({ ...editingStudent, shift: e.target.value })}
                   className="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
-                  {getActiveShiftOptions(editingStudent.branch || editingStudent.branch_name).map(s => (
+                  {getDynamicShiftOptions(editingStudent.branch || editingStudent.branch_name, editingStudent.program || editingStudent.course).map(s => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>

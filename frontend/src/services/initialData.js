@@ -20,18 +20,38 @@ export const ACADEMY_INFO = {
   ]
 };
 
+export const ACADEMY_PROGRAMS = [
+  { id: 'prog-karate', name: 'Karate (Shotokan)', icon: '🥋', hasBelts: true, defaultBelt: 'White Belt' },
+  { id: 'prog-boxing', name: 'Boxing', icon: '🥊', hasBelts: false, defaultBelt: 'No Belt' },
+  { id: 'prog-kickboxing', name: 'Kick Boxing', icon: '💥', hasBelts: false, defaultBelt: 'No Belt' },
+  { id: 'prog-fitness', name: 'Fitness Training', icon: '🏋️‍♂️', hasBelts: false, defaultBelt: 'No Belt' },
+  { id: 'prog-self-defence', name: 'Self Defense', icon: '🛡️', hasBelts: false, defaultBelt: 'No Belt' },
+  { id: 'prog-ladies', name: 'Ladies Special Batch', icon: '🧕', hasBelts: false, defaultBelt: 'No Belt' }
+];
+
+export const PROGRAM_OPTIONS = [
+  'Karate (Shotokan)',
+  'Boxing',
+  'Kick Boxing',
+  'Fitness Training',
+  'Self Defense',
+  'Ladies Special Batch'
+];
+
 export const SHIFT_OPTIONS = [
   "Evening Batch (5:00 PM - 7:00 PM)",
   "Morning Batch (6:00 AM - 7:30 AM)",
   "Night / Late Evening Batch (7:00 PM - 8:30 PM)",
   "Weekend Special Batch (Sat & Sun: 7:00 AM - 9:00 AM)",
-  "Ladies Special Batch",
+  "Ladies Special Batch (4:00 PM - 5:30 PM)",
   "Kids Special Batch (4:00 PM - 5:00 PM)",
+  "Boxing Morning Batch (6:00 AM - 7:30 AM)",
+  "Kick Boxing Sparring Batch (7:00 PM - 8:30 PM)",
   "Custom Shift / Flexible"
 ];
 
 // Helper to resolve active training shift schedules dynamically from Branch Management storage
-export const getDynamicShiftOptions = (branchFilter = null) => {
+export const getDynamicShiftOptions = (branchFilter = null, programFilter = null) => {
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
@@ -40,13 +60,33 @@ export const getDynamicShiftOptions = (branchFilter = null) => {
         let list = parsed;
         if (branchFilter && branchFilter !== 'All') {
           const bLow = branchFilter.toLowerCase().trim();
-          const filtered = parsed.filter(s => String(s.branch || '').toLowerCase().includes(bLow) || bLow.includes(String(s.branch || '').toLowerCase()));
-          if (filtered.length > 0) list = filtered;
+          const bFiltered = list.filter(s => String(s.branch || '').toLowerCase().includes(bLow) || bLow.includes(String(s.branch || '').toLowerCase()));
+          if (bFiltered.length > 0) list = bFiltered;
         }
-        return list.map(s => `${s.name} (${s.time})`);
+        if (programFilter && programFilter !== 'All') {
+          const pLow = programFilter.toLowerCase().trim();
+          const progMatched = list.filter(s => 
+            String(s.program || s.course || s.discipline || s.name || '').toLowerCase().includes(pLow) ||
+            pLow.includes(String(s.program || s.course || s.discipline || '').toLowerCase())
+          );
+          if (progMatched.length > 0) list = progMatched;
+        }
+        if (list.length > 0) {
+          return list.map(s => `${s.name} (${s.time})`);
+        }
       }
     }
   } catch (e) {}
+
+  if (programFilter) {
+    const pLow = programFilter.toLowerCase();
+    if (pLow.includes('ladies')) return ["Ladies Special Batch (4:00 PM - 5:30 PM)", "Ladies Morning Fitness (6:00 AM - 7:15 AM)"];
+    if (pLow.includes('kick')) return ["Kick Boxing Sparring Batch (7:00 PM - 8:30 PM)", "Kick Boxing Cardio (6:00 AM - 7:30 AM)"];
+    if (pLow.includes('box')) return ["Boxing Morning Conditioning (6:00 AM - 7:30 AM)", "Boxing Evening Strikes (6:00 PM - 7:30 PM)"];
+    if (pLow.includes('fitness')) return ["Morning Fitness Conditioning (6:00 AM - 7:30 AM)", "Evening Cardio & Stamina (7:00 PM - 8:30 PM)"];
+    if (pLow.includes('defense')) return ["Self Defense Practical Workshop", "Practical Defense Evening (6:30 PM - 8:00 PM)"];
+  }
+
   return SHIFT_OPTIONS;
 };
 

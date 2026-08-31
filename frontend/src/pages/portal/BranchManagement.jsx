@@ -6,7 +6,7 @@ import {
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
 import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, filterOutDummyShifts, openWhatsApp } from '../../services/api';
-import { INITIAL_BRANCHES, SHIFT_OPTIONS } from '../../services/initialData';
+import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
   const navigate = useNavigate();
@@ -54,6 +54,7 @@ export default function BranchManagement() {
   // Shift Form Data
   const [shiftData, setShiftData] = useState({
     name: '',
+    program: 'Karate (Shotokan)',
     branch: 'Pulikkal Branch (Head Office)',
     days: 'Mon, Wed, Fri',
     time: '5:00 PM - 7:00 PM',
@@ -272,6 +273,7 @@ export default function BranchManagement() {
     setEditShift(s);
     setShiftData({
       name: s.name || '',
+      program: s.program || s.course || s.discipline || 'Karate (Shotokan)',
       branch: s.branch || 'Pulikkal Branch (Head Office)',
       days: s.days || 'Mon, Wed, Fri',
       time: s.time || '5:00 PM - 7:00 PM',
@@ -1053,6 +1055,19 @@ export default function BranchManagement() {
                   onChange={(e) => setShiftData({ ...shiftData, name: e.target.value })}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-amber-500 shadow-sm"
                 />
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">Discipline / Course Program *</label>
+                <select
+                  value={shiftData.program || 'Karate (Shotokan)'}
+                  onChange={(e) => setShiftData({ ...shiftData, program: e.target.value })}
+                  className="w-full bg-amber-50/50 border border-amber-300 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
+                >
+                  {PROGRAM_OPTIONS.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
