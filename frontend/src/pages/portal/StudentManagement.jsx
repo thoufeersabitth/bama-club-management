@@ -876,12 +876,18 @@ export default function StudentManagement() {
       const updatedList = students.map(s => isMatch(s) ? { ...s, ...saved } : s);
       setStudents(updatedList);
       saveStoredStudents(updatedList);
+      if (detailStudent && isMatch(detailStudent)) {
+        setDetailStudent(prev => ({ ...prev, ...saved }));
+      }
       setEditingStudent(null);
       setEditPhotoState({ rawSrc: '', zoom: 1.0, panX: 0, panY: 0 });
     } catch (err) {
       const updatedList = students.map(s => isMatch(s) ? { ...s, ...updatedData } : s);
       setStudents(updatedList);
       saveStoredStudents(updatedList);
+      if (detailStudent && isMatch(detailStudent)) {
+        setDetailStudent(prev => ({ ...prev, ...updatedData }));
+      }
       setEditingStudent(null);
       setEditPhotoState({ rawSrc: '', zoom: 1.0, panX: 0, panY: 0 });
     }
@@ -903,6 +909,9 @@ export default function StudentManagement() {
     setStudents(updatedList);
     saveStoredStudents(updatedList);
     setDeletingStudent(null);
+    if (detailStudent && (String(detailStudent.id) === String(stdId) || String(detailStudent.admissionNo || detailStudent.admission_no) === String(admNo))) {
+      setDetailStudent(null);
+    }
     if (inspectorStudent && (String(inspectorStudent.id) === String(stdId) || String(inspectorStudent.admissionNo || inspectorStudent.admission_no) === String(admNo))) {
       setInspectorStudent(updatedList.length > 0 ? updatedList[0] : null);
     }
@@ -1219,7 +1228,8 @@ export default function StudentManagement() {
   };
 
   // FULL DEDICATED CADET 360° PROFILE & FINANCIAL DUES DASHBOARD PAGE VIEW
-  if (detailStudent) {
+  const renderDetailView = () => {
+    if (!detailStudent) return null;
     const std = detailStudent;
     const rawMonthlyRate = parseFloat(std.feeAmount ?? std.fee_amount ?? globalFeeSettings?.defaultMonthlyFee ?? 500);
     const monthlyRate = (isNaN(rawMonthlyRate) || rawMonthlyRate < 100) 
@@ -2085,31 +2095,32 @@ export default function StudentManagement() {
             })()}
           </div>
         </div>
-
-        {/* Promote & Success Modals in 360 View */}
-        {renderPromoteModal()}
       </div>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Sleek Compact Top Banner */}
-      <div className="bg-white p-4 sm:px-5 sm:py-4 rounded-2xl border border-gray-200/90 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 hover:shadow-md transition-all duration-200 w-full">
-        <div>
-          <h1 className="text-base sm:text-lg font-black text-gray-900 tracking-tight leading-tight">Cadet Admissions & Profiles</h1>
-          <p className="text-[11px] text-gray-500 font-medium mt-0.5">Manage cadet admissions, photos, training shifts, belts, and digital profile cards.</p>
-        </div>
+      {detailStudent ? (
+        renderDetailView()
+      ) : (
+        <>
+          {/* Sleek Compact Top Banner */}
+          <div className="bg-white p-4 sm:px-5 sm:py-4 rounded-2xl border border-gray-200/90 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4 hover:shadow-md transition-all duration-200 w-full">
+            <div>
+              <h1 className="text-base sm:text-lg font-black text-gray-900 tracking-tight leading-tight">Cadet Admissions & Profiles</h1>
+              <p className="text-[11px] text-gray-500 font-medium mt-0.5">Manage cadet admissions, photos, training shifts, belts, and digital profile cards.</p>
+            </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {!isInstructor && (
-            <button
-              onClick={() => setShowGlobalFeeModal(true)}
-              className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
-            >
-              <Settings className="w-4 h-4 text-amber-600 flex-shrink-0" /> <span className="whitespace-nowrap">Fee Settings</span>
-            </button>
-          )}
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              {!isInstructor && (
+                <button
+                  onClick={() => setShowGlobalFeeModal(true)}
+                  className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+                >
+                  <Settings className="w-4 h-4 text-amber-600 flex-shrink-0" /> <span className="whitespace-nowrap">Fee Settings</span>
+                </button>
+              )}
 
           <button
             type="button"
@@ -2519,6 +2530,8 @@ export default function StudentManagement() {
           </div>
         </div>
       </div>
+    </>
+  )}
 
       {/* MODAL: Automatic WhatsApp Welcome Dispatch Confirmation */}
       {welcomeDispatchModal && (
