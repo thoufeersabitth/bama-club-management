@@ -26,7 +26,8 @@ export const ACADEMY_PROGRAMS = [
   { id: 'prog-kickboxing', name: 'Kick Boxing', icon: '💥', hasBelts: false, defaultBelt: 'No Belt' },
   { id: 'prog-fitness', name: 'Fitness Training', icon: '🏋️‍♂️', hasBelts: false, defaultBelt: 'No Belt' },
   { id: 'prog-self-defence', name: 'Self Defense', icon: '🛡️', hasBelts: false, defaultBelt: 'No Belt' },
-  { id: 'prog-ladies', name: 'Ladies Special Batch', icon: '🧕', hasBelts: false, defaultBelt: 'No Belt' }
+  { id: 'prog-ladies', name: 'Ladies Special Batch', icon: '🧕', hasBelts: false, defaultBelt: 'No Belt' },
+  { id: 'prog-personal-training', name: 'Personal Training (1-on-1)', icon: '👑', hasBelts: false, defaultBelt: 'No Belt' }
 ];
 
 export const PROGRAM_OPTIONS = [
@@ -35,7 +36,8 @@ export const PROGRAM_OPTIONS = [
   'Kick Boxing',
   'Fitness Training',
   'Self Defense',
-  'Ladies Special Batch'
+  'Ladies Special Batch',
+  'Personal Training (1-on-1)'
 ];
 
 export const SHIFT_OPTIONS = [
@@ -47,6 +49,7 @@ export const SHIFT_OPTIONS = [
   "Kids Special Batch (4:00 PM - 5:00 PM)",
   "Boxing Morning Batch (6:00 AM - 7:30 AM)",
   "Kick Boxing Sparring Batch (7:00 PM - 8:30 PM)",
+  "Personal Training (Flexible 1-on-1 Slots)",
   "Custom Shift / Flexible"
 ];
 
@@ -80,6 +83,7 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
 
   if (programFilter) {
     const pLow = programFilter.toLowerCase();
+    if (pLow.includes('personal')) return ["Personal Training (Flexible 1-on-1 Slots)", "Personal Training Morning (6:00 AM - 7:00 AM)", "Personal Training Evening (8:00 PM - 9:00 PM)"];
     if (pLow.includes('ladies')) return ["Ladies Special Batch (4:00 PM - 5:30 PM)", "Ladies Morning Fitness (6:00 AM - 7:15 AM)"];
     if (pLow.includes('kick')) return ["Kick Boxing Sparring Batch (7:00 PM - 8:30 PM)", "Kick Boxing Cardio (6:00 AM - 7:30 AM)"];
     if (pLow.includes('box')) return ["Boxing Morning Conditioning (6:00 AM - 7:30 AM)", "Boxing Evening Strikes (6:00 PM - 7:30 PM)"];
