@@ -75,7 +75,10 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
           if (progMatched.length > 0) list = progMatched;
         }
         if (list.length > 0) {
-          return list.map(s => `${s.name} (${s.time})`);
+          return Array.from(new Set(list.map(s => {
+            if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
+            return s.name || s.time;
+          })));
         }
       }
     }
@@ -89,6 +92,12 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
     if (pLow.includes('box')) return ["Boxing Morning Conditioning (6:00 AM - 7:30 AM)", "Boxing Evening Strikes (6:00 PM - 7:30 PM)"];
     if (pLow.includes('fitness')) return ["Morning Fitness Conditioning (6:00 AM - 7:30 AM)", "Evening Cardio & Stamina (7:00 PM - 8:30 PM)"];
     if (pLow.includes('defense')) return ["Self Defense Practical Workshop", "Practical Defense Evening (6:30 PM - 8:00 PM)"];
+    if (pLow.includes('karate')) return [
+      "Evening Karate Batch (5:00 PM - 7:00 PM)",
+      "Morning Karate Batch (6:00 AM - 7:30 AM)",
+      "Weekend Special Batch (Sat & Sun: 7:00 AM - 9:00 AM)",
+      "Kids Karate Special (4:00 PM - 5:00 PM)"
+    ];
   }
 
   return SHIFT_OPTIONS;
