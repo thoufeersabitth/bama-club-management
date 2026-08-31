@@ -849,7 +849,7 @@ export default function BranchManagement() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                      </div>
+</div>
                     </div>
                   </div>
                 );
@@ -861,25 +861,32 @@ export default function BranchManagement() {
 
       {/* MODAL: Create / Edit Branch Dojo */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setShowAddModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 cursor-pointer">
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-red-50 text-red-600 border border-red-200 rounded-2xl flex items-center justify-center shadow-sm">
-                <Building2 className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-xl bg-white rounded-3xl border border-gray-200 shadow-2xl relative flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-5 sm:px-6 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-50 text-red-600 border border-red-200 rounded-xl flex items-center justify-center shadow-xs flex-shrink-0">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 leading-tight">
+                    {editBranch ? `Edit Branch: ${editBranch.name}` : 'Add New Branch Dojo'}
+                  </h3>
+                  <p className="text-[11px] text-gray-500 font-medium">Configure branch dojo details, sensei, timings & facilities.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-black text-gray-900">
-                  {editBranch ? `Edit Branch: ${editBranch.name}` : 'Add New Branch Dojo'}
-                </h3>
-                <p className="text-xs text-gray-500 font-medium">Configure branch dojo photo, address, sensei, timings & facilities.</p>
-              </div>
+              <button 
+                type="button"
+                onClick={() => setShowAddModal(false)} 
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <form onSubmit={handleCreateOrUpdateBranch} className="space-y-3.5 text-xs">
+            {/* Modal Scrollable Body */}
+            <form id="branchDojoForm" onSubmit={handleCreateOrUpdateBranch} className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs">
               {/* Photo Upload & Preview */}
               <div className="space-y-2 bg-gray-50 p-3.5 rounded-2xl border border-gray-200">
                 <label className="block text-gray-800 font-black mb-1 flex items-center gap-1.5">
@@ -887,14 +894,14 @@ export default function BranchManagement() {
                 </label>
 
                 {formData.image && (
-                  <div className="h-36 w-full rounded-xl overflow-hidden border border-gray-300 relative shadow-sm">
+                  <div className="h-28 w-full rounded-xl overflow-hidden border border-gray-300 relative shadow-xs">
                     <img src={formData.image} alt="Dojo Preview" className="w-full h-full object-cover" />
                   </div>
                 )}
 
                 <div className="flex items-center gap-2 pt-1">
-                  <label className="px-3.5 py-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-900 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition">
-                    <Upload className="w-4 h-4 text-red-600" /> Upload Image File from Device
+                  <label className="px-3.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-300 text-gray-900 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition">
+                    <Upload className="w-3.5 h-3.5 text-red-600" /> Upload Image File
                     <input
                       type="file"
                       accept="image/*"
@@ -910,11 +917,12 @@ export default function BranchManagement() {
                   placeholder="Paste Image URL..."
                   value={formData.image}
                   onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-mono text-xs focus:outline-none focus:border-red-500 shadow-2xs"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-gray-900 text-xs font-mono focus:outline-none focus:border-red-500 shadow-xs"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Branch Name & Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Branch Name *</label>
                   <input
@@ -923,7 +931,7 @@ export default function BranchManagement() {
                     placeholder="e.g. Manjeri Branch Dojo"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-bold text-xs shadow-sm"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 shadow-xs"
                   />
                 </div>
                 <div>
@@ -934,49 +942,51 @@ export default function BranchManagement() {
                     placeholder="BAMA-DOJO-04"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-mono font-bold text-xs focus:bg-white focus:outline-none focus:border-red-500 shadow-sm"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 uppercase shadow-xs"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Chief Instructor & Phone Number */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Chief Instructor / Sensei *</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Sensei Rahul Kumar (3rd Dan)"
                     value={formData.branch_head}
                     onChange={(e) => setFormData({ ...formData, branch_head: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 shadow-sm"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 shadow-xs"
                   />
                 </div>
                 <div>
                   <label className="block text-gray-700 font-bold mb-1">Phone Number</label>
                   <input
-                    type="text"
+                    type="tel"
                     required
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-mono font-bold focus:bg-white focus:outline-none focus:border-red-500 shadow-sm"
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value, whatsapp: formData.whatsapp || e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 shadow-xs"
                   />
                 </div>
               </div>
 
+              {/* Full Address */}
               <div>
                 <label className="block text-gray-700 font-bold mb-1">Full Location Address *</label>
                 <textarea
-                  rows={2}
                   required
+                  rows="2"
                   placeholder="Street, Junction, Landmark, District, Pincode..."
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-medium shadow-sm"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-medium shadow-xs resize-none"
                 />
               </div>
 
-              <div>
-                <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+              {/* Training Batch Shift Timings */}
+              <div className="space-y-1.5 bg-amber-50/50 p-3.5 rounded-2xl border border-amber-200">
+                <label className="text-gray-800 font-bold flex items-center justify-between">
                   <span>Training Batch Shift Timings *</span>
                   <span className="text-[10px] text-amber-800 font-black bg-amber-100 px-2 py-0.5 rounded border border-amber-300">⚡ Multi-Shift Supported</span>
                 </label>
@@ -986,7 +996,7 @@ export default function BranchManagement() {
                   placeholder="e.g. Mon, Wed, Fri: 5:00 PM - 7:00 PM | Sat & Sun: 7:00 AM - 9:00 AM"
                   value={formData.timings}
                   onChange={(e) => setFormData({ ...formData, timings: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 shadow-sm text-xs sm:text-sm mb-2"
+                  className="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2 text-gray-900 font-bold focus:outline-none focus:border-red-500 shadow-xs text-xs sm:text-sm mb-1"
                 />
                 
                 {/* ⚡ Quick Preset Shift Chips */}
@@ -1017,6 +1027,7 @@ export default function BranchManagement() {
                 </div>
               </div>
 
+              {/* Facilities */}
               <div>
                 <label className="block text-gray-700 font-bold mb-1">Facilities & Equipment (Comma Separated)</label>
                 <input
@@ -1024,10 +1035,11 @@ export default function BranchManagement() {
                   placeholder="🥋 Tatami Safety Mats, 🥊 Punching Heavy Bags, ❄️ AC Dojo Hall"
                   value={formData.facilities}
                   onChange={(e) => setFormData({ ...formData, facilities: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-medium shadow-sm"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-medium shadow-xs"
                 />
               </div>
 
+              {/* Google Maps Location */}
               <div>
                 <div className="flex flex-wrap items-center justify-between mb-1 gap-1">
                   <label className="text-gray-700 font-bold flex items-center gap-1.5">
@@ -1041,7 +1053,7 @@ export default function BranchManagement() {
                     className="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-lg border border-red-200 transition flex items-center gap-1 cursor-pointer"
                     title="Open Google Maps in a new tab to find/pick exact dojo location"
                   >
-                    <span>🔍 Open Google Maps to Pick Location</span>
+                    <span>🔍 Open Google Maps</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -1051,7 +1063,7 @@ export default function BranchManagement() {
                     placeholder="e.g. https://maps.app.goo.gl/... or paste Google Maps link"
                     value={formData.mapUrl}
                     onChange={(e) => setFormData({ ...formData, mapUrl: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-medium shadow-sm"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-medium shadow-xs"
                   />
                   <button
                     type="button"
@@ -1060,17 +1072,14 @@ export default function BranchManagement() {
                       setFormData({ ...formData, mapUrl: autoUrl });
                     }}
                     className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-[10px] rounded-xl flex-shrink-0 transition cursor-pointer shadow-xs whitespace-nowrap"
-                    title="Auto-fill Google Maps search link based on branch name & address"
                   >
-                    ⚡ Auto-Fill Link
+                    ⚡ Auto-Fill
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-500 font-medium mt-1">
-                  💡 Click <b>"🔍 Open Google Maps"</b> to pick exact location & paste link, or click <b>"⚡ Auto-Fill Link"</b> for automatic map search link.
-                </p>
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
+              {/* Head office checkbox */}
+              <div className="flex items-center gap-2 pt-0.5">
                 <input
                   type="checkbox"
                   id="isHeadOffice"
@@ -1078,27 +1087,29 @@ export default function BranchManagement() {
                   onChange={(e) => setFormData({ ...formData, isHeadOffice: e.target.checked })}
                   className="w-4 h-4 text-red-600 rounded accent-red-600 cursor-pointer"
                 />
-                <label htmlFor="isHeadOffice" className="text-gray-900 font-bold cursor-pointer">
+                <label htmlFor="isHeadOffice" className="text-gray-900 font-bold cursor-pointer select-none">
                   Mark as Primary Head Office Dojo
                 </label>
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2.5 bg-gray-100 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-gradient-to-r from-red-600 via-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black text-xs rounded-xl shadow-md shadow-red-600/20 flex items-center gap-2 cursor-pointer"
-                >
-                  <Building2 className="w-4 h-4" /> {editBranch ? 'Save Changes' : 'Create Dojo Branch'}
-                </button>
-              </div>
             </form>
+
+            {/* Modal Sticky Bottom Actions Footer */}
+            <div className="p-4 sm:px-6 sm:py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 z-10">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-100 cursor-pointer shadow-xs transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="branchDojoForm"
+                className="px-6 py-2.5 bg-gradient-to-r from-red-600 via-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black text-xs rounded-xl shadow-md shadow-red-600/20 flex items-center gap-2 cursor-pointer transition active:scale-95"
+              >
+                <Building2 className="w-4 h-4" /> {editBranch ? 'Save Changes' : 'Create Dojo Branch'}
+              </button>
+            </div>
           </div>
         </div>
       )}
