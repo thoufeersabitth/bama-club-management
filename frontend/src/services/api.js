@@ -1181,14 +1181,16 @@ export const fetchTrainingSchedules = async () => {
   };
 
   const scheduleMap = new Map();
+  let serverFetchedSuccessfully = false;
 
-  // 2. Fetch active shifts from live Fly.io PostgreSQL announcements API
+  // 2. Fetch active shifts from live Fly.io PostgreSQL announcements API (Primary Single Source of Truth)
   try {
     const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
     if (res.ok) {
+      serverFetchedSuccessfully = true;
       const data = await res.json();
       const announcements = data.results || (Array.isArray(data) ? data : []);
       announcements.forEach(a => {
@@ -1213,25 +1215,29 @@ export const fetchTrainingSchedules = async () => {
     console.error('Failed to fetch training schedules from Fly.io live server:', err);
   }
 
-  // 3. Fallback to existing localStorage shifts (filtered against deleted set)
-  try {
-    const stored = localStorage.getItem('bama_training_schedules');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        filterOutDummyShifts(parsed).forEach(s => {
-          const key = String(s.name + (s.branch || '')).toLowerCase().trim();
-          if (key && !scheduleMap.has(key) && !isDeleted(s)) {
-            if (typeof s.id === 'string' && s.id.length > 20) {
-              scheduleMap.set(key, s);
+  // 3. Fallback to existing localStorage shifts ONLY if server was completely offline/unreachable
+  if (!serverFetchedSuccessfully) {
+    try {
+      const stored = localStorage.getItem('bama_training_schedules');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          filterOutDummyShifts(parsed).forEach(s => {
+            const key = String(s.name + (s.branch || '')).toLowerCase().trim();
+            if (key && !scheduleMap.has(key) && !isDeleted(s)) {
+              if (typeof s.id === 'string' && s.id.length > 20) {
+                scheduleMap.set(key, s);
+              }
             }
-          }
-        });
+          });
+        }
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
   const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values())).filter(s => !isDeleted(s));
+  
+  // Overwrite phone & laptop local storage with the exact clean database roster
   try {
     localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
   } catch (e) {}

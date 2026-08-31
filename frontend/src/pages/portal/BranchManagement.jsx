@@ -115,9 +115,7 @@ export default function BranchManagement() {
       });
 
       fetchTrainingSchedules().then(schs => {
-        if (schs && schs.length > 0) {
-          setSchedules(schs);
-        }
+        setSchedules(schs || []);
       });
 
       fetchStudents().then(stds => setStudentsList(stds || []));
