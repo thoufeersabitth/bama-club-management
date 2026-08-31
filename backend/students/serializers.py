@@ -38,7 +38,9 @@ class StudentSerializer(serializers.ModelSerializer):
             'admissionFeePaidAmount': 'admission_fee_paid_amount',
             'admissionFeePaid': 'admission_fee_paid',
             'joiningDate': 'joining_date',
-            'medicalNotes': 'medical_notes'
+            'medicalNotes': 'medical_notes',
+            'course': 'program',
+            'discipline': 'program'
         }
         for camel, snake in mappings.items():
             if camel in data and snake not in data:

@@ -43,6 +43,7 @@ class Student(models.Model):
     instructor = models.CharField(max_length=255, default='Sensei Abdul Rahman', blank=True, null=True)
     joining_date = models.DateField(blank=True, null=True)
     current_belt = models.CharField(max_length=100, default='White Belt', blank=True, null=True)
+    program = models.CharField(max_length=150, default='Karate (Shotokan)', blank=True, null=True)
     fee_frequency = models.CharField(max_length=50, default='MONTHLY', blank=True, null=True)
     fee_amount = models.DecimalField(max_digits=10, decimal_places=2, default=500.00, blank=True, null=True)
     initial_paid_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, blank=True, null=True)

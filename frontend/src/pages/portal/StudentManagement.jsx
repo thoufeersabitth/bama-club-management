@@ -765,12 +765,19 @@ export default function StudentManagement() {
   const handleOpenEditModal = (student) => {
     const cleanBranch = student.branch_name || student.branch_detail?.name || student.branchName || (typeof student.branch === 'object' ? student.branch?.name : student.branch) || '';
     const bStr = String(cleanBranch).toLowerCase();
-    let exactBranchName = 'Pulikkal Branch (Head Office)';
+    let exactBranchName = cleanBranch || 'Pulikkal Branch (Head Office)';
     if (bStr.includes('chungam')) exactBranchName = 'Chungam Branch Dojo';
     else if (bStr.includes('mongam')) exactBranchName = 'Mongam Branch Dojo';
 
+    const rawBelt = String(student.currentBelt || student.current_belt || '').trim();
+    const hasRealBelt = Boolean(rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt.toLowerCase()));
+    const courseProg = student.program || student.course || student.discipline || (hasRealBelt ? 'Karate (Shotokan)' : 'Karate (Shotokan)');
+    const resolvedBelt = courseProg.toLowerCase().includes('karate') ? (hasRealBelt ? rawBelt : 'White Belt') : 'No Belt';
+
     setEditingStudent({
       ...student,
+      program: courseProg,
+      course: courseProg,
       name: student.name || '',
       guardianName: student.guardianName || student.guardian_name || '',
       guardian_name: student.guardianName || student.guardian_name || '',
@@ -780,8 +787,8 @@ export default function StudentManagement() {
       age: student.age || 10,
       gender: student.gender || 'Male',
       bloodGroup: student.bloodGroup || student.blood_group || 'O+',
-      currentBelt: student.currentBelt || student.current_belt || 'White Belt',
-      current_belt: student.currentBelt || student.current_belt || 'White Belt',
+      currentBelt: resolvedBelt,
+      current_belt: resolvedBelt,
       branch: exactBranchName,
       branch_name: exactBranchName,
       shift: student.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
@@ -827,8 +834,16 @@ export default function StudentManagement() {
       editBranchId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
     }
 
+    const editProg = editingStudent.program || editingStudent.course || editingStudent.discipline || 'Karate (Shotokan)';
+    const editIsKarate = editProg.toLowerCase().includes('karate');
+    const editRawBelt = String(editingStudent.currentBelt || editingStudent.current_belt || '').trim();
+    const editHasRealBelt = Boolean(editRawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(editRawBelt.toLowerCase()));
+    const finalBelt = editIsKarate ? (editHasRealBelt ? editRawBelt : 'White Belt') : 'No Belt';
+
     const updatedData = {
       ...editingStudent,
+      program: editProg,
+      course: editProg,
       hasCustomFee: true,
       has_custom_fee: true,
       photo: finalPhoto,
@@ -843,8 +858,8 @@ export default function StudentManagement() {
       gender: editingStudent.gender || 'Male',
       bloodGroup: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
       blood_group: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
-      currentBelt: editingStudent.currentBelt || editingStudent.current_belt || 'White Belt',
-      current_belt: editingStudent.currentBelt || editingStudent.current_belt || 'White Belt',
+      currentBelt: finalBelt,
+      current_belt: finalBelt,
       branch: editBranchId,
       branch_id: editBranchId,
       branch_name: editBranchName,
@@ -1239,8 +1254,11 @@ export default function StudentManagement() {
   const renderDetailView = () => {
     if (!detailStudent) return null;
     const std = detailStudent;
-    const stdProg = std.program || std.course || std.discipline || 'Karate (Shotokan)';
+    const rawBelt = String(std.currentBelt || std.current_belt || '').trim();
+    const hasRealBelt = Boolean(rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt.toLowerCase()));
+    const stdProg = std.program || std.course || std.discipline || (hasRealBelt ? 'Karate (Shotokan)' : 'Karate (Shotokan)');
     const isKarate = stdProg.toLowerCase().includes('karate');
+    const canPromote = isKarate && hasRealBelt;
     const rawMonthlyRate = parseFloat(std.feeAmount ?? std.fee_amount ?? globalFeeSettings?.defaultMonthlyFee ?? 500);
     const monthlyRate = (isNaN(rawMonthlyRate) || rawMonthlyRate < 100) 
       ? (parseFloat(globalFeeSettings?.defaultMonthlyFee) || 500) 
@@ -1385,11 +1403,11 @@ export default function StudentManagement() {
                      '🥋 Karate (Shotokan)'}
                   </span>
 
-                  {/* Belt Badge & Promote Button - ONLY FOR KARATE CADETS */}
-                  {isKarate && (
+                  {/* Belt Badge & Promote Button - ONLY FOR VALID KARATE BELTS (NEVER RENDER NO BELT) */}
+                  {canPromote && (
                     <>
                       <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-300 text-xs font-black uppercase">
-                        🥋 {std.currentBelt || std.current_belt || 'White Belt'}
+                        🥋 {rawBelt}
                       </span>
                       <button
                         type="button"
@@ -2432,14 +2450,16 @@ export default function StudentManagement() {
                   </td>
                   <td className="py-4 px-5">
                     {(() => {
-                      const stdProg = std.program || std.course || std.discipline || 'Karate (Shotokan)';
+                      const rawBelt = String(std.currentBelt || std.current_belt || '').trim();
+                      const hasRealBelt = Boolean(rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt.toLowerCase()));
+                      const stdProg = std.program || std.course || std.discipline || (hasRealBelt ? 'Karate (Shotokan)' : 'Karate (Shotokan)');
                       const isKarate = stdProg.toLowerCase().includes('karate');
-                      const beltName = std.currentBelt || std.current_belt || 'White Belt';
+                      const canPromote = isKarate && hasRealBelt;
                       
-                      if (isKarate) {
+                      if (canPromote) {
                         return (
                           <span className="px-3 py-1 rounded-full bg-gray-100/90 border border-gray-200 text-gray-800 font-bold text-xs inline-flex items-center gap-1 shadow-xs">
-                            🥋 {beltName}
+                            🥋 {rawBelt}
                           </span>
                         );
                       }
@@ -2503,9 +2523,12 @@ export default function StudentManagement() {
                   <td className="py-4 px-5 text-right">
                     <div className="bg-gray-100/80 p-1 rounded-2xl border border-gray-200/80 inline-flex items-center gap-1 shadow-sm" onClick={(e) => e.stopPropagation()}>
                       {(() => {
+                        const rawBelt = String(std.currentBelt || std.current_belt || '').trim();
+                        const hasRealBelt = Boolean(rawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(rawBelt.toLowerCase()));
                         const stdProg = std.program || std.course || std.discipline || 'Karate (Shotokan)';
                         const isKarate = stdProg.toLowerCase().includes('karate');
-                        if (!isKarate) return null;
+                        const canPromote = isKarate && hasRealBelt;
+                        if (!canPromote) return null;
                         return (
                           <button
                             onClick={() => handleOpenPromoteModal(std)}
