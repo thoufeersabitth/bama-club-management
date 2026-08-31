@@ -55,35 +55,52 @@ export const SHIFT_OPTIONS = [
 
 // Helper to resolve active training shift schedules dynamically from Branch Management storage
 export const getDynamicShiftOptions = (branchFilter = null, programFilter = null) => {
+  let customShifts = [];
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        let list = parsed;
-        if (branchFilter && branchFilter !== 'All') {
-          const bLow = branchFilter.toLowerCase().trim();
-          const bFiltered = list.filter(s => String(s.branch || '').toLowerCase().includes(bLow) || bLow.includes(String(s.branch || '').toLowerCase()));
-          if (bFiltered.length > 0) list = bFiltered;
-        }
-        if (programFilter && programFilter !== 'All') {
-          const pLow = programFilter.toLowerCase().trim();
-          const progMatched = list.filter(s => 
-            String(s.program || s.course || s.discipline || s.name || '').toLowerCase().includes(pLow) ||
-            pLow.includes(String(s.program || s.course || s.discipline || '').toLowerCase())
-          );
-          if (progMatched.length > 0) list = progMatched;
-        }
-        if (list.length > 0) {
-          return Array.from(new Set(list.map(s => {
-            if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
-            return s.name || s.time;
-          })));
-        }
+        customShifts = parsed;
       }
     }
   } catch (e) {}
 
+  if (customShifts.length > 0) {
+    let list = customShifts;
+    if (branchFilter && branchFilter !== 'All') {
+      const bLow = branchFilter.toLowerCase().trim();
+      const bFiltered = list.filter(s => {
+        const sB = String(s.branch || '').toLowerCase().trim();
+        return sB.includes(bLow) || bLow.includes(sB) || (bLow.includes('head') && sB.includes('head'));
+      });
+      if (bFiltered.length > 0) {
+        list = bFiltered;
+      }
+    }
+
+    if (programFilter && programFilter !== 'All') {
+      const pLow = programFilter.toLowerCase().trim();
+      const progMatched = list.filter(s => {
+        const sP = String(s.program || s.course || s.discipline || '').toLowerCase().trim();
+        const sN = String(s.name || '').toLowerCase().trim();
+        return sP.includes(pLow) || pLow.includes(sP) || sN.includes(pLow);
+      });
+      if (progMatched.length > 0) {
+        list = progMatched;
+      }
+    }
+
+    if (list.length > 0) {
+      const formatted = list.map(s => {
+        if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
+        return s.name || s.time;
+      });
+      return Array.from(new Set(formatted));
+    }
+  }
+
+  // Fallback program defaults if no custom shifts matched yet
   if (programFilter) {
     const pLow = programFilter.toLowerCase();
     if (pLow.includes('personal')) return ["Personal Training (Flexible 1-on-1 Slots)", "Personal Training Morning (6:00 AM - 7:00 AM)", "Personal Training Evening (8:00 PM - 9:00 PM)"];

@@ -6,7 +6,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase
 } from 'lucide-react';
-import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate } from '../../services/api';
+import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -267,13 +267,26 @@ export default function StudentManagement() {
     });
   };
 
+  const loadTrainingSchedules = () => {
+    fetchTrainingSchedules().then(schedules => {
+      if (schedules && schedules.length > 0) {
+        localStorage.setItem('bama_training_schedules', JSON.stringify(schedules));
+      }
+    });
+  };
+
   useEffect(() => {
     loadBranchesList();
+    loadTrainingSchedules();
     window.addEventListener('bama_branches_updated', loadBranchesList);
-    window.addEventListener('storage', loadBranchesList);
+    window.addEventListener('bama_schedules_updated', loadTrainingSchedules);
+    window.addEventListener('storage', () => {
+      loadBranchesList();
+      loadTrainingSchedules();
+    });
     return () => {
       window.removeEventListener('bama_branches_updated', loadBranchesList);
-      window.removeEventListener('storage', loadBranchesList);
+      window.removeEventListener('bama_schedules_updated', loadTrainingSchedules);
     };
   }, []);
 
@@ -1420,9 +1433,35 @@ export default function StudentManagement() {
                     </>
                   )}
 
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
-                    Active
-                  </span>
+                  {/* Prominently Highlighted Status Badge */}
+                  {(() => {
+                    const statusVal = String(std.status || 'Active').trim();
+                    const isSuspended = statusVal.toLowerCase() === 'suspended';
+                    const isInactive = statusVal.toLowerCase() === 'inactive';
+                    
+                    if (isSuspended) {
+                      return (
+                        <span className="px-3 py-1 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 text-white font-black text-xs shadow-md shadow-rose-600/20 inline-flex items-center gap-1.5 uppercase">
+                          <span className="w-2 h-2 rounded-full bg-white" />
+                          SUSPENDED
+                        </span>
+                      );
+                    }
+                    if (isInactive) {
+                      return (
+                        <span className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-xs shadow-md shadow-amber-500/20 inline-flex items-center gap-1.5 uppercase">
+                          <span className="w-2 h-2 rounded-full bg-white" />
+                          INACTIVE
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-xs shadow-md shadow-emerald-500/20 inline-flex items-center gap-1.5 uppercase">
+                        <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                        ACTIVE CADET
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 font-medium">
@@ -1463,6 +1502,14 @@ export default function StudentManagement() {
               </h3>
 
               <div className="space-y-2.5 font-medium">
+                <div className="flex justify-between border-b border-gray-50 pb-2">
+                  <span className="text-gray-500">Cadet Status:</span>
+                  <span className="px-2.5 py-0.5 rounded-md font-black text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                    {std.status || 'Active'}
+                  </span>
+                </div>
+
                 <div className="flex justify-between border-b border-gray-50 pb-2">
                   <span className="text-gray-500">Enrolled Course:</span>
                   <strong className="text-red-700 font-black flex items-center gap-1">{stdProg}</strong>
