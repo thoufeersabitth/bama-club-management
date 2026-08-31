@@ -141,6 +141,50 @@ export const saveFeeSettingsBackend = async (settings) => {
   } catch (err) {}
 };
 
+// Universal intelligent resolver for student course / discipline
+export const resolveDiscipline = (st) => {
+  if (!st) return 'Karate (Shotokan)';
+  
+  const explicit = st.program || st.course || st.discipline;
+  if (explicit && String(explicit).trim() !== '' && explicit !== 'undefined' && explicit !== 'null') {
+    const expLow = String(explicit).toLowerCase().trim();
+    if (expLow.includes('kick')) return 'Kick Boxing';
+    if (expLow.includes('box')) return 'Boxing';
+    if (expLow.includes('fit')) return 'Fitness Training';
+    if (expLow.includes('defense')) return 'Self Defense';
+    if (expLow.includes('ladies')) return 'Ladies Special Batch';
+    if (expLow.includes('personal')) return 'Personal Training (1-on-1)';
+    if (expLow.includes('karate')) return 'Karate (Shotokan)';
+    return explicit;
+  }
+
+  const rawBelt = String(st.currentBelt || st.current_belt || '').trim();
+  const beltLow = rawBelt.toLowerCase();
+  if (beltLow.includes('kick')) return 'Kick Boxing';
+  if (beltLow.includes('box')) return 'Boxing';
+  if (beltLow.includes('fit')) return 'Fitness Training';
+  if (beltLow.includes('defense')) return 'Self Defense';
+  if (beltLow.includes('ladies')) return 'Ladies Special Batch';
+  if (beltLow.includes('personal')) return 'Personal Training (1-on-1)';
+
+  const shiftStr = String(st.shift || '').toLowerCase();
+  if (shiftStr.includes('personal')) return 'Personal Training (1-on-1)';
+  if (shiftStr.includes('ladies')) return 'Ladies Special Batch';
+  if (shiftStr.includes('kick')) return 'Kick Boxing';
+  if (shiftStr.includes('box')) return 'Boxing';
+  if (shiftStr.includes('fit')) return 'Fitness Training';
+  if (shiftStr.includes('defense')) return 'Self Defense';
+  if (shiftStr.includes('karate')) return 'Karate (Shotokan)';
+
+  const medNotes = String(st.medicalNotes || st.medical_notes || '');
+  if (medNotes.includes('[PROGRAM:')) {
+    const matched = medNotes.match(/\[PROGRAM:([^\]]+)\]/);
+    if (matched && matched[1]) return matched[1].trim();
+  }
+
+  return 'Karate (Shotokan)';
+};
+
 // Helper for local persistent storage fallback (Unified across all storage keys & Normalized)
 export const getStoredStudents = () => {
   try {
@@ -187,6 +231,7 @@ export const getStoredStudents = () => {
 
             const cadetFeeFreq = st.fee_frequency || st.feeFrequency || 'MONTHLY';
             const cadetPaidMonths = Array.isArray(st.paid_months) ? st.paid_months : (Array.isArray(st.paidMonths) ? st.paidMonths : []);
+            const resolvedCourse = resolveDiscipline(st);
 
             return {
               ...st,
@@ -218,9 +263,9 @@ export const getStoredStudents = () => {
               branch_name: normBranch,
               branchName: normBranch,
               dojo_branch: normBranch,
-              program: st.program || st.course || st.discipline || 'Karate (Shotokan)',
-              course: st.program || st.course || st.discipline || 'Karate (Shotokan)',
-              discipline: st.program || st.course || st.discipline || 'Karate (Shotokan)'
+              program: resolvedCourse,
+              course: resolvedCourse,
+              discipline: resolvedCourse
             };
           });
           return cleaned;
@@ -299,9 +344,9 @@ export const saveStoredStudents = (students) => {
         branch_name: normBranch,
         branchName: normBranch,
         dojo_branch: normBranch,
-        program: st.program || st.course || st.discipline || 'Karate (Shotokan)',
-        course: st.program || st.course || st.discipline || 'Karate (Shotokan)',
-        discipline: st.program || st.course || st.discipline || 'Karate (Shotokan)'
+        program: resolveDiscipline(st),
+        course: resolveDiscipline(st),
+        discipline: resolveDiscipline(st)
       };
     });
     const cleaned = filterOutDummyCadets(normalized);
@@ -472,9 +517,9 @@ export const fetchStudents = async (params = {}) => {
             branch_name: sBranchName,
             branchName: sBranchName,
             dojo_branch: sBranchName,
-            program: s.program || s.course || s.discipline || 'Karate (Shotokan)',
-            course: s.program || s.course || s.discipline || 'Karate (Shotokan)',
-            discipline: s.program || s.course || s.discipline || 'Karate (Shotokan)'
+            program: resolveDiscipline(s),
+            course: resolveDiscipline(s),
+            discipline: resolveDiscipline(s)
           };
         });
 
@@ -510,6 +555,12 @@ export const createStudent = async (data) => {
   const branchVal = data.branch_id || data.branch || data.branch_name || '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
   const branchName = data.branch_name || data.branchName || (typeof data.branch === 'string' && data.branch.length < 50 ? data.branch : 'Pulikkal Branch (Head Office)');
 
+  const explicitProg = resolveDiscipline(data);
+  const isKarateProg = explicitProg.toLowerCase().includes('karate');
+  const validBelt = isKarateProg ? (data.currentBelt || data.current_belt || 'White Belt') : explicitProg;
+  const baseNotes = String(data.medicalNotes || data.medical_notes || '').replace(/\[PROGRAM:[^\]]+\]/g, '').trim();
+  const taggedNotes = baseNotes ? `${baseNotes} [PROGRAM:${explicitProg}]` : `[PROGRAM:${explicitProg}]`;
+
   const payload = {
     admission_no: data.admissionNo || data.admission_no || `BAMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
     name: data.name || data.student_name || 'Cadet Student',
@@ -521,10 +572,11 @@ export const createStudent = async (data) => {
     dob: data.dob || null,
     gender: data.gender || 'Male',
     blood_group: (data.bloodGroup || data.blood_group || 'O+').slice(0, 20),
-    current_belt: data.currentBelt || data.current_belt || 'White Belt',
-    program: data.program || data.course || data.discipline || 'Karate (Shotokan)',
-    course: data.program || data.course || data.discipline || 'Karate (Shotokan)',
-    discipline: data.program || data.course || data.discipline || 'Karate (Shotokan)',
+    current_belt: validBelt,
+    program: explicitProg,
+    course: explicitProg,
+    discipline: explicitProg,
+    medical_notes: taggedNotes,
     branch: branchVal,
     shift: data.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
     admission_fee: admFee,
@@ -561,6 +613,9 @@ export const createStudent = async (data) => {
       const saved = {
         ...payload,
         ...serverCadet,
+        program: explicitProg,
+        course: explicitProg,
+        discipline: explicitProg,
         id: serverCadet?.id || `std-${Date.now()}`,
         admissionNo: adm,
         admission_no: adm,
@@ -616,8 +671,21 @@ export const updateStudent = async (id, data) => {
   const updatedFeeAmount = data.fee_amount !== undefined ? Math.max(0, parseInt(data.fee_amount) || 0) : (data.feeAmount !== undefined ? Math.max(0, parseInt(data.feeAmount) || 0) : 500);
   const updatedAdmissionFee = data.admission_fee !== undefined ? Math.max(0, parseInt(data.admission_fee) || 0) : (data.admissionFee !== undefined ? Math.max(0, parseInt(data.admissionFee) || 0) : 1000);
 
+  const explicitProg = resolveDiscipline(data);
+  const isKarateProg = explicitProg.toLowerCase().includes('karate');
+  const validBelt = isKarateProg ? (data.currentBelt || data.current_belt || 'White Belt') : explicitProg;
+  const baseNotes = String(data.medicalNotes || data.medical_notes || '').replace(/\[PROGRAM:[^\]]+\]/g, '').trim();
+  const taggedNotes = baseNotes ? `${baseNotes} [PROGRAM:${explicitProg}]` : `[PROGRAM:${explicitProg}]`;
+
   const payload = {
     ...data,
+    current_belt: validBelt,
+    currentBelt: validBelt,
+    program: explicitProg,
+    course: explicitProg,
+    discipline: explicitProg,
+    medical_notes: taggedNotes,
+    medicalNotes: taggedNotes,
     fee_amount: updatedFeeAmount,
     feeAmount: updatedFeeAmount,
     admission_fee: updatedAdmissionFee,
