@@ -992,31 +992,80 @@ export const deleteBranchBackend = async (id, branchName = '') => {
 };
 
 export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
+  const normShiftName = String(shiftName || '').toLowerCase().trim();
+  const normId = String(id || '').trim();
+
+  // 1. Update local deleted list
   try {
     const deletedShifts = JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
-    if (id) deletedShifts.push(String(id));
-    if (shiftName) deletedShifts.push(String(shiftName).toLowerCase().trim());
+    if (normId) deletedShifts.push(normId);
+    if (normShiftName) deletedShifts.push(normShiftName);
     localStorage.setItem('bama_deleted_shift_ids', JSON.stringify(Array.from(new Set(deletedShifts))));
   } catch (e) {}
 
+  // 2. Remove from local storage immediately
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
       const parsed = JSON.parse(stored);
-      const filtered = parsed.filter(s => s.id !== id && s.name !== shiftName);
+      const filtered = parsed.filter(s => {
+        const sId = String(s.id || '').trim();
+        const sName = String(s.name || '').toLowerCase().trim();
+        if (normId && sId === normId) return false;
+        if (normShiftName && sName === normShiftName) return false;
+        return true;
+      });
       localStorage.setItem('bama_training_schedules', JSON.stringify(filtered));
     }
   } catch (e) {}
 
+  // 3. Delete matching shift announcements on Fly.io PostgreSQL database
   try {
-    if (typeof id === 'string' && id.length > 20) {
-      await fetch(`https://bama-club-backend.fly.dev/api/announcements/${id}/`, {
-        method: 'DELETE'
-      });
+    const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const announcements = data.results || (Array.isArray(data) ? data : []);
+      for (const a of announcements) {
+        let isMatch = (normId && String(a.id).trim() === normId);
+        if (!isMatch && normShiftName && String(a.title || '').toLowerCase().trim() === normShiftName) {
+          isMatch = true;
+        }
+        if (!isMatch && a.content) {
+          try {
+            const parsed = JSON.parse(a.content);
+            if (normId && String(parsed.id || '').trim() === normId) isMatch = true;
+            if (normShiftName && String(parsed.name || '').toLowerCase().trim() === normShiftName) isMatch = true;
+          } catch (e) {}
+        }
+
+        if (isMatch) {
+          await fetch(`https://bama-club-backend.fly.dev/api/announcements/${a.id}/`, {
+            method: 'DELETE'
+          });
+        }
+      }
     }
   } catch (err) {
-    console.error('Failed to delete shift on backend:', err);
+    console.error('Failed to delete shift on Fly.io backend:', err);
   }
+
+  // 4. Persist global tombstone on PostgreSQL backend so EVERY OTHER DEVICE (Phone / Laptop) immediately stays in sync!
+  try {
+    const tombstonePayload = {
+      title: `DELETED_SHIFT:${normShiftName || normId}`,
+      content: JSON.stringify({ deleted_id: normId, deleted_name: normShiftName, deleted_at: new Date().toISOString() }),
+      category: 'DELETED_SHIFT',
+      is_important: false
+    };
+    await fetch('https://bama-club-backend.fly.dev/api/announcements/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(tombstonePayload)
+    });
+  } catch (err) {}
 };
 
 export const createTrainingScheduleBackend = async (shiftData) => {
@@ -1087,17 +1136,53 @@ export const filterOutDummyShifts = (list) => {
 export const fetchTrainingSchedules = async () => {
   const branches = await fetchBranches();
 
-  const deletedShiftIds = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
-    } catch (e) {
-      return [];
+  // 1. Fetch deleted shifts tombstone from Fly.io PostgreSQL database (so Phone & Laptop stay 100% in sync)
+  const globalDeletedShifts = new Set();
+  try {
+    const localDeleted = JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
+    localDeleted.forEach(d => globalDeletedShifts.add(String(d).toLowerCase().trim()));
+  } catch (e) {}
+
+  try {
+    const delRes = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_SHIFT', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (delRes.ok) {
+      const delData = await delRes.json();
+      const delAnnouncements = delData.results || (Array.isArray(delData) ? delData : []);
+      delAnnouncements.forEach(a => {
+        if (a.content) {
+          try {
+            const parsed = JSON.parse(a.content);
+            if (parsed.deleted_id) globalDeletedShifts.add(String(parsed.deleted_id).toLowerCase().trim());
+            if (parsed.deleted_name) globalDeletedShifts.add(String(parsed.deleted_name).toLowerCase().trim());
+          } catch (e) {}
+        }
+        if (a.title && a.title.startsWith('DELETED_SHIFT:')) {
+          globalDeletedShifts.add(a.title.replace('DELETED_SHIFT:', '').toLowerCase().trim());
+        }
+      });
     }
-  })();
+  } catch (err) {}
+
+  // Store merged global deleted list locally
+  try {
+    localStorage.setItem('bama_deleted_shift_ids', JSON.stringify(Array.from(globalDeletedShifts)));
+  } catch (e) {}
+
+  const isDeleted = (shiftObj) => {
+    if (!shiftObj) return true;
+    const sId = String(shiftObj.id || '').toLowerCase().trim();
+    const sName = String(shiftObj.name || '').toLowerCase().trim();
+    if (sId && globalDeletedShifts.has(sId)) return true;
+    if (sName && globalDeletedShifts.has(sName)) return true;
+    return false;
+  };
 
   const scheduleMap = new Map();
 
-  // 1. Fetch from live Fly.io PostgreSQL announcements API (Single Source of Truth)
+  // 2. Fetch active shifts from live Fly.io PostgreSQL announcements API
   try {
     const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
       headers: { 'Accept': 'application/json' },
@@ -1117,7 +1202,7 @@ export const fetchTrainingSchedules = async () => {
               status: parsed.status || 'Active'
             };
             const key = String(shiftObj.name + (shiftObj.branch || '')).toLowerCase().trim();
-            if (key && !deletedShiftIds.includes(String(a.id)) && !deletedShiftIds.includes(String(shiftObj.name).toLowerCase().trim())) {
+            if (key && !isDeleted(shiftObj) && !isDeleted({ id: a.id, name: a.title })) {
               scheduleMap.set(key, shiftObj);
             }
           } catch (e) {}
@@ -1128,34 +1213,7 @@ export const fetchTrainingSchedules = async () => {
     console.error('Failed to fetch training schedules from Fly.io live server:', err);
   }
 
-  // 2. Automatically ensure every active branch with timings has its official training shift
-  branches.forEach(b => {
-    if (b && b.name && b.timings) {
-      const bName = b.name;
-      const bShiftName = `${bName} Batch`;
-      const key = String(bShiftName + bName).toLowerCase().trim();
-      const bId = String(b.id || '');
-      if (!deletedShiftIds.includes(bId) && !deletedShiftIds.includes(key) && !deletedShiftIds.includes(bName.toLowerCase().trim())) {
-        const hasExistingShiftForBranch = Array.from(scheduleMap.values()).some(
-          s => String(s.branch || '').toLowerCase().trim() === bName.toLowerCase().trim()
-        );
-        if (!hasExistingShiftForBranch) {
-          scheduleMap.set(key, {
-            id: `shift-${b.id || Date.now()}`,
-            name: bShiftName,
-            branch: bName,
-            days: 'Mon, Wed, Fri',
-            time: b.timings,
-            instructor: b.branch_head || 'Sensei Abdul Rahman (5th Dan)',
-            targetGroup: 'All Belts & Cadets',
-            status: 'Active'
-          });
-        }
-      }
-    }
-  });
-
-  // 3. Check localStorage for any local user shifts
+  // 3. Fallback to existing localStorage shifts (filtered against deleted set)
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     if (stored) {
@@ -1163,7 +1221,7 @@ export const fetchTrainingSchedules = async () => {
       if (Array.isArray(parsed)) {
         filterOutDummyShifts(parsed).forEach(s => {
           const key = String(s.name + (s.branch || '')).toLowerCase().trim();
-          if (key && !scheduleMap.has(key) && !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())) {
+          if (key && !scheduleMap.has(key) && !isDeleted(s)) {
             if (typeof s.id === 'string' && s.id.length > 20) {
               scheduleMap.set(key, s);
             }
@@ -1173,9 +1231,7 @@ export const fetchTrainingSchedules = async () => {
     }
   } catch (e) {}
 
-  const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values())).filter(
-    s => !deletedShiftIds.includes(String(s.id)) && !deletedShiftIds.includes(String(s.name).toLowerCase().trim())
-  );
+  const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values())).filter(s => !isDeleted(s));
   try {
     localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
   } catch (e) {}
