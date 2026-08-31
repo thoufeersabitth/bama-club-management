@@ -725,12 +725,11 @@ export const deleteStudent = async (id, admissionNo) => {
 };
 
 export const sanitizeBranches = (list) => {
-  if (!Array.isArray(list)) return INITIAL_BRANCHES;
-  const filtered = list.filter(b => {
+  if (!Array.isArray(list)) return [];
+  return list.filter(b => {
     const name = String(b?.name || '').toLowerCase().trim();
     return !name.includes('ghjgkhlj') && name !== 'ghjgkhlj';
   });
-  return filtered.length > 0 ? filtered : INITIAL_BRANCHES;
 };
 
 export const fetchBranches = async () => {
@@ -744,17 +743,10 @@ export const fetchBranches = async () => {
     }
   })();
 
-  // 1. Base default branches (excluding deleted)
-  INITIAL_BRANCHES.forEach(b => {
-    const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-    if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
-      branchMap.set(key, b);
-    }
-  });
-
-  // 2. Fetch directly from Fly.io live PostgreSQL server FIRST
+  // 1. Fetch directly from Fly.io live PostgreSQL server FIRST
+  let fetchedFromServer = false;
   try {
-    const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
@@ -762,6 +754,7 @@ export const fetchBranches = async () => {
       const data = await res.json();
       const serverBranches = data.results || (Array.isArray(data) ? data : []);
       if (Array.isArray(serverBranches) && serverBranches.length > 0) {
+        fetchedFromServer = true;
         serverBranches.forEach(b => {
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
           if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
@@ -779,21 +772,33 @@ export const fetchBranches = async () => {
     console.error('Failed to fetch branches from Fly.io live server:', err);
   }
 
-  // 3. Merge with local storage cache keys
-  try {
-    const saved = localStorage.getItem('bama_custom_branches');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        parsed.forEach(b => {
-          const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-          if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
-            branchMap.set(key, b);
-          }
-        });
+  // 2. If server was offline or empty, fallback to local storage cache keys
+  if (!fetchedFromServer) {
+    try {
+      const saved = localStorage.getItem('bama_custom_branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed.forEach(b => {
+            const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+            if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+              branchMap.set(key, b);
+            }
+          });
+        }
       }
+    } catch (e) {}
+
+    // Only inject default INITIAL_BRANCHES if absolutely nothing was found anywhere
+    if (branchMap.size === 0) {
+      INITIAL_BRANCHES.forEach(b => {
+        const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+        if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+          branchMap.set(key, b);
+        }
+      });
     }
-  } catch (e) {}
+  }
 
   const cleaned = sanitizeBranches(Array.from(branchMap.values()).filter(b => 
     !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())
@@ -803,7 +808,7 @@ export const fetchBranches = async () => {
     localStorage.setItem('bama_branches', JSON.stringify(cleaned));
   } catch (e) {}
 
-  return cleaned;
+  return cleaned.length > 0 ? cleaned : INITIAL_BRANCHES;
 };
 
 export const createBranchBackend = async (branchData) => {
@@ -885,6 +890,21 @@ export const deleteBranchBackend = async (id, branchName = '') => {
       await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
         method: 'DELETE'
       });
+    } else {
+      const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        const serverBranches = data.results || (Array.isArray(data) ? data : []);
+        const match = serverBranches.find(b => 
+          String(b.id) === String(id) || 
+          (branchName && String(b.name || '').toLowerCase().trim() === String(branchName).toLowerCase().trim())
+        );
+        if (match && match.id) {
+          await fetch(`https://bama-club-backend.fly.dev/api/branches/${match.id}/`, {
+            method: 'DELETE'
+          });
+        }
+      }
     }
   } catch (err) {
     console.error('Failed to delete branch on backend:', err);
