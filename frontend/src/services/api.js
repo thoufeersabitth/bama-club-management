@@ -448,6 +448,65 @@ export const fetchDashboardStats = async () => {
 };
 
 export const fetchStudents = async (params = {}) => {
+  // 1. Gather all globally deleted students from Fly.io PostgreSQL database + local storage
+  const globalDeletedStudentIds = new Set();
+  try {
+    const localDeleted = JSON.parse(localStorage.getItem('bama_deleted_student_ids') || '[]');
+    localDeleted.forEach(d => {
+      if (d) globalDeletedStudentIds.add(String(d).toLowerCase().trim());
+    });
+  } catch (e) {}
+
+  try {
+    const delRes = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_STUDENT', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (delRes.ok) {
+      const delData = await delRes.json();
+      const delAnnouncements = delData.results || (Array.isArray(delData) ? delData : []);
+      delAnnouncements.forEach(a => {
+        if (a.content) {
+          try {
+            const parsed = JSON.parse(a.content);
+            if (parsed.deleted_id) globalDeletedStudentIds.add(String(parsed.deleted_id).toLowerCase().trim());
+            if (parsed.deleted_adm) globalDeletedStudentIds.add(String(parsed.deleted_adm).toLowerCase().trim());
+          } catch (e) {}
+        }
+        if (a.title && a.title.startsWith('DELETED_STUDENT:')) {
+          globalDeletedStudentIds.add(a.title.replace('DELETED_STUDENT:', '').toLowerCase().trim());
+        }
+      });
+    }
+  } catch (err) {}
+
+  // 2. Synchronize any local deletions to Fly.io PostgreSQL backend
+  try {
+    const localDeleted = JSON.parse(localStorage.getItem('bama_deleted_student_ids') || '[]');
+    if (localDeleted.length > 0) {
+      for (const delIdent of localDeleted) {
+        if (delIdent) {
+          fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(delIdent)}/`, { method: 'DELETE' }).catch(() => {});
+          fetch('https://bama-club-backend.fly.dev/api/announcements/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              title: `DELETED_STUDENT:${delIdent}`,
+              content: JSON.stringify({ deleted_id: delIdent, deleted_adm: delIdent, deleted_at: new Date().toISOString() }),
+              category: 'DELETED_STUDENT',
+              is_important: false
+            })
+          }).catch(() => {});
+        }
+      }
+    }
+  } catch (e) {}
+
+  // Store merged global deleted list locally
+  try {
+    localStorage.setItem('bama_deleted_student_ids', JSON.stringify(Array.from(globalDeletedStudentIds)));
+  } catch (e) {}
+
   try {
     let allServerData = [];
     const url = new URL('https://bama-club-backend.fly.dev/api/students/');
@@ -478,7 +537,12 @@ export const fetchStudents = async (params = {}) => {
     }
 
     if (allServerData && allServerData.length > 0) {
-      const filteredServer = filterOutDummyCadets(allServerData);
+      const filteredServer = filterOutDummyCadets(allServerData).filter(s => {
+        const sId = String(s.id || '').toLowerCase().trim();
+        const sAdm = String(s.admission_no || s.admissionNo || '').toLowerCase().trim();
+        if (globalDeletedStudentIds.has(sId) || globalDeletedStudentIds.has(sAdm)) return false;
+        return true;
+      });
 
       const normalizedServer = filteredServer.map(s => {
         const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
