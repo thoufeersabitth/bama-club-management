@@ -1061,7 +1061,7 @@ export default function StudentManagement() {
     if (selectedBillingPlan === 'SCHOOL_BATCH') matchesPlan = isSchool;
 
     // Program / Course Discipline Filter
-    const cadetProg = s.program || s.course || s.discipline || 'Karate (Shotokan)';
+    const cadetProg = resolveStudentProgram(s);
     const matchesProgram = selectedProgram === 'ALL' || 
       cadetProg.toLowerCase().includes(selectedProgram.toLowerCase()) || 
       selectedProgram.toLowerCase().includes(cadetProg.toLowerCase());
