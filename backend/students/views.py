@@ -12,6 +12,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all().order_by('-created_at')
     serializer_class = StudentSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = None
 
     def _resolve_branch(self, branch_input):
         if not branch_input:

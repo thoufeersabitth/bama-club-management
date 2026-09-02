@@ -484,23 +484,40 @@ export const fetchStudents = async (params = {}) => {
   } catch (e) {}
 
   try {
+    let allServerData = [];
     const url = new URL('https://bama-club-backend.fly.dev/api/students/');
+    url.searchParams.set('page_size', '1000');
     url.searchParams.set('_t', Date.now().toString());
-    const res = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
 
-    if (res.ok) {
-      const data = await res.json();
-      const serverData = data.results || data;
+    let nextUrl = url.toString();
+    while (nextUrl) {
+      const res = await fetch(nextUrl, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
 
-      if (Array.isArray(serverData)) {
-        const filteredServer = filterOutDummyCadets(serverData).filter(s => {
-          const sId = String(s.id || '').toLowerCase().trim();
-          const sAdm = String(s.admission_no || s.admissionNo || '').toLowerCase().trim();
-          return !globalDeletedStudentIds.has(sId) && !globalDeletedStudentIds.has(sAdm);
-        });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          allServerData = data;
+          break;
+        } else if (data && Array.isArray(data.results)) {
+          allServerData = [...allServerData, ...data.results];
+          nextUrl = data.next ? data.next : null;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    if (allServerData.length > 0) {
+      const filteredServer = filterOutDummyCadets(allServerData).filter(s => {
+        const sId = String(s.id || '').toLowerCase().trim();
+        const sAdm = String(s.admission_no || s.admissionNo || '').toLowerCase().trim();
+        return !globalDeletedStudentIds.has(sId) && !globalDeletedStudentIds.has(sAdm);
+      });
 
         const normalizedServer = filteredServer.map(s => {
           const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
@@ -560,10 +577,9 @@ export const fetchStudents = async (params = {}) => {
         localStorage.setItem('bama_students_list', serialized);
         return normalizedServer;
       }
+    } catch (err) {
+      console.error('Failed to fetch students from live server:', err);
     }
-  } catch (err) {
-    console.error('Failed to fetch students from live server:', err);
-  }
 
   return getStoredStudents();
 };
