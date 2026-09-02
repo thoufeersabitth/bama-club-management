@@ -448,41 +448,6 @@ export const fetchDashboardStats = async () => {
 };
 
 export const fetchStudents = async (params = {}) => {
-  // 1. Fetch global deleted student blacklist from Fly.io PostgreSQL database (so Phone & Laptop stay 100% in sync)
-  const globalDeletedStudentIds = new Set();
-  try {
-    const localDeleted = JSON.parse(localStorage.getItem('bama_deleted_student_ids') || '[]');
-    localDeleted.forEach(d => globalDeletedStudentIds.add(String(d).toLowerCase().trim()));
-  } catch (e) {}
-
-  try {
-    const delRes = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_STUDENT', {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-    if (delRes.ok) {
-      const delData = await delRes.json();
-      const delAnnouncements = delData.results || (Array.isArray(delData) ? delData : []);
-      delAnnouncements.forEach(a => {
-        if (a.content) {
-          try {
-            const parsed = JSON.parse(a.content);
-            if (parsed.deleted_id) globalDeletedStudentIds.add(String(parsed.deleted_id).toLowerCase().trim());
-            if (parsed.deleted_adm) globalDeletedStudentIds.add(String(parsed.deleted_adm).toLowerCase().trim());
-          } catch (e) {}
-        }
-        if (a.title && a.title.startsWith('DELETED_STUDENT:')) {
-          globalDeletedStudentIds.add(a.title.replace('DELETED_STUDENT:', '').toLowerCase().trim());
-        }
-      });
-    }
-  } catch (err) {}
-
-  // Save merged global deleted list locally
-  try {
-    localStorage.setItem('bama_deleted_student_ids', JSON.stringify(Array.from(globalDeletedStudentIds)));
-  } catch (e) {}
-
   try {
     let allServerData = [];
     const url = new URL('https://bama-club-backend.fly.dev/api/students/');
@@ -512,74 +477,70 @@ export const fetchStudents = async (params = {}) => {
       }
     }
 
-    if (allServerData.length > 0) {
-      const filteredServer = filterOutDummyCadets(allServerData).filter(s => {
-        const sId = String(s.id || '').toLowerCase().trim();
-        const sAdm = String(s.admission_no || s.admissionNo || '').toLowerCase().trim();
-        return !globalDeletedStudentIds.has(sId) && !globalDeletedStudentIds.has(sAdm);
+    if (allServerData && allServerData.length > 0) {
+      const filteredServer = filterOutDummyCadets(allServerData);
+
+      const normalizedServer = filteredServer.map(s => {
+        const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
+        const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
+
+        const adm = s.admissionNo || s.admission_no || '';
+        const admFee = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
+        const admPaid = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? admFee);
+        const monthlyFee = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
+        const monthlyPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
+        const pendingDues = parseFloat(s.pendingAmount ?? s.pending_amount ?? Math.max(0, (admFee + monthlyFee) - (admPaid + monthlyPaid)));
+        const feeStat = s.feeStatus || s.fee_status || (pendingDues === 0 ? 'Paid' : (admPaid + monthlyPaid) > 0 ? 'Partial' : 'Pending');
+
+        const cadetFeeFreq = s.fee_frequency || s.feeFrequency || 'MONTHLY';
+        const cadetPaidMonths = Array.isArray(s.paid_months) ? s.paid_months : (Array.isArray(s.paidMonths) ? s.paidMonths : []);
+
+        return {
+          ...s,
+          name: s.name || s.student_name || 'Cadet',
+          student_name: s.student_name || s.name || 'Cadet',
+          admissionNo: adm,
+          admission_no: adm,
+          admissionFee: admFee,
+          admission_fee: admFee,
+          admissionFeePaidAmount: admPaid,
+          admission_fee_paid_amount: admPaid,
+          admissionFeePaid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
+          admission_fee_paid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
+          feeFrequency: cadetFeeFreq,
+          fee_frequency: cadetFeeFreq,
+          feeCycleMonths: s.feeCycleMonths || (cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1),
+          paid_months: cadetPaidMonths,
+          paidMonths: cadetPaidMonths,
+          feeAmount: monthlyFee,
+          fee_amount: monthlyFee,
+          initialPaidAmount: monthlyPaid,
+          initial_paid_amount: monthlyPaid,
+          pendingAmount: pendingDues,
+          pending_amount: pendingDues,
+          feeStatus: feeStat,
+          fee_status: feeStat,
+          branch: sBranchName,
+          branch_id: sBranchId,
+          branch_name: sBranchName,
+          branchName: sBranchName,
+          dojo_branch: sBranchName,
+          program: resolveDiscipline(s),
+          course: resolveDiscipline(s),
+          discipline: resolveDiscipline(s)
+        };
       });
 
-        const normalizedServer = filteredServer.map(s => {
-          const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
-          const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
-
-          const adm = s.admissionNo || s.admission_no || '';
-          const admFee = parseFloat(s.admissionFee ?? s.admission_fee ?? 1000);
-          const admPaid = parseFloat(s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? admFee);
-          const monthlyFee = parseFloat(s.feeAmount ?? s.fee_amount ?? 500);
-          const monthlyPaid = parseFloat(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
-          const pendingDues = parseFloat(s.pendingAmount ?? s.pending_amount ?? Math.max(0, (admFee + monthlyFee) - (admPaid + monthlyPaid)));
-          const feeStat = s.feeStatus || s.fee_status || (pendingDues === 0 ? 'Paid' : (admPaid + monthlyPaid) > 0 ? 'Partial' : 'Pending');
-
-          const cadetFeeFreq = s.fee_frequency || s.feeFrequency || 'MONTHLY';
-          const cadetPaidMonths = Array.isArray(s.paid_months) ? s.paid_months : (Array.isArray(s.paidMonths) ? s.paidMonths : []);
-
-          return {
-            ...s,
-            name: s.name || s.student_name || 'Cadet',
-            student_name: s.student_name || s.name || 'Cadet',
-            admissionNo: adm,
-            admission_no: adm,
-            admissionFee: admFee,
-            admission_fee: admFee,
-            admissionFeePaidAmount: admPaid,
-            admission_fee_paid_amount: admPaid,
-            admissionFeePaid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
-            admission_fee_paid: s.admissionFeePaid ?? s.admission_fee_paid ?? (admPaid >= admFee),
-            feeFrequency: cadetFeeFreq,
-            fee_frequency: cadetFeeFreq,
-            feeCycleMonths: s.feeCycleMonths || (cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1),
-            paid_months: cadetPaidMonths,
-            paidMonths: cadetPaidMonths,
-            feeAmount: monthlyFee,
-            fee_amount: monthlyFee,
-            initialPaidAmount: monthlyPaid,
-            initial_paid_amount: monthlyPaid,
-            pendingAmount: pendingDues,
-            pending_amount: pendingDues,
-            feeStatus: feeStat,
-            fee_status: feeStat,
-            branch: sBranchName,
-            branch_id: sBranchId,
-            branch_name: sBranchName,
-            branchName: sBranchName,
-            dojo_branch: sBranchName,
-            program: resolveDiscipline(s),
-            course: resolveDiscipline(s),
-            discipline: resolveDiscipline(s)
-          };
-        });
-
-        const serialized = JSON.stringify(normalizedServer);
-        localStorage.setItem('bama_cadets_roster', serialized);
-        localStorage.setItem('bama_students', serialized);
-        localStorage.setItem('bama_cadets', serialized);
-        localStorage.setItem('bama_students_list', serialized);
-        return normalizedServer;
-      }
-    } catch (err) {
-      console.error('Failed to fetch students from live server:', err);
+      const serialized = JSON.stringify(normalizedServer);
+      localStorage.setItem('bama_cadets_roster', serialized);
+      localStorage.setItem('bama_students', serialized);
+      localStorage.setItem('bama_cadets', serialized);
+      localStorage.setItem('bama_students_list', serialized);
+      return normalizedServer;
     }
+  } catch (err) {
+    console.error('Failed to fetch students from live server:', err);
+  }
 
   return getStoredStudents();
 };
