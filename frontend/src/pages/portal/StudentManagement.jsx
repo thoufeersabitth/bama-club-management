@@ -3058,10 +3058,10 @@ export default function StudentManagement() {
                   onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
                   className="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold text-xs focus:outline-none focus:border-amber-500 cursor-pointer"
                 >
-                  {!formData.branch ? (
+                  {!formData.branch && !formData.branch_name ? (
                     <option value="">-- Select Dojo Branch First --</option>
                   ) : (
-                    getDynamicShiftOptions(formData.branch, formData.program).map(s => (
+                    getDynamicShiftOptions(formData.branch_name || formData.branch, formData.program).map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))
                   )}
@@ -3632,37 +3632,18 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Row 3.5: Branch Dojo Selector */}
+              {/* Row 3.5: Branch Dojo (Locked in Edit Profile) */}
               <div>
-                <label className="block text-gray-700 font-bold mb-1 text-red-600 flex items-center justify-between">
-                  <span>Branch Dojo *</span>
-                  <span className="text-[10px] text-gray-500 font-normal">Select branch to view shifts</span>
+                <label className="block text-gray-700 font-bold mb-1 truncate flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700">Branch Dojo *</span>
+                  <span className="text-[9px] text-amber-800 font-black bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-300 ml-1">🔒 Locked</span>
                 </label>
-                <select
-                  disabled={isInstructor}
-                  value={editingStudent.branch_id || editingStudent.branch || editingStudent.branch_name}
-                  onChange={(e) => {
-                    const selVal = e.target.value;
-                    const matchedB = branchesList.find(b => b.id === selVal || b.name === selVal);
-                    const bId = matchedB?.id || selVal;
-                    const bName = matchedB?.name || selVal;
-                    const branchShifts = getDynamicShiftOptions(bName, editingStudent.program || editingStudent.course);
-                    const defaultShift = branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
-
-                    setEditingStudent(prev => ({
-                      ...prev,
-                      branch: bName,
-                      branch_name: bName,
-                      branch_id: bId,
-                      shift: defaultShift
-                    }));
-                  }}
-                  className="w-full bg-gray-50 border-2 border-red-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-red-500 disabled:opacity-60 cursor-pointer transition truncate"
-                >
-                  {branchesList.map(b => (
-                    <option key={b.id || b.name} value={b.id || b.name}>{b.name}</option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  disabled={true}
+                  value={editingStudent.branch_name || editingStudent.branch || 'Pulikkal Branch (Head Office)'}
+                  className="w-full bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-700 font-bold text-xs cursor-not-allowed transition truncate shadow-inner"
+                />
               </div>
 
               {/* Row 4: Training Shift Batch Field */}
