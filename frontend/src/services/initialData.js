@@ -66,9 +66,23 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
     }
   } catch (e) {}
 
+  const resolveBranchName = (bVal) => {
+    if (!bVal) return '';
+    try {
+      const stored = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+      const branches = stored ? JSON.parse(stored) : INITIAL_BRANCHES;
+      if (Array.isArray(branches)) {
+        const found = branches.find(b => b.id === bVal || b.name === bVal || b.code === bVal);
+        if (found && found.name) return found.name;
+      }
+    } catch (e) {}
+    return String(bVal);
+  };
+
   const getBranchKey = (bVal) => {
     if (!bVal) return '';
-    const s = String(bVal).toLowerCase().trim();
+    const resolved = resolveBranchName(bVal);
+    const s = String(resolved).toLowerCase().trim();
     if (s.includes('pengad') || s.includes('btmamups')) return 'pengad';
     if (s.includes('chungam') || s.includes('cgm') || s.includes('dojo-02') || s.includes('a9e9ccd7')) return 'chungam';
     if (s.includes('mongam') || s.includes('dojo-03') || s.includes('d4639193')) return 'mongam';
@@ -78,8 +92,9 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
   };
 
   const getStandardProgramShifts = (prog, branchName = '') => {
+    const resolvedName = resolveBranchName(branchName);
     const pLow = String(prog || '').toLowerCase();
-    const bLow = String(branchName || '').toLowerCase();
+    const bLow = String(resolvedName || '').toLowerCase();
     const isSchool = bLow.includes('school') || bLow.includes('pengad') || bLow.includes('btmamups');
 
     if (isSchool) {
@@ -131,9 +146,12 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
 
   if (branchFilter && branchFilter !== 'All' && branchFilter !== 'ALL') {
     const targetKey = getBranchKey(branchFilter);
+    const targetName = resolveBranchName(branchFilter).toLowerCase().trim();
+
     const branchShifts = customShifts.filter(s => {
       const sKey = getBranchKey(s.branch || s.branchName || s.branch_name || s.branch_id);
-      return sKey === targetKey || String(s.branch || '').toLowerCase().includes(targetKey);
+      const sName = resolveBranchName(s.branch || s.branchName || s.branch_name || s.branch_id).toLowerCase().trim();
+      return sKey === targetKey || (targetKey && sName.includes(targetKey)) || (targetName && sName.includes(targetName)) || (sName && targetName.includes(sName));
     });
 
     if (branchShifts.length > 0) {
