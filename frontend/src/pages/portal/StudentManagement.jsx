@@ -2283,7 +2283,7 @@ export default function StudentManagement() {
               const defaultBranchId = matchedB?.id || matchedB?.name || 'branch-pulikkal';
               const defaultBranchName = matchedB?.name || 'Pulikkal Branch (Head Office)';
 
-              const initialShifts = getActiveShiftOptions(defaultBranchName);
+              const initialShifts = getDynamicShiftOptions(defaultBranchName, 'Karate (Shotokan)');
               const defaultShift = initialShifts.length > 0 ? initialShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
 
               const feeInfo = await getApplicableFees(defaultBranchId);

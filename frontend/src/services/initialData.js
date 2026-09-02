@@ -66,58 +66,120 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
     }
   } catch (e) {}
 
-  if (customShifts.length > 0) {
-    let list = customShifts;
-    if (branchFilter && branchFilter !== 'All') {
-      const bLow = branchFilter.toLowerCase().trim();
-      const bFiltered = list.filter(s => {
-        const sB = String(s.branch || '').toLowerCase().trim();
-        return sB.includes(bLow) || bLow.includes(sB) || (bLow.includes('head') && sB.includes('head'));
-      });
-      if (bFiltered.length > 0) {
-        list = bFiltered;
-      }
+  const getBranchKey = (bVal) => {
+    if (!bVal) return '';
+    const s = String(bVal).toLowerCase().trim();
+    if (s.includes('pengad') || s.includes('btmamups')) return 'pengad';
+    if (s.includes('chungam') || s.includes('cgm') || s.includes('dojo-02') || s.includes('a9e9ccd7')) return 'chungam';
+    if (s.includes('mongam') || s.includes('dojo-03') || s.includes('d4639193')) return 'mongam';
+    if (s.includes('feroke') || s.includes('dojo-04') || s.includes('67b5ad14')) return 'feroke';
+    if (s.includes('pulikkal') || s.includes('plk') || s.includes('dojo-01') || s.includes('4d04730d') || s.includes('head')) return 'pulikkal';
+    return s;
+  };
+
+  const getStandardProgramShifts = (prog, branchName = '') => {
+    const pLow = String(prog || '').toLowerCase();
+    const bLow = String(branchName || '').toLowerCase();
+    const isSchool = bLow.includes('school') || bLow.includes('pengad') || bLow.includes('btmamups');
+
+    if (isSchool) {
+      return [
+        "School Morning Batch (6:00 AM - 7:30 AM)",
+        "School Evening Karate Batch (5:00 PM - 7:00 PM)",
+        "School Custom Batch (Tue & Thu 4:30 PM - 5:30 PM)",
+        "Boxing Morning Session (6:00 AM - 7:30 AM)",
+        "Kick Boxing Batch (7:00 PM - 8:30 PM)",
+        "Ladies Special Batch (4:00 PM - 5:30 PM)",
+        "Personal Training (1-on-1) (Flexible 1-on-1 Slots)"
+      ];
     }
 
-    if (programFilter && programFilter !== 'All') {
+    if (pLow.includes('personal')) return [
+      "Personal Training (Flexible 1-on-1 Slots)",
+      "Personal Training Morning (6:00 AM - 7:00 AM)",
+      "Personal Training Evening (8:00 PM - 9:00 PM)"
+    ];
+    if (pLow.includes('ladies')) return [
+      "Ladies Special Batch (4:00 PM - 5:30 PM)",
+      "Ladies Morning Fitness (6:00 AM - 7:15 AM)"
+    ];
+    if (pLow.includes('kick')) return [
+      "Kick Boxing Sparring Batch (7:00 PM - 8:30 PM)",
+      "Kick Boxing Cardio (6:00 AM - 7:30 AM)"
+    ];
+    if (pLow.includes('box')) return [
+      "Boxing Morning Conditioning (6:00 AM - 7:30 AM)",
+      "Boxing Evening Strikes (6:00 PM - 7:30 PM)"
+    ];
+    if (pLow.includes('fitness')) return [
+      "Morning Fitness Conditioning (6:00 AM - 7:30 AM)",
+      "Evening Cardio & Stamina (7:00 PM - 8:30 PM)"
+    ];
+    if (pLow.includes('defense')) return [
+      "Self Defense Practical Workshop",
+      "Practical Defense Evening (6:30 PM - 8:00 PM)"
+    ];
+    
+    return [
+      "Evening Batch (5:00 PM - 7:00 PM)",
+      "Morning Batch (6:00 AM - 7:30 AM)",
+      "Night / Late Evening Batch (7:00 PM - 8:30 PM)",
+      "Weekend Special Batch (Sat & Sun: 7:00 AM - 9:00 AM)",
+      "Kids Special Batch (4:00 PM - 5:00 PM)"
+    ];
+  };
+
+  if (branchFilter && branchFilter !== 'All' && branchFilter !== 'ALL') {
+    const targetKey = getBranchKey(branchFilter);
+    const branchShifts = customShifts.filter(s => {
+      const sKey = getBranchKey(s.branch || s.branchName || s.branch_name || s.branch_id);
+      return sKey === targetKey || String(s.branch || '').toLowerCase().includes(targetKey);
+    });
+
+    if (branchShifts.length > 0) {
+      let filtered = branchShifts;
+      if (programFilter && programFilter !== 'All' && programFilter !== 'ALL') {
+        const pLow = programFilter.toLowerCase().trim();
+        const pMatched = branchShifts.filter(s => {
+          const sP = String(s.program || s.course || s.discipline || '').toLowerCase().trim();
+          const sN = String(s.name || '').toLowerCase().trim();
+          return sP.includes(pLow) || pLow.includes(sP) || sN.includes(pLow);
+        });
+        if (pMatched.length > 0) filtered = pMatched;
+      }
+
+      const formatted = filtered.map(s => {
+        if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
+        return s.name || s.time;
+      });
+      return Array.from(new Set(formatted));
+    }
+
+    // If branch has no custom schedule saved, return that branch's clean program defaults
+    return getStandardProgramShifts(programFilter, branchFilter);
+  }
+
+  // Global All Branches view
+  if (customShifts.length > 0) {
+    let list = customShifts;
+    if (programFilter && programFilter !== 'All' && programFilter !== 'ALL') {
       const pLow = programFilter.toLowerCase().trim();
       const progMatched = list.filter(s => {
         const sP = String(s.program || s.course || s.discipline || '').toLowerCase().trim();
         const sN = String(s.name || '').toLowerCase().trim();
         return sP.includes(pLow) || pLow.includes(sP) || sN.includes(pLow);
       });
-      if (progMatched.length > 0) {
-        list = progMatched;
-      }
+      if (progMatched.length > 0) list = progMatched;
     }
 
-    if (list.length > 0) {
-      const formatted = list.map(s => {
-        if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
-        return s.name || s.time;
-      });
-      return Array.from(new Set(formatted));
-    }
+    const formatted = list.map(s => {
+      if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
+      return s.name || s.time;
+    });
+    return Array.from(new Set(formatted));
   }
 
-  // Fallback program defaults if no custom shifts matched yet
-  if (programFilter) {
-    const pLow = programFilter.toLowerCase();
-    if (pLow.includes('personal')) return ["Personal Training (Flexible 1-on-1 Slots)", "Personal Training Morning (6:00 AM - 7:00 AM)", "Personal Training Evening (8:00 PM - 9:00 PM)"];
-    if (pLow.includes('ladies')) return ["Ladies Special Batch (4:00 PM - 5:30 PM)", "Ladies Morning Fitness (6:00 AM - 7:15 AM)"];
-    if (pLow.includes('kick')) return ["Kick Boxing Sparring Batch (7:00 PM - 8:30 PM)", "Kick Boxing Cardio (6:00 AM - 7:30 AM)"];
-    if (pLow.includes('box')) return ["Boxing Morning Conditioning (6:00 AM - 7:30 AM)", "Boxing Evening Strikes (6:00 PM - 7:30 PM)"];
-    if (pLow.includes('fitness')) return ["Morning Fitness Conditioning (6:00 AM - 7:30 AM)", "Evening Cardio & Stamina (7:00 PM - 8:30 PM)"];
-    if (pLow.includes('defense')) return ["Self Defense Practical Workshop", "Practical Defense Evening (6:30 PM - 8:00 PM)"];
-    if (pLow.includes('karate')) return [
-      "Evening Karate Batch (5:00 PM - 7:00 PM)",
-      "Morning Karate Batch (6:00 AM - 7:30 AM)",
-      "Weekend Special Batch (Sat & Sun: 7:00 AM - 9:00 AM)",
-      "Kids Karate Special (4:00 PM - 5:00 PM)"
-    ];
-  }
-
-  return SHIFT_OPTIONS;
+  return getStandardProgramShifts(programFilter, branchFilter);
 };
 
 export const BELT_LEVELS = [
