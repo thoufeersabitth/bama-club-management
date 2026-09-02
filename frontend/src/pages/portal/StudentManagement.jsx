@@ -1008,6 +1008,11 @@ export default function StudentManagement() {
       const rawBranch = cadet.branch_name || cadet.branchName || cadet.dojo_branch || cadet.dojoBranch || cadet.branch_dojo || bObjName || cadet.branch || '';
       const bStr = (String(rawBranch) + ' ' + String(bId) + ' ' + String(cadet.branch || '')).toLowerCase().trim();
 
+      if (bStr.includes('kick boxing') || bStr.includes('boxing pulikkal')) return 'kickboxing_pulikkal';
+      if (bStr.includes('pengad') || bStr.includes('btmamups')) return 'pengad';
+      if (bStr.includes('neerad') || bStr.includes('amlps')) return 'neerad';
+      if (bStr.includes('ansar')) return 'ansar';
+      if (bStr.includes('airport')) return 'airport';
       if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02') || bStr.includes('20c924cd')) return 'chungam';
       if (bStr.includes('mongam') || bStr.includes('dojo-03') || bStr.includes('d4639193')) return 'mongam';
       if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
@@ -1035,7 +1040,17 @@ export default function StudentManagement() {
     let matchesBranch = true;
 
     if (scopeLower && !scopeLower.includes('all')) {
-      if (scopeLower.includes('chungam') || scopeLower.includes('cgm') || scopeLower.includes('dojo-02') || scopeLower.includes('20c924cd')) {
+      if (scopeLower.includes('kick boxing') || scopeLower.includes('boxing pulikkal')) {
+        matchesBranch = (cadetBranchKey === 'kickboxing_pulikkal');
+      } else if (scopeLower.includes('pengad') || scopeLower.includes('btmamups')) {
+        matchesBranch = (cadetBranchKey === 'pengad');
+      } else if (scopeLower.includes('neerad') || scopeLower.includes('amlps')) {
+        matchesBranch = (cadetBranchKey === 'neerad');
+      } else if (scopeLower.includes('ansar')) {
+        matchesBranch = (cadetBranchKey === 'ansar');
+      } else if (scopeLower.includes('airport')) {
+        matchesBranch = (cadetBranchKey === 'airport');
+      } else if (scopeLower.includes('chungam') || scopeLower.includes('cgm') || scopeLower.includes('dojo-02') || scopeLower.includes('20c924cd')) {
         matchesBranch = (cadetBranchKey === 'chungam');
       } else if (scopeLower.includes('mongam') || scopeLower.includes('dojo-03') || scopeLower.includes('d4639193')) {
         matchesBranch = (cadetBranchKey === 'mongam');

@@ -425,43 +425,61 @@ export default function BranchManagement() {
   });
 
   // Calculate cadet count per branch with 100% Bulletproof Fuzzy Matching
-  // Calculate cadet count per branch with 100% Exact & Smart Fuzzy Matching
-  const getBranchCadetCount = (branchName) => {
-    if (!branchName) return 0;
+  // Calculate cadet count per branch with 100% Exact & Disambiguated Matching
+  const getBranchCadetCount = (b) => {
+    if (!b) return 0;
     let roster = studentsList;
     if (!roster || roster.length === 0) {
       try {
-        const saved = localStorage.getItem('bama_students_list');
+        const saved = localStorage.getItem('bama_students_list') || localStorage.getItem('bama_cadets_roster');
         if (saved) roster = JSON.parse(saved);
       } catch (e) {}
     }
-    if (!roster || roster.length === 0) return 0;
+    if (!roster || !Array.isArray(roster) || roster.length === 0) return 0;
 
-    const bStr = String(branchName).toLowerCase().trim();
+    const bName = String(b.name || (typeof b === 'string' ? b : '')).toLowerCase().trim();
+    const bId = String(b.id || '').toLowerCase().trim();
+    const bCode = String(b.code || '').toLowerCase().trim();
 
     return roster.filter(s => {
-      const cadetBranch = String(
-        s.branch_name ||
-        s.branch_detail?.name ||
-        s.branchName ||
-        (typeof s.branch === 'object' ? s.branch?.name : s.branch) ||
-        ''
-      ).toLowerCase().trim();
+      const sBranchId = String(s.branch_id || (typeof s.branch === 'object' ? s.branch?.id : '') || s.branch_detail?.id || '').toLowerCase().trim();
+      const sBranchName = String(s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_detail?.name || '').toLowerCase().trim();
 
-      if (!cadetBranch) {
-        // Unassigned default cadets match Head Office (Pulikkal)
-        return bStr.includes('pulikkal') || bStr.includes('head office');
+      // 1. Direct ID / UUID match
+      if (bId && sBranchId && bId === sBranchId) return true;
+
+      // 2. Direct exact name match
+      if (bName && sBranchName && bName === sBranchName) return true;
+
+      // 3. Exact Code match
+      if (bCode && (sBranchId === bCode || sBranchName === bCode)) return true;
+
+      // 4. Distinguish Kick Boxing Pulikkal vs Pulikkal Head Office
+      const isBKickBoxing = bName.includes('kick boxing') || bName.includes('boxing');
+      const isSKickBoxing = sBranchName.includes('kick boxing') || sBranchName.includes('boxing');
+      if (isBKickBoxing !== isSKickBoxing) return false;
+
+      // 5. School branch matching
+      const isBSchool = bName.includes('school') || bName.includes('ups') || bName.includes('lps') || bName.includes('ansar') || bName.includes('airport');
+      const isSSchool = sBranchName.includes('school') || sBranchName.includes('ups') || sBranchName.includes('lps') || sBranchName.includes('ansar') || sBranchName.includes('airport');
+      
+      if (isBSchool || isSSchool) {
+        if (bName.includes('pengad') || bName.includes('btmamups')) return sBranchName.includes('pengad') || sBranchName.includes('btmamups');
+        if (bName.includes('neerad') || bName.includes('amlps')) return sBranchName.includes('neerad') || sBranchName.includes('amlps');
+        if (bName.includes('ansar')) return sBranchName.includes('ansar');
+        if (bName.includes('airport')) return sBranchName.includes('airport');
+        return bName === sBranchName;
       }
 
-      if (bStr.includes('pulikkal') || bStr.includes('head office')) {
-        return cadetBranch.includes('pulikkal') || cadetBranch.includes('head office') || cadetBranch === 'pulikkal';
+      // 6. Dojo branches
+      if (bName.includes('chungam')) return sBranchName.includes('chungam');
+      if (bName.includes('mongam')) return sBranchName.includes('mongam');
+      if (bName.includes('feroke')) return sBranchName.includes('feroke');
+      if (bName.includes('pulikkal') || bName.includes('head office')) {
+        return !isSKickBoxing && !isSSchool && (sBranchName.includes('pulikkal') || sBranchName.includes('head office') || !sBranchName);
       }
 
-      if (bStr.includes('chungam')) return cadetBranch.includes('chungam');
-      if (bStr.includes('mongam')) return cadetBranch.includes('mongam');
-      if (bStr.includes('feroke')) return cadetBranch.includes('feroke');
-
-      return cadetBranch === bStr || cadetBranch.includes(bStr) || bStr.includes(cadetBranch);
+      return false;
     }).length;
   };
 
@@ -597,7 +615,7 @@ export default function BranchManagement() {
       {activeTab === 'BRANCHES' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBranches.map((b) => {
-            const cadetCount = getBranchCadetCount(b.name);
+            const cadetCount = getBranchCadetCount(b);
             const facList = Array.isArray(b.facilities) ? b.facilities : (b.facilities || '').split(',').map(f => f.trim()).filter(Boolean);
             const branchImg = b.image || b.img || b.photo || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
 
