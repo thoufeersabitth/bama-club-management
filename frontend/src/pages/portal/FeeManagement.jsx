@@ -131,10 +131,21 @@ export default function FeeManagement() {
           const paidMonthsList = Array.isArray(s.paid_months) ? s.paid_months : (Array.isArray(s.paidMonths) ? s.paidMonths : []);
           const initialPaid = parseInt(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
 
-          // For quarterly: check if active month is covered in paid_months
+          // Check if active month (e.g. 'September') is explicitly in paid_months
           const isMonthPaidInList = paidMonthsList.some(m => m.toLowerCase().includes(activeMonth.toLowerCase()));
-          const pendingAmt = isMonthPaidInList ? 0 : Math.max(0, feeAmt - initialPaid);
-          const calculatedStatus = (pendingAmt === 0 || isMonthPaidInList) ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
+
+          // For the baseline kickoff month (August 2026): initial paid covers August
+          const isAugustCovered = (activeMonth.toLowerCase() === 'august' && initialPaid >= feeAmt);
+
+          // For quarterly (School Batch): covers 3 months (August, September, October) if school fee paid
+          const isQuarterlyCovered = isQuarterly && (isMonthPaidInList || (initialPaid >= feeAmt && ['august', 'september', 'october'].includes(activeMonth.toLowerCase())));
+
+          const isFullyPaidForMonth = isMonthPaidInList || isAugustCovered || isQuarterlyCovered;
+
+          const paidAmtForMonth = isFullyPaidForMonth ? feeAmt : (activeMonth.toLowerCase() === 'august' ? initialPaid : 0);
+          const pendingAmtForMonth = isFullyPaidForMonth ? 0 : Math.max(0, feeAmt - paidAmtForMonth);
+
+          const calculatedStatus = isFullyPaidForMonth ? 'Paid' : (paidAmtForMonth > 0 ? 'Partial' : 'Pending');
 
           const rawAdmFee = s.admissionFee !== undefined ? parseInt(s.admissionFee) : (s.admission_fee !== undefined ? parseInt(s.admission_fee) : defaultAdmSetting);
           const admFee = isAcademyAdmFree ? 0 : (isNaN(rawAdmFee) ? 1000 : rawAdmFee);
@@ -157,8 +168,8 @@ export default function FeeManagement() {
             month: activeMonth,
             year: 2026,
             amount: feeAmt,
-            paid_amount: isMonthPaidInList ? feeAmt : initialPaid,
-            pending_amount: pendingAmt,
+            paid_amount: paidAmtForMonth,
+            pending_amount: pendingAmtForMonth,
             admission_pending: admPending,
             status: calculatedStatus,
             receipt_no: `REC-${s.admissionNo || s.admission_no || 'BAMA-2026'}`
@@ -528,6 +539,68 @@ export default function FeeManagement() {
               <span className="text-sm sm:text-base font-black text-rose-600 font-mono">₹{totalPending.toLocaleString()}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 📅 PROMINENT MONTH-WISE BILLING SELECTOR CONTROL CENTER */}
+      <div className="bg-gradient-to-r from-red-950 via-gray-900 to-black p-4 sm:p-5 rounded-3xl border border-red-900/40 shadow-xl space-y-3.5 text-white">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-red-600/30 border border-red-500/50 flex items-center justify-center text-red-400 flex-shrink-0 shadow-inner">
+              <Calendar className="w-6 h-6 text-red-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-red-400 bg-red-950/80 px-2 py-0.5 rounded-md border border-red-800/60">
+                  Active Billing Month
+                </span>
+                <span className="text-[10px] text-gray-400 font-mono">Click any month to view live dues & paid list</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2 mt-0.5">
+                <span>{selectedMonth === 'All' ? 'All Months Overview' : `${selectedMonth} 2026`}</span>
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+                  🟢 {fees.filter(f => getPendingDuesAmount(f) === 0).length} Paid • 🔴 {fees.filter(f => getPendingDuesAmount(f) > 0).length} Due
+                </span>
+              </h2>
+            </div>
+          </div>
+
+          {/* Direct Dropdown for Any Month */}
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            <label className="text-xs font-bold text-gray-300 whitespace-nowrap">Switch Month:</label>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="bg-gray-900 border-2 border-red-500/80 text-white font-black text-xs rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:border-red-400 shadow-md"
+            >
+              <option value="All">All Months (Overview)</option>
+              {MONTHS_LIST.map(m => (
+                <option key={m} value={m}>{m} 2026</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Quick Clickable Month Tabs Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-white/10 scrollbar-none">
+          {['August', 'September', 'October', 'November', 'December', 'All'].map(m => {
+            const isSel = selectedMonth === m;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setSelectedMonth(m)}
+                className={`px-3.5 py-1.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+                  isSel
+                    ? 'bg-red-600 text-white shadow-lg shadow-red-600/50 ring-2 ring-red-400 scale-105'
+                    : 'bg-white/10 hover:bg-white/20 text-gray-300 border border-white/10'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{m === 'All' ? 'All Months' : `${m} 2026`}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
