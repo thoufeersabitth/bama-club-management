@@ -4,6 +4,21 @@ import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, ge
 import { ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions, INITIAL_BRANCHES } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
+const MONTHS_LIST = [
+  'September',
+  'August',
+  'July',
+  'June',
+  'May',
+  'April',
+  'March',
+  'February',
+  'January',
+  'October',
+  'November',
+  'December'
+];
+
 export default function FeeManagement() {
   const { user } = useAuth();
   const isInstructor = user?.role === 'INSTRUCTOR';
@@ -37,7 +52,7 @@ export default function FeeManagement() {
 
   const [search, setSearch] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('All');
-  const [selectedMonth, setSelectedMonth] = useState('All');
+  const [selectedMonth, setSelectedMonth] = useState('September');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedBillingPlan, setSelectedBillingPlan] = useState('All'); // 'All' | 'MONTHLY' | 'QUARTERLY'
@@ -87,10 +102,7 @@ export default function FeeManagement() {
   // Build 100% Dynamic Fee Invoices directly from Student Management Roster & Global Fee Settings
   useEffect(() => {
     const loadDynamicFees = () => {
-      const globalSettings = getGlobalFeeSettings();
-      const effMonth = globalSettings.effectiveMonth || 'August';
-      const effYear = globalSettings.effectiveYear || 2026;
-      const activeMonth = selectedMonth === 'All' ? 'August' : selectedMonth;
+      const activeMonth = selectedMonth === 'All' ? 'September' : selectedMonth;
 
       fetchStudents().then(stdList => {
         const cadets = stdList || getStoredStudents();
@@ -330,12 +342,30 @@ export default function FeeManagement() {
     const totalAmt = fee.amount || std.feeAmount || std.fee_amount || 500;
     const pendingAmt = getPendingDuesAmount(fee);
     const admPendingAmt = getAdmissionPendingAmount(fee);
-    const parentName = std.guardianName || std.guardian_name || 'Guardian';
-    const cadetName = std.name || 'Student';
+    const parentName = std.guardianName || std.guardian_name || 'Parent';
+    const cadetName = std.name || std.student_name || 'Cadet';
+    const activeMonthName = fee.month || selectedMonth === 'All' ? 'September' : selectedMonth;
+    const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
 
     let text = '';
-    const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
-    if (selectedStatus === 'AdmissionPending' || (admPendingAmt > 0 && pendingAmt === 0)) {
+    if (pendingAmt === 0 && admPendingAmt === 0) {
+      // 🧾 OFFICIAL PAYMENT RECEIPT / ACKNOWLEDGMENT (When already Paid!)
+      text = 
+        `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
+        `🧾 *OFFICIAL PAYMENT RECEIPT / ഫീസ് രസീത്*\n` +
+        `Receipt No: *${fee.receipt_no || `REC-${std.admissionNo || std.admission_no || '001'}`}*\n` +
+        `Cadet Name: *${cadetName}* (${std.admissionNo || std.admission_no || ''})\n` +
+        `Branch Dojo: *${std.branch || 'Head Office Dojo'}*\n` +
+        `Course: *${std.program || std.course || 'Karate (Shotokan)'}*\n` +
+        `Shift: *${std.shift || 'Evening Batch'}*\n` +
+        `Month: *${activeMonthName} ${fee.year || 2026}*\n` +
+        `----------------------------------------\n` +
+        `Total Paid: *₹${totalAmt}* (✅ FULLY PAID)\n` +
+        `Payment Status: *CLEARED / PAID*\n` +
+        `Remaining Dues: *₹0*\n` +
+        `----------------------------------------\n\n` +
+        `Dear Parent (${parentName}), we have successfully received and recorded the fee payment. Thank you for your continued support! OSS 🥋`;
+    } else if (selectedStatus === 'AdmissionPending' || (admPendingAmt > 0 && pendingAmt === 0)) {
       text = 
         `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
         `📌 *OFFICIAL ADMISSION / REGISTRATION FEE NOTICE*\n` +
@@ -351,7 +381,7 @@ export default function FeeManagement() {
         `📌 *OFFICIAL MONTHLY FEE REMINDER*\n` +
         `Cadet Name: *${cadetName}* (${std.admissionNo || std.admission_no || ''})\n` +
         `Shift: *${std.shift || 'Evening Batch'}*\n` +
-        `Month: *${fee.month || 'August'} ${fee.year || 2026}*\n` +
+        `Month: *${activeMonthName} ${fee.year || 2026}*\n` +
         `Total Monthly Fee: *₹${totalAmt}*\n` +
         `Pending Monthly Dues: *₹${pendingAmt}*` +
         (!isAdmFree && admPendingAmt > 0 ? `\nAdmission Fee Dues: *₹${admPendingAmt}*` : isAdmFree ? `\nAdmission Fee: *🎁 FREE / WAIVED*` : '') +
@@ -598,7 +628,22 @@ export default function FeeManagement() {
           </div>
 
           {/* Filter Dropdowns Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 w-full sm:w-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 w-full sm:w-auto">
+            {/* Month Filter */}
+            <div className="flex items-center gap-1.5 font-bold text-gray-700 bg-amber-50/80 border border-amber-300/90 rounded-xl px-2.5 py-1.5 shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-full bg-transparent text-xs text-amber-950 font-black focus:outline-none cursor-pointer truncate"
+              >
+                <option value="All">All Months</option>
+                {MONTHS_LIST.map(m => (
+                  <option key={m} value={m}>{m} 2026</option>
+                ))}
+              </select>
+            </div>
+
             {/* Branch Dojo Filter */}
             <div className="flex items-center gap-1.5 font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5">
               <Filter className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
@@ -1353,34 +1398,58 @@ export default function FeeManagement() {
             <div className="text-center space-y-1 border-b border-gray-200 pb-4">
               <h2 className="text-xl font-black tracking-tight text-gray-900">{ACADEMY_INFO.name}</h2>
               <p className="text-xs text-gray-500 font-bold">{ACADEMY_INFO.headOffice.address}</p>
-              <p className="text-[11px] text-red-600 font-black uppercase tracking-wider mt-1">Official Fee Receipt</p>
+              <span className="inline-block px-3 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-black uppercase tracking-wider mt-1.5 shadow-2xs">
+                Official Fee Payment Receipt
+              </span>
             </div>
 
             <div className="space-y-3 text-xs">
               <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="text-gray-500 font-medium">Receipt No:</span>
-                <strong className="font-mono text-gray-900">{activeReceipt.receipt_no}</strong>
+                <strong className="font-mono text-gray-900 font-black">{activeReceipt.receipt_no || `REC-${activeReceipt.student_detail?.admissionNo || '001'}`}</strong>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="text-gray-500 font-medium">Cadet Name:</span>
                 <strong className="text-gray-900 font-black">{activeReceipt.student_detail?.name}</strong>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">Branch Dojo:</span>
+                <strong className="text-gray-800 font-bold">{activeReceipt.student_detail?.branch || 'Pulikkal Head Office'}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="text-gray-500 font-medium">Shift Batch:</span>
                 <strong className="text-amber-800 font-bold">{activeReceipt.student_detail?.shift || 'Evening Batch'}</strong>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="text-gray-500 font-medium">Paid Amount:</span>
-                <strong className="text-emerald-600 font-mono text-sm font-black">₹{activeReceipt.paid_amount}</strong>
+                <span className="text-gray-500 font-medium">Billing Month:</span>
+                <strong className="text-gray-900 font-black">{activeReceipt.month || 'September'} {activeReceipt.year || 2026}</strong>
               </div>
-              <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="text-gray-500 font-medium">Pending Dues:</span>
-                <strong className="text-rose-600 font-mono font-black">₹{getPendingDuesAmount(activeReceipt)}</strong>
+              <div className="flex justify-between border-b border-gray-100 pb-2 bg-emerald-50/60 p-2.5 rounded-xl">
+                <span className="text-emerald-800 font-bold">Total Paid:</span>
+                <strong className="text-emerald-700 font-mono text-sm font-black">₹{activeReceipt.paid_amount} (CLEARED)</strong>
               </div>
+              {getPendingDuesAmount(activeReceipt) > 0 && (
+                <div className="flex justify-between border-b border-gray-100 pb-2 bg-rose-50/60 p-2.5 rounded-xl">
+                  <span className="text-rose-800 font-bold">Remaining Dues:</span>
+                  <strong className="text-rose-600 font-mono font-black">₹{getPendingDuesAmount(activeReceipt)}</strong>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
-              <button onClick={() => window.print()} className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs flex items-center gap-2 shadow-md cursor-pointer">
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => sendFeeWhatsAppReminder(activeReceipt)}
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" /> Send Receipt on WhatsApp
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="w-full sm:w-auto px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+              >
                 <Printer className="w-4 h-4" /> Print Receipt
               </button>
             </div>
