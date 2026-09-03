@@ -102,6 +102,59 @@ export default function FeeManagement() {
     return 'Pending';
   };
 
+  // Helper to extract ONLY months that are actually pending for this cadet
+  const getCadetPendingMonths = (f) => {
+    if (!f) return [];
+    const std = f.student_detail || {};
+    const paidMonthsList = Array.isArray(std.paid_months) 
+      ? std.paid_months 
+      : (Array.isArray(std.paidMonths) ? std.paidMonths : []);
+    
+    const feeAmt = parseFloat(f.amount || std.fee_amount || std.feeAmount || 500);
+    const initialPaid = parseFloat(std.initial_paid_amount ?? std.initialPaidAmount ?? 0);
+    const isAugustCovered = initialPaid >= feeAmt || String(std.fee_status || std.feeStatus).toLowerCase() === 'paid';
+
+    const joinDateStr = std.joiningDate || std.joining_date || std.created_at || '2026-08-01';
+    let joinMonthIdx = 7; // Default August (0-indexed: 7 is August)
+    try {
+      const d = new Date(joinDateStr);
+      if (!isNaN(d.getTime())) {
+        joinMonthIdx = d.getMonth();
+      }
+    } catch (e) {}
+
+    const allMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    const relevantMonths = allMonths.slice(joinMonthIdx);
+
+    const pendingMonths = relevantMonths.filter(m => {
+      const mLow = m.toLowerCase();
+      const isPaid = paidMonthsList.some(pm => String(pm).toLowerCase().includes(mLow));
+      if (isPaid) return false;
+
+      // August covered by initial enrollment fee payment
+      if (mLow === 'august' && isAugustCovered) return false;
+
+      // School batch covers Aug, Sep, Oct if initial paid
+      const isQuarterly = f.is_quarterly || String(std.fee_frequency || std.feeFrequency).toUpperCase() === 'QUARTERLY';
+      if (isQuarterly && initialPaid >= feeAmt && ['august', 'september', 'october'].includes(mLow)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (pendingMonths.length === 0) {
+      const nextUnpaid = allMonths.filter(m => !paidMonthsList.some(pm => String(pm).toLowerCase().includes(m.toLowerCase())));
+      return nextUnpaid.length > 0 ? [nextUnpaid[0]] : ['September', 'October'];
+    }
+
+    return pendingMonths;
+  };
+
   // Build 100% Dynamic Fee Invoices directly from Student Management Roster & Global Fee Settings
   useEffect(() => {
     const loadDynamicFees = () => {
@@ -1025,6 +1078,10 @@ export default function FeeManagement() {
                   <button
                     onClick={() => {
                       setPaymentModalFee(fee);
+                      const pMonths = getCadetPendingMonths(fee);
+                      if (pMonths.length > 0) {
+                        setPaymentMonth(`${pMonths[0]} 2026`);
+                      }
                       if (admPendingAmt > 0 && pendingAmt === 0) {
                         setPaymentType('ADMISSION');
                         setPaymentAmount(String(admPendingAmt));
@@ -1232,6 +1289,10 @@ export default function FeeManagement() {
                       <button
                         onClick={() => {
                           setPaymentModalFee(fee);
+                          const pMonths = getCadetPendingMonths(fee);
+                          if (pMonths.length > 0) {
+                            setPaymentMonth(`${pMonths[0]} 2026`);
+                          }
                           if (admPendingAmt > 0 && pendingAmt === 0) {
                             setPaymentType('ADMISSION');
                             setPaymentAmount(String(admPendingAmt));
@@ -1446,24 +1507,31 @@ export default function FeeManagement() {
                 </div>
               </div>
 
-              {/* Which Month Are You Collecting For? */}
-              {paymentType === 'MONTHLY' && (
-                <div>
-                  <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
-                    <span>Billing Month *</span>
-                    <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">Month to Clear</span>
-                  </label>
-                  <select
-                    value={paymentMonth}
-                    onChange={(e) => setPaymentMonth(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer shadow-2xs"
-                  >
-                    {MONTHS_LIST.map(m => (
-                      <option key={m} value={`${m} 2026`}>{m} 2026</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Which Month Are You Collecting For? ONLY PENDING MONTHS */}
+              {paymentType === 'MONTHLY' && (() => {
+                const pendingMonths = getCadetPendingMonths(paymentModalFee);
+                return (
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+                      <span>Pending Billing Month *</span>
+                      <span className="text-[10px] text-rose-700 font-black bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                        {pendingMonths.length} Month(s) Due
+                      </span>
+                    </label>
+                    <select
+                      value={paymentMonth}
+                      onChange={(e) => setPaymentMonth(e.target.value)}
+                      className="w-full bg-rose-50/40 border border-rose-200 rounded-xl px-3 py-2.5 text-gray-900 font-black focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer shadow-2xs"
+                    >
+                      {pendingMonths.map(m => (
+                        <option key={m} value={`${m} 2026`}>
+                          ⚠️ {m} 2026 (Pending Due)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
 
               <div>
                 <div className="flex items-center justify-between mb-1">
