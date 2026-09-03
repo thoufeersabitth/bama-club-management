@@ -6,8 +6,8 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase
 } from 'lucide-react';
-import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate } from '../../services/api';
-import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS } from '../../services/initialData';
+import { fetchStudents, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend } from '../../services/api';
+import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 const FIXED_AVATAR_DIM = 300;
@@ -160,6 +160,7 @@ export default function StudentManagement() {
   const [activeProfileTab, setActiveProfileTab] = useState('overview');
   const [selectedDuesMonths, setSelectedDuesMonths] = useState([]);
   const [settleSuccessMsg, setSettleSuccessMsg] = useState('');
+  const [studentActiveReceipt, setStudentActiveReceipt] = useState(null);
   const [globalFeeSettings, setGlobalFeeSettings] = useState(getGlobalFeeSettings());
   const [showGlobalFeeModal, setShowGlobalFeeModal] = useState(false);
   const [showInquiriesModal, setShowInquiriesModal] = useState(false);
@@ -1673,14 +1674,42 @@ export default function StudentManagement() {
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={sendWhatsAppStatement}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer flex-shrink-0"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Send WhatsApp Notice</span>
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const paidMonthsStr = (Array.isArray(std.paid_months) && std.paid_months.length > 0)
+                            ? std.paid_months.join(', ')
+                            : 'September 2026';
+                          setStudentActiveReceipt({
+                            receipt_no: `REC-${std.admissionNo || std.admission_no || 'BAMA'}-${Date.now().toString().slice(-4)}`,
+                            student_detail: std,
+                            month: paidMonthsStr,
+                            amount: std.initial_paid_amount || std.fee_amount || 500,
+                            paid_amount: std.initial_paid_amount || std.fee_amount || 500,
+                            payment_date: new Date().toLocaleDateString('en-GB'),
+                            cleared_months: Array.isArray(std.paid_months) ? std.paid_months : ['September 2026'],
+                            parent_phone: cleanPhone || contactPhone,
+                            parent_name: parentName,
+                            shift: std.shift || 'Evening Batch',
+                            branch: std.branch_name || std.branch || 'Head Office'
+                          });
+                        }}
+                        className="px-3.5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer flex-shrink-0"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Print / PDF Receipt</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={sendWhatsAppStatement}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer flex-shrink-0"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Send WhatsApp Notice</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -1846,18 +1875,53 @@ export default function StudentManagement() {
                   saveStoredStudents(updatedRoster);
                   setStudents(updatedRoster);
 
+                  const receiptNo = `REC-SCH-${std.admissionNo || 'BAMA'}-${Date.now().toString().slice(-4)}`;
                   try {
                     await updateStudent(std.id, {
                       paid_months: newPaidMonths,
-                      initial_paid_amount: newTotalPaid
+                      initial_paid_amount: newTotalPaid,
+                      fee_status: 'Paid',
+                      pending_amount: 0
                     });
                   } catch (e) {}
 
+                  try {
+                    await saveFeePaymentBackend({
+                      student: std.id,
+                      month: `${term.title} (${term.period})`,
+                      year: 2026,
+                      amount: term.rate,
+                      paid_amount: term.rate,
+                      pending_amount: 0,
+                      status: 'Paid',
+                      receipt_no: receiptNo
+                    });
+                  } catch (e) {}
+
+                  window.dispatchEvent(new CustomEvent('bama_data_updated'));
+
                   setSettleSuccessMsg(`✓ Successfully cleared ${term.title} (${term.period}) for ₹${term.rate}!`);
+
+                  const receiptObj = {
+                    receipt_no: receiptNo,
+                    student_detail: std,
+                    month: `${term.title} (${term.period} - ${term.months.join(', ')})`,
+                    amount: term.rate,
+                    paid_amount: term.rate,
+                    payment_date: new Date().toLocaleDateString('en-GB'),
+                    cleared_months: term.months,
+                    parent_phone: cleanPhone || contactPhone,
+                    parent_name: parentName,
+                    shift: std.shift || 'School Batch',
+                    branch: std.branch_name || std.branch || 'School Branch'
+                  };
+
+                  setStudentActiveReceipt(receiptObj);
                   
                   const receiptText = 
                     `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
-                    `🧾 *OFFICIAL SCHOOL BATCH TERM FEE RECEIPT*\n` +
+                    `🧾 *OFFICIAL SCHOOL BATCH TERM FEE RECEIPT / ഫീസ് രസീത്*\n` +
+                    `Receipt No: *${receiptNo}*\n` +
                     `Cadet Name: *${std.name}* (${std.admissionNo || std.admission_no})\n` +
                     `Branch Dojo: *${std.branch_name || std.branch || 'Head Office'}*\n` +
                     `Billing Plan: *School Batch (3-Month Term Plan)*\n` +
@@ -2041,13 +2105,20 @@ export default function StudentManagement() {
                 if (selectedDuesMonths.length === 0) return;
                 const newPaidMonths = Array.from(new Set([...paidMonthsList, ...selectedDuesMonths]));
                 const newTotalPaid = totalPaidAmount + selectedMonthsCost;
+                const isAllDuesCleared = unpaidDueMonths.filter(m => !selectedDuesMonths.includes(m.month)).length === 0;
+                const newFeeStatus = isAllDuesCleared ? 'Paid' : 'Partial';
+                const receiptNo = `REC-${std.admissionNo || 'BAMA'}-${Date.now().toString().slice(-4)}`;
 
                 const updatedStudentObj = {
                   ...std,
                   paid_months: newPaidMonths,
                   paidMonths: newPaidMonths,
                   initialPaidAmount: newTotalPaid,
-                  initial_paid_amount: newTotalPaid
+                  initial_paid_amount: newTotalPaid,
+                  fee_status: newFeeStatus,
+                  feeStatus: newFeeStatus,
+                  pending_amount: isAllDuesCleared ? 0 : Math.max(0, monthlyRate),
+                  pendingAmount: isAllDuesCleared ? 0 : Math.max(0, monthlyRate)
                 };
 
                 setDetailStudent(updatedStudentObj);
@@ -2062,15 +2133,49 @@ export default function StudentManagement() {
                 try {
                   await updateStudent(std.id, {
                     paid_months: newPaidMonths,
-                    initial_paid_amount: newTotalPaid
+                    initial_paid_amount: newTotalPaid,
+                    fee_status: newFeeStatus,
+                    pending_amount: isAllDuesCleared ? 0 : Math.max(0, monthlyRate)
                   });
                 } catch (e) {}
 
+                try {
+                  await saveFeePaymentBackend({
+                    student: std.id,
+                    month: selectedDuesMonths.join(', '),
+                    year: 2026,
+                    amount: selectedMonthsCost,
+                    paid_amount: selectedMonthsCost,
+                    pending_amount: isAllDuesCleared ? 0 : Math.max(0, monthlyRate),
+                    status: newFeeStatus,
+                    receipt_no: receiptNo
+                  });
+                } catch (e) {}
+
+                window.dispatchEvent(new CustomEvent('bama_data_updated'));
+
                 setSettleSuccessMsg(`✓ Successfully collected ₹${selectedMonthsCost} for ${selectedDuesMonths.length} month(s)!`);
                 
+                const receiptObj = {
+                  receipt_no: receiptNo,
+                  student_detail: std,
+                  month: selectedDuesMonths.join(', '),
+                  amount: selectedMonthsCost,
+                  paid_amount: selectedMonthsCost,
+                  payment_date: new Date().toLocaleDateString('en-GB'),
+                  cleared_months: selectedDuesMonths,
+                  parent_phone: cleanPhone || contactPhone,
+                  parent_name: parentName,
+                  shift: std.shift || 'Evening Batch',
+                  branch: std.branch_name || std.branch || 'Head Office'
+                };
+
+                setStudentActiveReceipt(receiptObj);
+
                 const receiptText = 
                   `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
-                  `🧾 *OFFICIAL MONTHLY FEE PAYMENT RECEIPT*\n` +
+                  `🧾 *OFFICIAL MONTHLY FEE PAYMENT RECEIPT / ഫീസ് രസീത്*\n` +
+                  `Receipt No: *${receiptNo}*\n` +
                   `Cadet Name: *${std.name}* (${std.admissionNo || std.admission_no})\n` +
                   `Branch Dojo: *${std.branch_name || std.branch || 'Head Office'}*\n` +
                   `Billing Plan: *Regular Dojo (Monthly Plan)*\n` +
@@ -2782,6 +2887,92 @@ export default function StudentManagement() {
                 className="w-full py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition cursor-pointer"
               >
                 Close Window
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Cadet Printable Fee Receipt in Student Management */}
+      {studentActiveReceipt && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-lg bg-white text-gray-900 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative border border-gray-200">
+            <button onClick={() => setStudentActiveReceipt(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-1 border-b border-gray-200 pb-4">
+              <h2 className="text-xl font-black tracking-tight text-gray-900">{ACADEMY_INFO.name}</h2>
+              <p className="text-xs text-gray-500 font-bold">{ACADEMY_INFO.headOffice.address}</p>
+              <span className="inline-block px-3 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-black uppercase tracking-wider mt-1.5 shadow-2xs">
+                Official Fee Payment Receipt
+              </span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">Receipt No:</span>
+                <strong className="font-mono text-gray-900 font-black">{studentActiveReceipt.receipt_no}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">Cadet Name:</span>
+                <strong className="text-gray-900 font-black">{studentActiveReceipt.student_detail?.name}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">Admission No:</span>
+                <strong className="text-red-700 font-mono font-bold">{studentActiveReceipt.student_detail?.admissionNo || studentActiveReceipt.student_detail?.admission_no}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">Branch Dojo:</span>
+                <strong className="text-gray-800 font-bold">{studentActiveReceipt.branch}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">Shift Batch:</span>
+                <strong className="text-amber-800 font-bold">{studentActiveReceipt.shift}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">Cleared Period / Month(s):</span>
+                <strong className="text-gray-900 font-black">{studentActiveReceipt.month}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2 bg-emerald-50/70 p-2.5 rounded-xl">
+                <span className="text-emerald-800 font-bold">Total Paid:</span>
+                <strong className="text-emerald-700 font-mono text-base font-black">₹{studentActiveReceipt.amount} (CLEARED)</strong>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  const receiptMsg = 
+                    `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
+                    `🧾 *OFFICIAL FEE PAYMENT RECEIPT / ഫീസ് രസീത്*\n` +
+                    `Receipt No: *${studentActiveReceipt.receipt_no}*\n` +
+                    `Cadet Name: *${studentActiveReceipt.student_detail?.name}* (${studentActiveReceipt.student_detail?.admissionNo || ''})\n` +
+                    `Branch Dojo: *${studentActiveReceipt.branch}*\n` +
+                    `Shift: *${studentActiveReceipt.shift}*\n` +
+                    `Cleared Month(s): *${studentActiveReceipt.month}*\n` +
+                    `----------------------------------------\n` +
+                    `Total Paid: *₹${studentActiveReceipt.amount}* (✅ FULLY PAID)\n` +
+                    `Payment Status: *CLEARED / PAID*\n` +
+                    `----------------------------------------\n\n` +
+                    `Dear Parent (${studentActiveReceipt.parent_name}), we have successfully received and recorded your fee payment. Thank you! OSS 🥋`;
+                  openWhatsApp({
+                    phone: studentActiveReceipt.parent_phone,
+                    message: receiptMsg
+                  });
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" /> Send Receipt on WhatsApp
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="w-full sm:w-auto px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
+              >
+                <Printer className="w-4 h-4" /> Print / Save PDF
               </button>
             </div>
           </div>

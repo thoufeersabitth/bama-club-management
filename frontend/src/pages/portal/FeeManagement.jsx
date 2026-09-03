@@ -62,6 +62,9 @@ export default function FeeManagement() {
   const [paymentModalFee, setPaymentModalFee] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentType, setPaymentType] = useState('MONTHLY'); // 'MONTHLY' | 'ADMISSION' | 'BOTH'
+  const [paymentMonth, setPaymentMonth] = useState('September 2026');
+  const [paymentMethod, setPaymentMethod] = useState('Google Pay / UPI');
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   // Bulk WhatsApp Dispatcher Queue State
   const [showBulkWhatsAppModal, setShowBulkWhatsAppModal] = useState(false);
@@ -271,6 +274,7 @@ export default function FeeManagement() {
       const newTotalPaid = currentPaid + paidVal;
       const newPending = Math.max(0, totalFee - newTotalPaid);
       const newStatus = newPending === 0 ? 'Paid' : newTotalPaid > 0 ? 'Partial' : 'Pending';
+      const chosenMonthStr = paymentMonth.includes('2026') ? paymentMonth : `${paymentMonth} 2026`;
 
       const updatedFees = fees.map(f => {
         if (f.id === paymentModalFee.id) {
@@ -279,6 +283,10 @@ export default function FeeManagement() {
             paid_amount: newTotalPaid,
             pending_amount: newPending,
             status: newStatus,
+            month: chosenMonthStr,
+            payment_method: paymentMethod,
+            payment_date: paymentDate,
+            receipt_no: f.receipt_no || `REC-${f.student_detail?.admissionNo || '001'}`,
             student_detail: {
               ...f.student_detail,
               initialPaidAmount: newTotalPaid,
@@ -308,7 +316,7 @@ export default function FeeManagement() {
 
         const newPaidMonths = isQuarterly
           ? Array.from(new Set([...currentPaidMonths, 'August 2026', 'September 2026', 'October 2026']))
-          : Array.from(new Set([...currentPaidMonths, `${paymentModalFee.month || 'August'} 2026`]));
+          : Array.from(new Set([...currentPaidMonths, chosenMonthStr]));
 
         const updatedStudents = storedStudents.map(s => {
           if (s.id === targetId || s.admissionNo === paymentModalFee.student_detail?.admissionNo) {
@@ -344,6 +352,7 @@ export default function FeeManagement() {
 
         if (updatedFeeObj) {
           saveFeePaymentBackend(updatedFeeObj).catch(() => {});
+          window.dispatchEvent(new CustomEvent('bama_data_updated'));
         }
       } catch (err) {}
     }
@@ -550,36 +559,36 @@ export default function FeeManagement() {
         </div>
       </div>
 
-      {/* 📅 PROMINENT MONTH-WISE BILLING SELECTOR CONTROL CENTER */}
-      <div className="bg-gradient-to-r from-red-950 via-gray-900 to-black p-4 sm:p-5 rounded-3xl border border-red-900/40 shadow-xl space-y-3.5 text-white">
+      {/* 📅 ELEGANT EXECUTIVE LIGHT WHITE MONTH SELECTOR */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-sm space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-red-600/30 border border-red-500/50 flex items-center justify-center text-red-400 flex-shrink-0 shadow-inner">
-              <Calendar className="w-6 h-6 text-red-400" />
+            <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600 flex-shrink-0">
+              <Calendar className="w-5 h-5 text-red-600" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-red-400 bg-red-950/80 px-2 py-0.5 rounded-md border border-red-800/60">
-                  Active Billing Month
+                <span className="text-[10px] font-black uppercase tracking-wider text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                  Billing Cycle
                 </span>
-                <span className="text-[10px] text-gray-400 font-mono">Click any month to view live dues & paid list</span>
+                <span className="text-[10px] text-gray-500 font-medium">Select a month to inspect live dues & collections</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2 mt-0.5">
-                <span>{selectedMonth === 'All' ? 'All Months Overview' : `${selectedMonth} 2026`}</span>
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold">
+              <h2 className="text-lg sm:text-xl font-black tracking-tight text-gray-900 flex items-center gap-2 mt-0.5">
+                <span>{selectedMonth === 'All' ? 'All Invoices (Overall Roster)' : `${selectedMonth} 2026 Billing`}</span>
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-black">
                   🟢 {fees.filter(f => getPendingDuesAmount(f) === 0).length} Paid • 🔴 {fees.filter(f => getPendingDuesAmount(f) > 0).length} Due
                 </span>
               </h2>
             </div>
           </div>
 
-          {/* Direct Dropdown for Any Month */}
+          {/* Quick Dropdown */}
           <div className="flex items-center gap-2 self-start md:self-auto">
-            <label className="text-xs font-bold text-gray-300 whitespace-nowrap">Switch Month:</label>
+            <label className="text-xs font-bold text-gray-600 whitespace-nowrap">Month:</label>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-gray-900 border-2 border-red-500/80 text-white font-black text-xs rounded-xl px-3 py-2 cursor-pointer focus:outline-none focus:border-red-400 shadow-md"
+              className="bg-gray-50 border border-gray-300 text-gray-900 font-bold text-xs rounded-xl px-3 py-1.5 cursor-pointer focus:outline-none focus:border-red-500 shadow-2xs"
             >
               <option value="All">All Months (Overview)</option>
               {MONTHS_LIST.map(m => (
@@ -589,19 +598,19 @@ export default function FeeManagement() {
           </div>
         </div>
 
-        {/* Quick Clickable Month Tabs Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 border-t border-white/10 scrollbar-none">
-          {['August', 'September', 'October', 'November', 'December', 'All'].map(m => {
+        {/* Clean Pill Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-gray-100">
+          {['All', 'August', 'September', 'October', 'November', 'December'].map(m => {
             const isSel = selectedMonth === m;
             return (
               <button
                 key={m}
                 type="button"
                 onClick={() => setSelectedMonth(m)}
-                className={`px-3.5 py-1.5 rounded-xl font-black text-xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
                   isSel
-                    ? 'bg-red-600 text-white shadow-lg shadow-red-600/50 ring-2 ring-red-400 scale-105'
-                    : 'bg-white/10 hover:bg-white/20 text-gray-300 border border-white/10'
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
@@ -1437,6 +1446,25 @@ export default function FeeManagement() {
                 </div>
               </div>
 
+              {/* Which Month Are You Collecting For? */}
+              {paymentType === 'MONTHLY' && (
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+                    <span>Billing Month *</span>
+                    <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">Month to Clear</span>
+                  </label>
+                  <select
+                    value={paymentMonth}
+                    onChange={(e) => setPaymentMonth(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer shadow-2xs"
+                  >
+                    {MONTHS_LIST.map(m => (
+                      <option key={m} value={`${m} 2026`}>{m} 2026</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-gray-700 font-bold">
@@ -1452,6 +1480,42 @@ export default function FeeManagement() {
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-emerald-700 font-black text-lg font-mono focus:bg-white focus:outline-none focus:border-red-500 shadow-sm"
+                />
+              </div>
+
+              {/* Payment Mode Selector */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">Payment Mode *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'Google Pay / UPI', label: '🟢 GPay / UPI' },
+                    { id: 'Cash', label: '💵 Cash' },
+                    { id: 'Bank Transfer', label: '🏦 Bank' }
+                  ].map(pm => (
+                    <button
+                      key={pm.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(pm.id)}
+                      className={`py-2 px-1.5 text-center rounded-xl border text-[11px] font-black transition cursor-pointer ${
+                        paymentMethod === pm.id
+                          ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      {pm.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment Date */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">Payment Date *</label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 shadow-2xs"
                 />
               </div>
 
