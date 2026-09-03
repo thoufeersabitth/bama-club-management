@@ -52,7 +52,7 @@ export default function FeeManagement() {
 
   const [search, setSearch] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('All');
-  const [selectedMonth, setSelectedMonth] = useState('September');
+  const [selectedMonth, setSelectedMonth] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedBillingPlan, setSelectedBillingPlan] = useState('All'); // 'All' | 'MONTHLY' | 'QUARTERLY'
@@ -102,10 +102,9 @@ export default function FeeManagement() {
   // Build 100% Dynamic Fee Invoices directly from Student Management Roster & Global Fee Settings
   useEffect(() => {
     const loadDynamicFees = () => {
-      const activeMonth = selectedMonth === 'All' ? 'September' : selectedMonth;
-
       fetchStudents().then(stdList => {
         const cadets = stdList || getStoredStudents();
+        const globalSettings = getGlobalFeeSettings();
         const defaultSchoolRate = parseInt(globalSettings.defaultSchoolBatchFee) || 1200;
         const defaultMonthlyRate = parseInt(globalSettings.defaultMonthlyFee) || 500;
         const defaultAdmSetting = parseInt(globalSettings.defaultAdmissionFee);
@@ -123,29 +122,38 @@ export default function FeeManagement() {
             (s.shift && s.shift.toLowerCase().includes('school'))
           );
 
-          const isNewRate = isMonthOnOrAfterEffective(activeMonth, 2026, effMonth, effYear);
-          const applicableDefault = isQuarterly ? defaultSchoolRate : defaultMonthlyRate;
           const studentCustomRate = parseInt(s.fee_amount ?? s.feeAmount ?? 0);
+          const applicableDefault = isQuarterly ? defaultSchoolRate : defaultMonthlyRate;
           const feeAmt = studentCustomRate > 0 ? studentCustomRate : applicableDefault;
 
           const paidMonthsList = Array.isArray(s.paid_months) ? s.paid_months : (Array.isArray(s.paidMonths) ? s.paidMonths : []);
           const initialPaid = parseInt(s.initialPaidAmount ?? s.initial_paid_amount ?? 0);
 
-          // Check if active month (e.g. 'September') is explicitly in paid_months
-          const isMonthPaidInList = paidMonthsList.some(m => m.toLowerCase().includes(activeMonth.toLowerCase()));
+          let paidAmt = initialPaid;
+          let pendingAmt = Math.max(0, feeAmt - initialPaid);
+          let calculatedStatus = s.fee_status || s.feeStatus || (pendingAmt === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending');
 
-          // For the baseline kickoff month (August 2026): initial paid covers August
-          const isAugustCovered = (activeMonth.toLowerCase() === 'august' && initialPaid >= feeAmt);
+          if (selectedMonth !== 'All') {
+            const targetMonthLow = selectedMonth.toLowerCase();
+            const isMonthInPaidList = paidMonthsList.some(m => m.toLowerCase().includes(targetMonthLow));
+            const isAugustCovered = (targetMonthLow === 'august' && (initialPaid >= feeAmt || String(s.fee_status).toLowerCase() === 'paid'));
+            const isQuarterCovered = isQuarterly && (isMonthInPaidList || (initialPaid >= feeAmt && ['august', 'september', 'october'].includes(targetMonthLow)));
 
-          // For quarterly (School Batch): covers 3 months (August, September, October) if school fee paid
-          const isQuarterlyCovered = isQuarterly && (isMonthPaidInList || (initialPaid >= feeAmt && ['august', 'september', 'october'].includes(activeMonth.toLowerCase())));
-
-          const isFullyPaidForMonth = isMonthPaidInList || isAugustCovered || isQuarterlyCovered;
-
-          const paidAmtForMonth = isFullyPaidForMonth ? feeAmt : (activeMonth.toLowerCase() === 'august' ? initialPaid : 0);
-          const pendingAmtForMonth = isFullyPaidForMonth ? 0 : Math.max(0, feeAmt - paidAmtForMonth);
-
-          const calculatedStatus = isFullyPaidForMonth ? 'Paid' : (paidAmtForMonth > 0 ? 'Partial' : 'Pending');
+            const isCovered = isMonthInPaidList || isAugustCovered || isQuarterCovered;
+            if (isCovered) {
+              paidAmt = feeAmt;
+              pendingAmt = 0;
+              calculatedStatus = 'Paid';
+            } else if (targetMonthLow === 'august') {
+              paidAmt = initialPaid;
+              pendingAmt = Math.max(0, feeAmt - initialPaid);
+              calculatedStatus = pendingAmt === 0 ? 'Paid' : (paidAmt > 0 ? 'Partial' : 'Pending');
+            } else {
+              paidAmt = 0;
+              pendingAmt = feeAmt;
+              calculatedStatus = 'Pending';
+            }
+          }
 
           const rawAdmFee = s.admissionFee !== undefined ? parseInt(s.admissionFee) : (s.admission_fee !== undefined ? parseInt(s.admission_fee) : defaultAdmSetting);
           const admFee = isAcademyAdmFree ? 0 : (isNaN(rawAdmFee) ? 1000 : rawAdmFee);
@@ -165,11 +173,11 @@ export default function FeeManagement() {
             },
             billing_plan: isQuarterly ? 'QUARTERLY' : 'MONTHLY',
             is_quarterly: isQuarterly,
-            month: activeMonth,
+            month: selectedMonth === 'All' ? 'Current Cycle' : selectedMonth,
             year: 2026,
             amount: feeAmt,
-            paid_amount: paidAmtForMonth,
-            pending_amount: pendingAmtForMonth,
+            paid_amount: paidAmt,
+            pending_amount: pendingAmt,
             admission_pending: admPending,
             status: calculatedStatus,
             receipt_no: `REC-${s.admissionNo || s.admission_no || 'BAMA-2026'}`
