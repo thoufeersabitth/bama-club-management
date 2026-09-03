@@ -155,6 +155,20 @@ export default function FeeManagement() {
     return pendingMonths;
   };
 
+  // Accurately resolve which month's receipt or reminder is being handled
+  const resolveFeeMonth = (f) => {
+    if (!f) return 'August';
+    if (selectedMonth && selectedMonth !== 'All') return selectedMonth;
+    if (f.month && f.month !== 'Current Cycle' && f.month !== 'All') return f.month;
+    const std = f.student_detail || {};
+    const paidList = Array.isArray(std.paid_months) ? std.paid_months : (Array.isArray(std.paidMonths) ? std.paidMonths : []);
+    if (paidList.length > 0) {
+      const lastPaid = paidList[paidList.length - 1];
+      return String(lastPaid).replace(/\s*2026/g, '').trim();
+    }
+    return 'August';
+  };
+
   // Build 100% Dynamic Fee Invoices directly from Student Management Roster & Global Fee Settings
   useEffect(() => {
     const loadDynamicFees = () => {
@@ -425,7 +439,7 @@ export default function FeeManagement() {
     const admPendingAmt = getAdmissionPendingAmount(fee);
     const parentName = std.guardianName || std.guardian_name || 'Parent';
     const cadetName = std.name || std.student_name || 'Cadet';
-    const activeMonthName = fee.month || selectedMonth === 'All' ? 'September' : selectedMonth;
+    const activeMonthName = resolveFeeMonth(fee);
     const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
 
     let text = '';
@@ -1635,7 +1649,7 @@ export default function FeeManagement() {
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2">
                 <span className="text-gray-500 font-medium">Billing Month:</span>
-                <strong className="text-gray-900 font-black">{activeReceipt.month || 'September'} {activeReceipt.year || 2026}</strong>
+                <strong className="text-gray-900 font-black">{resolveFeeMonth(activeReceipt)} {activeReceipt.year || 2026}</strong>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2 bg-emerald-50/60 p-2.5 rounded-xl">
                 <span className="text-emerald-800 font-bold">Total Paid:</span>
