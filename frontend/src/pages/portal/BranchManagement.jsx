@@ -31,6 +31,7 @@ export default function BranchManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editBranch, setEditBranch] = useState(null);
   const [savingBranch, setSavingBranch] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState(null);
 
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [editShift, setEditShift] = useState(null);
@@ -172,6 +173,7 @@ export default function BranchManagement() {
   const handleCreateOrUpdateBranch = async (e) => {
     e.preventDefault();
     setSavingBranch(true);
+    setBannerMessage(null);
     try {
       const facilityArray = typeof formData.facilities === 'string'
         ? formData.facilities.split(',').map(f => f.trim()).filter(Boolean)
@@ -191,7 +193,16 @@ export default function BranchManagement() {
         };
         updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
         updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
+        setBannerMessage({ type: 'success', text: `Branch "${formData.name}" updated successfully!` });
       } else {
+        // Prevent duplicate branch names (case-insensitive)
+        const nameDuplicate = branches.find(b => b.name?.trim().toLowerCase() === formData.name?.trim().toLowerCase());
+        if (nameDuplicate) {
+          alert(`A branch named "${formData.name}" already exists! Please enter a distinct name.`);
+          setSavingBranch(false);
+          return;
+        }
+
         // Ensure a collision-free code
         let bCode = formData.code?.trim();
         const existingCodes = new Set(branches.map(b => String(b.code || '').toUpperCase().trim()));
@@ -210,9 +221,17 @@ export default function BranchManagement() {
           status: 'Active'
         };
         
-        const serverCreated = await createBranchBackend(newB);
-        const finalBranch = serverCreated?.id ? serverCreated : newB;
+        const serverResult = await createBranchBackend(newB);
+        if (serverResult?.error) {
+          alert(`Failed to create branch: ${serverResult.message}`);
+          setBannerMessage({ type: 'error', text: `Failed to create branch: ${serverResult.message}` });
+          setSavingBranch(false);
+          return;
+        }
+
+        const finalBranch = serverResult?.id ? serverResult : newB;
         updatedList = [...branches.filter(b => b.id !== finalBranch.id), finalBranch];
+        setBannerMessage({ type: 'success', text: `Branch "${formData.name}" created successfully (Code: ${bCode})!` });
       }
 
       setBranches(updatedList);
@@ -226,6 +245,8 @@ export default function BranchManagement() {
       resetForm();
     } catch (err) {
       console.error('Failed to save branch:', err);
+      alert(`Error saving branch: ${err.message || 'Unknown error'}`);
+      setBannerMessage({ type: 'error', text: `Error: ${err.message || 'Unknown error'}` });
     } finally {
       setSavingBranch(false);
     }
@@ -528,6 +549,27 @@ export default function BranchManagement() {
           </button>
         </div>
       </div>
+
+      {/* Action / Notification Banner */}
+      {bannerMessage && (
+        <div className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs font-bold transition animate-in fade-in slide-in-from-top-2 ${
+          bannerMessage.type === 'error'
+            ? 'bg-red-50 text-red-800 border-red-200'
+            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="text-base">{bannerMessage.type === 'error' ? '⚠️' : '✅'}</span>
+            <span>{bannerMessage.text}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBannerMessage(null)}
+            className="p-1 hover:bg-black/5 rounded-lg cursor-pointer text-gray-500 hover:text-gray-900"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

@@ -965,11 +965,11 @@ export const createBranchBackend = async (branchData) => {
   try {
     const payload = {
       name: branchData.name || 'New Dojo Branch',
-      code: branchData.code || `BAMA-DOJO-${Math.floor(10 + Math.random() * 90)}`,
+      code: branchData.code || generateUniqueBranchCode([]),
       address: branchData.address || 'Kerala, India',
-      phone: branchData.phone || '+91 9544085442',
-      whatsapp: branchData.whatsapp || branchData.phone || '+91 9544085442',
-      email: branchData.email || '',
+      phone: (branchData.phone || '+91 9544085442').slice(0, 20),
+      whatsapp: (branchData.whatsapp || branchData.phone || '+91 9544085442').slice(0, 20),
+      email: branchData.email?.trim() || '',
       branch_head: branchData.branch_head || branchData.head || 'Sensei Abdul Rahman (5th Dan)',
       is_head_office: !!branchData.isHeadOffice,
       timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
@@ -982,12 +982,23 @@ export const createBranchBackend = async (branchData) => {
     });
     if (res.ok) {
       const serverData = await res.json();
-      return { ...branchData, ...serverData };
+      return { success: true, ...branchData, ...serverData };
+    } else {
+      const errText = await res.text();
+      let errMsg = errText;
+      try {
+        const errJson = JSON.parse(errText);
+        errMsg = Object.entries(errJson)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+          .join(' | ');
+      } catch (e) {}
+      console.error('Failed to create branch on backend:', res.status, errMsg);
+      return { error: true, message: errMsg, ...branchData };
     }
   } catch (err) {
     console.error('Failed to create branch on backend:', err);
+    return { error: true, message: err.message, ...branchData };
   }
-  return branchData;
 };
 
 export const updateBranchBackend = async (id, branchData) => {
