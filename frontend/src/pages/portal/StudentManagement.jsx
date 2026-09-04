@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users, Search, Filter, Plus, QrCode, Edit, Eye, Trash2,
   X, Check, Shield, Award, MapPin, Phone, Mail, FileText,
@@ -137,10 +138,12 @@ const getActiveShiftOptions = (branchName = '') => {
 };
 
 export default function StudentManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const branchFromUrl = searchParams.get('branch');
   const [students, setStudents] = useState(getStoredStudents);
   const [search, setSearch] = useState('');
   const [selectedBelt, setSelectedBelt] = useState('ALL');
-  const [selectedBranch, setSelectedBranch] = useState('ALL');
+  const [selectedBranch, setSelectedBranch] = useState(() => branchFromUrl || 'ALL');
   const [selectedProgram, setSelectedProgram] = useState('ALL');
   const [selectedShift, setSelectedShift] = useState('ALL');
   const [selectedBillingPlan, setSelectedBillingPlan] = useState('ALL');
@@ -337,6 +340,14 @@ export default function StudentManagement() {
       document.removeEventListener('visibilitychange', loadRoster);
     };
   }, [user, activeBranch]);
+
+  // Sync selectedBranch if URL search parameter 'branch' changes
+  useEffect(() => {
+    const bParam = searchParams.get('branch');
+    if (bParam && bParam !== selectedBranch) {
+      setSelectedBranch(bParam);
+    }
+  }, [searchParams]);
 
   // Handle Photo Pick for New Cadet Form
   const handleAddPhotoPick = (e) => {
@@ -2566,7 +2577,19 @@ export default function StudentManagement() {
               <span className="text-[11px] whitespace-nowrap">Branch:</span>
               <select
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedBranch(val);
+                  setSearchParams(prev => {
+                    const next = new URLSearchParams(prev);
+                    if (val && val !== 'ALL') {
+                      next.set('branch', val);
+                    } else {
+                      next.delete('branch');
+                    }
+                    return next;
+                  }, { replace: true });
+                }}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition shadow-sm truncate"
               >
                 <option value="ALL">All Branches</option>

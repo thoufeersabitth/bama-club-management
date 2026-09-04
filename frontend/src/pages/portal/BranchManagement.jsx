@@ -25,6 +25,7 @@ export default function BranchManagement() {
   
   const [activeTab, setActiveTab] = useState('BRANCHES'); // 'BRANCHES' | 'SCHEDULES'
   const [search, setSearch] = useState('');
+  const [scheduleBranchFilter, setScheduleBranchFilter] = useState('ALL');
 
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
@@ -34,6 +35,22 @@ export default function BranchManagement() {
   const [editShift, setEditShift] = useState(null);
   const [viewShiftDetails, setViewShiftDetails] = useState(null);
   const [shiftRosterSearch, setShiftRosterSearch] = useState('');
+
+  // Roster Modal State
+  const [rosterModal, setRosterModal] = useState({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    branchName: '',
+    cadets: []
+  });
+  const [rosterSearch, setRosterSearch] = useState('');
+
+  // Interactive Multi-Shift Builder Input in Branch Modal
+  const [customShiftInput, setCustomShiftInput] = useState({
+    days: 'Mon, Wed, Fri',
+    time: '5:00 PM - 7:00 PM'
+  });
 
   // Branch Form Data
   const [formData, setFormData] = useState({
@@ -320,18 +337,47 @@ export default function BranchManagement() {
 
   const filteredSchedules = schedules.filter(s => {
     const q = search.toLowerCase();
-    return (
+    const matchesSearch = (
       (s.name || '').toLowerCase().includes(q) ||
       (s.branch || '').toLowerCase().includes(q) ||
       (s.instructor || '').toLowerCase().includes(q) ||
-      (s.days || '').toLowerCase().includes(q)
+      (s.days || '').toLowerCase().includes(q) ||
+      (s.time || '').toLowerCase().includes(q)
     );
+    if (!matchesSearch) return false;
+    if (scheduleBranchFilter && scheduleBranchFilter !== 'ALL') {
+      const sBranch = String(s.branch || s.branch_name || '').toLowerCase().trim();
+      const targetB = String(scheduleBranchFilter).toLowerCase().trim();
+      return sBranch === targetB || sBranch.includes(targetB) || targetB.includes(sBranch);
+    }
+    return true;
   });
 
-  // Calculate cadet count per branch with 100% Bulletproof Fuzzy Matching
-  // Calculate cadet count per branch with 100% Exact & Disambiguated Matching
-  const getBranchCadetCount = (b) => {
-    if (!b) return 0;
+  // Parse timings string to individual slots array
+  const getBranchTimingSlots = (timingsStr) => {
+    if (!timingsStr || String(timingsStr).trim() === '') return [];
+    return String(timingsStr).split('|').map(s => s.trim()).filter(Boolean);
+  };
+
+  const handleAddShiftToBranchForm = (slotToAdd) => {
+    if (!slotToAdd || !slotToAdd.trim()) return;
+    const cleanSlot = slotToAdd.trim();
+    const currentSlots = getBranchTimingSlots(formData.timings);
+    if (!currentSlots.includes(cleanSlot)) {
+      const updated = [...currentSlots, cleanSlot];
+      setFormData(prev => ({ ...prev, timings: updated.join(' | ') }));
+    }
+  };
+
+  const handleRemoveShiftFromBranchForm = (slotToRemove) => {
+    const currentSlots = getBranchTimingSlots(formData.timings);
+    const updated = currentSlots.filter(s => s !== slotToRemove);
+    setFormData(prev => ({ ...prev, timings: updated.join(' | ') }));
+  };
+
+  // Bulletproof cadet resolution for Branch or Shift Batch
+  const getBranchCadets = (b, shiftFilter = null) => {
+    if (!b) return [];
     let roster = studentsList;
     if (!roster || roster.length === 0) {
       try {
@@ -339,13 +385,14 @@ export default function BranchManagement() {
         if (saved) roster = JSON.parse(saved);
       } catch (e) {}
     }
-    if (!roster || !Array.isArray(roster) || roster.length === 0) return 0;
+    if (!roster || !Array.isArray(roster) || roster.length === 0) return [];
 
-    const bName = String(b.name || (typeof b === 'string' ? b : '')).toLowerCase().trim();
-    const bId = String(b.id || '').toLowerCase().trim();
-    const bCode = String(b.code || '').toLowerCase().trim();
+    const bObj = typeof b === 'object' ? b : branches.find(br => br.name === b || br.id === b) || { name: String(b) };
+    const bName = String(bObj.name || (typeof b === 'string' ? b : '')).toLowerCase().trim();
+    const bId = String(bObj.id || '').toLowerCase().trim();
+    const bCode = String(bObj.code || '').toLowerCase().trim();
 
-    return roster.filter(s => {
+    const branchCadets = roster.filter(s => {
       const sBranchId = String(s.branch_id || (typeof s.branch === 'object' ? s.branch?.id : '') || s.branch_detail?.id || '').toLowerCase().trim();
       const sBranchName = String(s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_detail?.name || '').toLowerCase().trim();
 
@@ -384,7 +431,46 @@ export default function BranchManagement() {
       }
 
       return false;
-    }).length;
+    });
+
+    if (shiftFilter && String(shiftFilter).trim() !== '') {
+      const sFilterLow = String(shiftFilter).toLowerCase().trim();
+      return branchCadets.filter(s => {
+        const sShift = String(s.shift || '').toLowerCase().trim();
+        if (!sShift) return false;
+        return sShift.includes(sFilterLow) || sFilterLow.includes(sShift);
+      });
+    }
+
+    return branchCadets;
+  };
+
+  const getBranchCadetCount = (b) => {
+    return getBranchCadets(b).length;
+  };
+
+  const openBranchCadetsRoster = (b) => {
+    const list = getBranchCadets(b);
+    setRosterModal({
+      isOpen: true,
+      title: b.name,
+      subtitle: `Chief Sensei: ${b.branch_head || 'Sensei Abdul Rahman (5th Dan)'} • Total Enrolled: ${list.length} Cadets`,
+      branchName: b.name,
+      cadets: list
+    });
+    setRosterSearch('');
+  };
+
+  const openShiftCadetsRoster = (sch) => {
+    const list = getBranchCadets(sch.branch, sch.time || sch.name);
+    setRosterModal({
+      isOpen: true,
+      title: `${sch.name || 'Training Shift'} (${sch.branch})`,
+      subtitle: `Timings: ${sch.time || sch.days} • Sensei: ${sch.instructor || 'Instructor'} • Enrolled: ${list.length} Cadets`,
+      branchName: sch.branch,
+      cadets: list
+    });
+    setRosterSearch('');
   };
 
   return (
@@ -565,15 +651,25 @@ export default function BranchManagement() {
                     <span className="text-gray-700 font-bold flex items-center gap-1.5">
                       <Users className="w-4 h-4 text-red-600" /> Enrolled Cadets:
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/portal/students?branch=${encodeURIComponent(b.name)}`)}
-                      className="text-xs font-black text-red-700 bg-white px-3 py-1 rounded-xl border border-red-200 shadow-xs hover:bg-red-600 hover:text-white transition flex items-center gap-1 cursor-pointer"
-                      title="Click to view all enrolled cadets in this branch"
-                    >
-                      <span>{cadetCount} Cadets</span>
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openBranchCadetsRoster(b)}
+                        className="text-xs font-black text-red-700 bg-white px-3 py-1 rounded-xl border border-red-200 shadow-xs hover:bg-red-600 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+                        title="Quick view enrolled cadets in this branch"
+                      >
+                        <span>{cadetCount} Cadets</span>
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/portal/students?branch=${encodeURIComponent(b.name)}`)}
+                        className="p-1 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-xl transition cursor-pointer"
+                        title="Open full Student Directory filtered to this branch"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Contact & Address Box */}
@@ -586,10 +682,46 @@ export default function BranchManagement() {
                       <Phone className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
                       <span className="font-mono font-bold text-gray-900">{b.phone || '+91 95440 85442'}</span>
                     </p>
-                    <p className="flex items-start gap-2 pt-1 border-t border-gray-200/80">
-                      <Clock className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <span className="font-medium text-gray-800">{b.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM'}</span>
-                    </p>
+
+                    {/* Active Batches & Shift Slots */}
+                    <div className="pt-2 border-t border-gray-200/80 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-amber-600" /> Active Batches / Shifts:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShiftData({
+                              name: '',
+                              program: 'Karate (Shotokan)',
+                              branch: b.name,
+                              days: 'Mon, Wed, Fri',
+                              time: '5:00 PM - 7:00 PM',
+                              instructor: b.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+                              targetGroup: 'All Belts & Cadets'
+                            });
+                            setEditShift(null);
+                            setShowShiftModal(true);
+                          }}
+                          className="text-[10px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer flex items-center gap-0.5"
+                        >
+                          <Plus className="w-3 h-3" /> Add Batch
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {getBranchTimingSlots(b.timings).map((slot, sIdx) => (
+                          <span
+                            key={sIdx}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-amber-300 text-amber-900 font-bold text-[11px] rounded-xl shadow-2xs"
+                          >
+                            <Clock className="w-3 h-3 text-amber-600 flex-shrink-0" />
+                            <span>{slot}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Facilities Badges */}
@@ -644,15 +776,95 @@ export default function BranchManagement() {
 
       {/* TAB 2: TRAINING SHIFT SCHEDULES & BATCH TIMINGS */}
       {activeTab === 'SCHEDULES' && (
-        <>
+        <div className="space-y-4">
+          {/* Branch Filter Pills Navigation */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setScheduleBranchFilter('ALL')}
+              className={`px-3.5 py-1.5 rounded-xl font-black text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                scheduleBranchFilter === 'ALL'
+                  ? 'bg-red-600 text-white shadow-sm'
+                  : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+              }`}
+            >
+              <span>All Branches</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${scheduleBranchFilter === 'ALL' ? 'bg-red-700 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                {schedules.length}
+              </span>
+            </button>
+
+            {branches.map(b => {
+              const bShiftCount = schedules.filter(s => {
+                const sB = String(s.branch || s.branch_name || '').toLowerCase().trim();
+                const bN = String(b.name || '').toLowerCase().trim();
+                return sB === bN || sB.includes(bN) || bN.includes(sB);
+              }).length;
+
+              const isSel = scheduleBranchFilter === b.name;
+              return (
+                <button
+                  key={b.id || b.name}
+                  type="button"
+                  onClick={() => setScheduleBranchFilter(b.name)}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                    isSel
+                      ? 'bg-amber-500 text-black font-black shadow-sm'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  <span>{b.name}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isSel ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                    {bShiftCount}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Contextual Banner when a branch is selected */}
+          {scheduleBranchFilter !== 'ALL' && (
+            <div className="bg-amber-50 border border-amber-200 p-3 sm:px-4 sm:py-2.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-amber-700 flex-shrink-0" />
+                <span className="font-black text-amber-900">Active Batches for: {scheduleBranchFilter}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditShift(null);
+                  setShiftData({
+                    name: '',
+                    branch: scheduleBranchFilter,
+                    program: 'Karate (Shotokan)',
+                    days: 'Mon, Wed, Fri',
+                    time: '5:00 PM - 7:00 PM',
+                    instructor: branches.find(b => b.name === scheduleBranchFilter)?.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+                    targetGroup: 'All Belts & Cadets'
+                  });
+                  setShowShiftModal(true);
+                }}
+                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer text-xs w-full sm:w-auto"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Batch for this Branch
+              </button>
+            </div>
+          )}
+
           {filteredSchedules.length === 0 ? (
             <div className="bg-white rounded-3xl p-12 text-center border border-gray-200 shadow-sm space-y-3">
               <div className="w-16 h-16 bg-red-50 text-red-600 rounded-3xl flex items-center justify-center mx-auto border border-red-100">
                 <Clock className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-black text-gray-900">No Training Shift Schedules Added Yet</h3>
+              <h3 className="text-base font-black text-gray-900">
+                {scheduleBranchFilter !== 'ALL'
+                  ? `No Batches Found for ${scheduleBranchFilter}`
+                  : 'No Training Shift Schedules Added Yet'}
+              </h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                Only the batch shifts and timings you explicitly add will be displayed here. Click the button below to add your first batch shift!
+                {scheduleBranchFilter !== 'ALL'
+                  ? `Click the button below to add the first training batch for ${scheduleBranchFilter}.`
+                  : 'Only the batch shifts and timings you explicitly add will be displayed here.'}
               </p>
               <button
                 type="button"
@@ -660,10 +872,10 @@ export default function BranchManagement() {
                   setEditShift(null);
                   setShiftData({
                     name: '',
-                    branch: branches[0]?.name || 'Pulikkal Branch (Head Office)',
+                    branch: scheduleBranchFilter !== 'ALL' ? scheduleBranchFilter : (branches[0]?.name || 'Pulikkal Branch (Head Office)'),
                     days: 'Mon, Wed, Fri',
                     time: '5:00 PM - 7:00 PM',
-                    instructor: 'Sensei Abdul Rahman (5th Dan)',
+                    instructor: (scheduleBranchFilter !== 'ALL' && branches.find(b => b.name === scheduleBranchFilter)?.branch_head) || 'Sensei Abdul Rahman (5th Dan)',
                     targetGroup: 'All Belts & Cadets'
                   });
                   setShowShiftModal(true);
@@ -676,21 +888,7 @@ export default function BranchManagement() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredSchedules.map((sch) => {
-                const shiftCadetCount = (() => {
-                  if (!studentsList || studentsList.length === 0) return 0;
-                  const schBranch = String(sch.branch || '').toLowerCase().trim();
-                  const schTime = String(sch.time || '').toLowerCase().trim();
-                  const schName = String(sch.name || '').toLowerCase().trim();
-
-                  return studentsList.filter(s => {
-                    const sBranch = String(s.branch_name || s.branch || s.branch_detail?.name || '').toLowerCase().trim();
-                    const bMatch = sBranch === schBranch || (schBranch.length > 3 && sBranch.includes(schBranch)) || (sBranch.length > 3 && schBranch.includes(sBranch));
-                    if (!bMatch) return false;
-                    const sShift = String(s.shift || '').toLowerCase().trim();
-                    if (!sShift) return true;
-                    return sShift.includes(schTime) || schTime.includes(sShift) || sShift.includes(schName);
-                  }).length;
-                })();
+                const shiftCadetCount = getBranchCadets(sch.branch, sch.time || sch.name).length;
 
                 return (
                   <div
@@ -703,7 +901,7 @@ export default function BranchManagement() {
                           {sch.branch}
                         </span>
                         <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[10px] rounded-full">
-                          {sch.status}
+                          {sch.status || 'Active'}
                         </span>
                       </div>
 
@@ -720,15 +918,25 @@ export default function BranchManagement() {
                         <span className="text-gray-700 font-bold flex items-center gap-1.5">
                           <Users className="w-4 h-4 text-amber-600" /> Enrolled Cadets:
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/portal/students?branch=${encodeURIComponent(sch.branch)}`)}
-                          className="text-xs font-black text-amber-800 bg-white px-3 py-1 rounded-xl border border-amber-300 shadow-xs hover:bg-amber-600 hover:text-white transition flex items-center gap-1 cursor-pointer"
-                          title="Click to view all enrolled cadets in this batch"
-                        >
-                          <span>{shiftCadetCount} Cadets</span>
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openShiftCadetsRoster(sch)}
+                            className="text-xs font-black text-amber-800 bg-white px-3 py-1 rounded-xl border border-amber-300 shadow-xs hover:bg-amber-600 hover:text-white transition flex items-center gap-1 cursor-pointer"
+                            title="Click to view all enrolled cadets in this batch"
+                          >
+                            <span>{shiftCadetCount} Cadets</span>
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/portal/students?branch=${encodeURIComponent(sch.branch)}`)}
+                            className="p-1 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl transition cursor-pointer"
+                            title="Open in full Student Directory"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 space-y-2 text-xs">
@@ -769,14 +977,14 @@ export default function BranchManagement() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-</div>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* MODAL: Create / Edit Branch Dojo */}
@@ -904,46 +1112,122 @@ export default function BranchManagement() {
                 />
               </div>
 
-              {/* Training Batch Shift Timings */}
-              <div className="space-y-1.5 bg-amber-50/50 p-3.5 rounded-2xl border border-amber-200">
-                <label className="text-gray-800 font-bold flex items-center justify-between">
-                  <span>Training Batch Shift Timings *</span>
-                  <span className="text-[10px] text-amber-800 font-black bg-amber-100 px-2 py-0.5 rounded border border-amber-300">⚡ Multi-Shift Supported</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Mon, Wed, Fri: 5:00 PM - 7:00 PM | Sat & Sun: 7:00 AM - 9:00 AM"
-                  value={formData.timings}
-                  onChange={(e) => setFormData({ ...formData, timings: e.target.value })}
-                  className="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2 text-gray-900 font-bold focus:outline-none focus:border-red-500 shadow-xs text-xs sm:text-sm mb-1"
-                />
-                
-                {/* ⚡ Quick Preset Shift Chips */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-[10px] text-gray-500 font-bold self-center">⚡ Add Presets:</span>
-                  {[
-                    'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
-                    'Mon, Wed, Fri: 6:00 AM - 7:30 AM',
-                    'Tue, Thu, Sat: 5:30 PM - 7:30 PM',
-                    'Sat & Sun: 7:00 AM - 9:00 AM',
-                    'Mon - Fri: 4:00 PM - 5:00 PM'
-                  ].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => {
-                        if (!formData.timings || formData.timings === 'Mon, Wed, Fri: 5:00 PM - 7:00 PM') {
-                          setFormData({ ...formData, timings: preset });
-                        } else if (!formData.timings.includes(preset)) {
-                          setFormData({ ...formData, timings: `${formData.timings} | ${preset}` });
-                        }
-                      }}
-                      className="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-lg border border-red-200 transition cursor-pointer"
-                    >
-                      + {preset}
-                    </button>
-                  ))}
+              {/* Training Batch Shift Timings - Interactive Multi-Shift Batch Builder */}
+              <div className="space-y-3 bg-gradient-to-br from-amber-50/70 to-orange-50/40 p-4 rounded-2xl border-2 border-amber-300 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <label className="text-gray-900 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                    <Clock className="w-4 h-4 text-amber-600" /> Branch Training Shifts & Batches *
+                  </label>
+                  <span className="text-[10px] text-amber-900 font-bold bg-amber-200/80 px-2 py-0.5 rounded-full border border-amber-300">
+                    {getBranchTimingSlots(formData.timings).length} Batches Added
+                  </span>
+                </div>
+
+                {/* 1. Visual Active Shift Cards List */}
+                <div className="space-y-1.5">
+                  {getBranchTimingSlots(formData.timings).length === 0 ? (
+                    <div className="p-3 bg-white/80 rounded-xl border border-dashed border-amber-300 text-center text-xs text-gray-500">
+                      No training shifts added yet. Pick a preset below or add a custom shift.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+                      {getBranchTimingSlots(formData.timings).map((slot, sIdx) => (
+                        <div
+                          key={sIdx}
+                          className="flex items-center justify-between gap-2 p-2.5 bg-white border border-amber-300 rounded-xl shadow-2xs group hover:border-red-300 transition"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                              {sIdx + 1}
+                            </span>
+                            <span className="text-xs font-bold text-gray-900 truncate">
+                              {slot}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveShiftFromBranchForm(slot)}
+                            className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer flex-shrink-0"
+                            title="Remove this training shift"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Quick 1-Click Preset Batches */}
+                <div className="pt-2 border-t border-amber-200/70 space-y-1.5">
+                  <span className="text-[10px] text-gray-600 font-bold block uppercase tracking-wider">
+                    ⚡ Quick 1-Click Batch Presets:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
+                      'Mon, Wed, Fri: 6:00 AM - 7:30 AM',
+                      'Tue, Thu, Sat: 5:30 PM - 7:30 PM',
+                      'Sat & Sun: 7:00 AM - 9:00 AM',
+                      'Mon - Fri: 4:00 PM - 5:00 PM'
+                    ].map((preset) => {
+                      const isAdded = getBranchTimingSlots(formData.timings).includes(preset);
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          disabled={isAdded}
+                          onClick={() => handleAddShiftToBranchForm(preset)}
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border transition flex items-center gap-1 cursor-pointer ${
+                            isAdded
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 opacity-60 cursor-default'
+                              : 'bg-white hover:bg-amber-100 text-amber-900 border-amber-300 shadow-2xs'
+                          }`}
+                        >
+                          {isAdded ? <Check className="w-3 h-3 text-emerald-600" /> : <Plus className="w-3 h-3 text-amber-600" />}
+                          <span>{preset}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Add Custom Shift Adder Form */}
+                <div className="pt-2 border-t border-amber-200/70 space-y-2">
+                  <span className="text-[10px] text-gray-600 font-bold block uppercase tracking-wider">
+                    + Add Custom Shift Timing:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Days (e.g. Mon, Wed, Fri)"
+                        value={customShiftInput.days}
+                        onChange={(e) => setCustomShiftInput({ ...customShiftInput, days: e.target.value })}
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 font-bold focus:outline-none focus:border-red-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Time (e.g. 5:00 PM - 7:00 PM)"
+                        value={customShiftInput.time}
+                        onChange={(e) => setCustomShiftInput({ ...customShiftInput, time: e.target.value })}
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-gray-900 font-bold focus:outline-none focus:border-red-500 shadow-2xs"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customShiftInput.days && customShiftInput.time) {
+                        handleAddShiftToBranchForm(`${customShiftInput.days.trim()}: ${customShiftInput.time.trim()}`);
+                      }
+                    }}
+                    className="w-full py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Shift to this Branch
+                  </button>
                 </div>
               </div>
 
@@ -1157,6 +1441,151 @@ export default function BranchManagement() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Branch / Shift Cadets Roster */}
+      {rosterModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl bg-white rounded-3xl border border-gray-200 shadow-2xl relative flex flex-col max-h-[88vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="p-5 sm:px-6 sm:py-4 border-b border-gray-100 flex items-center justify-between bg-white z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-50 text-red-600 border border-red-200 rounded-xl flex items-center justify-center shadow-xs flex-shrink-0">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 leading-tight">
+                    {rosterModal.title}
+                  </h3>
+                  <p className="text-[11px] text-gray-500 font-medium">
+                    {rosterModal.subtitle}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRosterModal({ ...rosterModal, isOpen: false })}
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-900 flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search & Actions Bar */}
+            <div className="p-4 border-b border-gray-100 bg-gray-50/70 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-xs">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Search cadet by name, phone, admission no..."
+                  value={rosterSearch}
+                  onChange={(e) => setRosterSearch(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 transition font-medium"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRosterModal({ ...rosterModal, isOpen: false });
+                  navigate(`/portal/students?branch=${encodeURIComponent(rosterModal.branchName)}`);
+                }}
+                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <span>Open in Full Cadet Directory</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Cadets List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {(() => {
+                const filteredList = rosterModal.cadets.filter(c => {
+                  const q = rosterSearch.toLowerCase();
+                  return (
+                    (c.name || c.student_name || '').toLowerCase().includes(q) ||
+                    (c.admissionNumber || c.admission_number || '').toLowerCase().includes(q) ||
+                    (c.phone || '').includes(q) ||
+                    (c.currentBelt || c.current_belt || '').toLowerCase().includes(q)
+                  );
+                });
+
+                if (filteredList.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-gray-400 text-xs">
+                      No cadets found matching your search.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="divide-y divide-gray-100 border border-gray-200 rounded-2xl overflow-hidden">
+                    {filteredList.map((cadet, idx) => (
+                      <div
+                        key={cadet.id || idx}
+                        className="p-3 bg-white hover:bg-gray-50 flex items-center justify-between gap-3 transition"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={cadet.photo || '/assets/prog_adults.jpg'}
+                            alt={cadet.name}
+                            className="w-9 h-9 rounded-xl object-cover border border-gray-200 flex-shrink-0"
+                            onError={(e) => { e.target.src = '/assets/prog_adults.jpg'; }}
+                          />
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-black text-gray-900 truncate">
+                              {cadet.name || cadet.student_name}
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 font-medium">
+                              <span className="font-mono bg-gray-100 px-1 rounded">{cadet.admissionNumber || cadet.admission_number || 'N/A'}</span>
+                              <span>•</span>
+                              <span className="text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                {cadet.currentBelt || cadet.current_belt || 'White Belt'}
+                              </span>
+                              <span>•</span>
+                              <span className="text-gray-600 truncate">{cadet.shift || 'Regular Shift'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            (cadet.feeStatus || cadet.fee_status) === 'Paid'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border border-rose-200'
+                          }`}>
+                            {(cadet.feeStatus || cadet.fee_status) === 'Paid' ? 'Paid' : 'Dues'}
+                          </span>
+                          {cadet.phone && (
+                            <button
+                              type="button"
+                              onClick={() => openWhatsApp(cadet.phone, `Hello from B.A.M.A Academy!`)}
+                              className="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-lg border border-emerald-200 transition cursor-pointer"
+                              title="Message Parent on WhatsApp"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 sm:px-6 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+              <span className="font-bold">Total Cadets: {rosterModal.cadets.length}</span>
+              <button
+                type="button"
+                onClick={() => setRosterModal({ ...rosterModal, isOpen: false })}
+                className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
