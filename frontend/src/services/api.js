@@ -1048,28 +1048,32 @@ export const deleteBranchBackend = async (id, branchName = '') => {
 
   try {
     if (typeof id === 'string' && id.length > 20) {
-      await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
+      const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
         method: 'DELETE'
       });
-    } else {
-      const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        const serverBranches = data.results || (Array.isArray(data) ? data : []);
-        const match = serverBranches.find(b => 
-          String(b.id) === String(id) || 
-          (branchName && String(b.name || '').toLowerCase().trim() === String(branchName).toLowerCase().trim())
-        );
-        if (match && match.id) {
-          await fetch(`https://bama-club-backend.fly.dev/api/branches/${match.id}/`, {
-            method: 'DELETE'
-          });
-        }
+      if (res.ok || res.status === 204) {
+        return { success: true };
+      }
+    }
+
+    const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      const serverBranches = data.results || (Array.isArray(data) ? data : []);
+      const match = serverBranches.find(b => 
+        String(b.id) === String(id) || 
+        (branchName && String(b.name || '').toLowerCase().trim() === String(branchName).toLowerCase().trim())
+      );
+      if (match && match.id) {
+        await fetch(`https://bama-club-backend.fly.dev/api/branches/${match.id}/`, {
+          method: 'DELETE'
+        });
       }
     }
   } catch (err) {
     console.error('Failed to delete branch on backend:', err);
   }
+  return { success: true };
 };
 
 export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {

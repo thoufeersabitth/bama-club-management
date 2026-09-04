@@ -1026,7 +1026,26 @@ export default function StudentManagement() {
     let matchesBranch = true;
 
     if (scopeLower && !scopeLower.includes('all')) {
-      if (scopeLower.includes('kick boxing') || scopeLower.includes('boxing pulikkal')) {
+      const targetBranchObj = (branchesList || []).find(b => 
+        String(b.id || '').toLowerCase().trim() === scopeLower ||
+        String(b.code || '').toLowerCase().trim() === scopeLower ||
+        String(b.name || '').toLowerCase().trim() === scopeLower
+      );
+
+      if (targetBranchObj) {
+        const isHeadOffice = !!(targetBranchObj.is_head_office || targetBranchObj.isHeadOffice || targetBranchObj.code === 'PLK-01');
+        if (isHeadOffice) {
+          matchesBranch = (cadetBranchKey === 'pulikkal');
+        } else {
+          const targetId = String(targetBranchObj.id || '').toLowerCase().trim();
+          const targetCode = String(targetBranchObj.code || '').toLowerCase().trim();
+          const targetName = String(targetBranchObj.name || '').toLowerCase().trim();
+          const sId = String(s.branch_id || (typeof s.branch === 'object' ? s.branch?.id : '') || s.branch_detail?.id || '').toLowerCase().trim();
+          const sCode = String(s.branch_code || s.branch_detail?.code || '').toLowerCase().trim();
+          const sName = String(s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_detail?.name || '').toLowerCase().trim();
+          matchesBranch = (targetId && sId && targetId === sId) || (targetCode && sCode && targetCode === sCode) || (targetName && sName && targetName === sName);
+        }
+      } else if (scopeLower.includes('kick boxing') || scopeLower.includes('boxing pulikkal')) {
         matchesBranch = (cadetBranchKey === 'kickboxing_pulikkal');
       } else if (scopeLower.includes('pengad') || scopeLower.includes('btmamups')) {
         matchesBranch = (cadetBranchKey === 'pengad');
@@ -1042,11 +1061,11 @@ export default function StudentManagement() {
         matchesBranch = (cadetBranchKey === 'mongam');
       } else if (scopeLower.includes('feroke') || scopeLower.includes('dojo-04') || scopeLower.includes('5f429f1f')) {
         matchesBranch = (cadetBranchKey === 'feroke');
-      } else if (scopeLower.includes('pulikkal') || scopeLower.includes('plk') || scopeLower.includes('dojo-01') || scopeLower.includes('283e0cc2')) {
+      } else if (scopeLower === 'pulikkal branch (head office)' || scopeLower === 'head office' || scopeLower === 'plk-01') {
         matchesBranch = (cadetBranchKey === 'pulikkal');
       } else {
         const cadetBranchName = String(s.branch_name || s.branch || s.branch_id || '').toLowerCase().trim();
-        matchesBranch = (cadetBranchKey === scopeLower || cadetBranchName.includes(scopeLower) || scopeLower.includes(cadetBranchName) || String(s.branch_id) === String(activeScope));
+        matchesBranch = (cadetBranchKey === scopeLower || cadetBranchName === scopeLower || String(s.branch_id) === String(activeScope));
       }
     }
 
