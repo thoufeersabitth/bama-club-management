@@ -825,7 +825,7 @@ export default function FeeManagement() {
                 className="w-full bg-transparent text-xs text-gray-900 font-bold focus:outline-none cursor-pointer truncate"
               >
                 <option value="All">All Shifts</option>
-                {getDynamicShiftOptions().map(s => (
+                {getDynamicShiftOptions(selectedBranch !== 'All' ? selectedBranch : null, null, branchesList).map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>

@@ -53,8 +53,8 @@ export const SHIFT_OPTIONS = [
   "Custom Shift / Flexible"
 ];
 
-// Helper to resolve active training shift schedules dynamically from Branch Management storage
-export const getDynamicShiftOptions = (branchFilter = null, programFilter = null) => {
+// Helper to resolve active training shift schedules dynamically from Branch timings & custom schedules
+export const getDynamicShiftOptions = (branchFilter = null, programFilter = null, branchesOverride = null) => {
   let customShifts = [];
   try {
     const stored = localStorage.getItem('bama_training_schedules');
@@ -66,92 +66,54 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
     }
   } catch (e) {}
 
-  const resolveBranchName = (bVal) => {
-    if (!bVal) return '';
+  const findBranchObj = (bVal) => {
+    if (!bVal) return null;
+    if (Array.isArray(branchesOverride) && branchesOverride.length > 0) {
+      const found = branchesOverride.find(b => b.id === bVal || b.name === bVal || b.code === bVal);
+      if (found) return found;
+    }
     try {
       const stored = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
       const branches = stored ? JSON.parse(stored) : INITIAL_BRANCHES;
       if (Array.isArray(branches)) {
         const found = branches.find(b => b.id === bVal || b.name === bVal || b.code === bVal);
-        if (found && found.name) return found.name;
+        if (found) return found;
       }
     } catch (e) {}
-    return String(bVal);
+    return null;
   };
 
-  const getBranchKey = (bVal) => {
-    if (!bVal) return '';
-    const resolved = resolveBranchName(bVal);
-    const s = String(resolved).toLowerCase().trim();
-    if (s.includes('pengad') || s.includes('btmamups')) return 'pengad';
-    if (s.includes('chungam') || s.includes('cgm') || s.includes('dojo-02') || s.includes('a9e9ccd7')) return 'chungam';
-    if (s.includes('mongam') || s.includes('dojo-03') || s.includes('d4639193')) return 'mongam';
-    if (s.includes('feroke') || s.includes('dojo-04') || s.includes('67b5ad14')) return 'feroke';
-    if (s.includes('pulikkal') || s.includes('plk') || s.includes('dojo-01') || s.includes('4d04730d') || s.includes('head')) return 'pulikkal';
-    return s;
-  };
-
-  const getStandardProgramShifts = (prog, branchName = '') => {
-    const resolvedName = resolveBranchName(branchName);
-    const pLow = String(prog || '').toLowerCase();
-    const bLow = String(resolvedName || '').toLowerCase();
-    const isSchool = bLow.includes('school') || bLow.includes('pengad') || bLow.includes('btmamups');
-
-    if (isSchool) {
-      return [
-        "School Morning Batch (6:00 AM - 7:30 AM)",
-        "School Evening Karate Batch (5:00 PM - 7:00 PM)",
-        "School Custom Batch (Tue & Thu 4:30 PM - 5:30 PM)",
-        "Boxing Morning Session (6:00 AM - 7:30 AM)",
-        "Kick Boxing Batch (7:00 PM - 8:30 PM)",
-        "Ladies Special Batch (4:00 PM - 5:30 PM)",
-        "Personal Training (1-on-1) (Flexible 1-on-1 Slots)"
-      ];
-    }
-
-    if (pLow.includes('personal')) return [
-      "Personal Training (Flexible 1-on-1 Slots)",
-      "Personal Training Morning (6:00 AM - 7:00 AM)",
-      "Personal Training Evening (8:00 PM - 9:00 PM)"
-    ];
-    if (pLow.includes('ladies')) return [
-      "Ladies Special Batch (4:00 PM - 5:30 PM)",
-      "Ladies Morning Fitness (6:00 AM - 7:15 AM)"
-    ];
-    if (pLow.includes('kick')) return [
-      "Kick Boxing Sparring Batch (7:00 PM - 8:30 PM)",
-      "Kick Boxing Cardio (6:00 AM - 7:30 AM)"
-    ];
-    if (pLow.includes('box')) return [
-      "Boxing Morning Conditioning (6:00 AM - 7:30 AM)",
-      "Boxing Evening Strikes (6:00 PM - 7:30 PM)"
-    ];
-    if (pLow.includes('fitness')) return [
-      "Morning Fitness Conditioning (6:00 AM - 7:30 AM)",
-      "Evening Cardio & Stamina (7:00 PM - 8:30 PM)"
-    ];
-    if (pLow.includes('defense')) return [
-      "Self Defense Practical Workshop",
-      "Practical Defense Evening (6:30 PM - 8:00 PM)"
-    ];
-    
-    return [
-      "Evening Batch (5:00 PM - 7:00 PM)",
-      "Morning Batch (6:00 AM - 7:30 AM)",
-      "Night / Late Evening Batch (7:00 PM - 8:30 PM)",
-      "Weekend Special Batch (Sat & Sun: 7:00 AM - 9:00 AM)",
-      "Kids Special Batch (4:00 PM - 5:00 PM)"
-    ];
+  const resolveBranchName = (bVal) => {
+    const found = findBranchObj(bVal);
+    if (found && found.name) return found.name;
+    return String(bVal || '');
   };
 
   if (branchFilter && branchFilter !== 'All' && branchFilter !== 'ALL') {
-    const targetKey = getBranchKey(branchFilter);
+    const targetBranch = findBranchObj(branchFilter);
     const targetName = resolveBranchName(branchFilter).toLowerCase().trim();
+    const targetId = targetBranch?.id || '';
 
+    const shiftResults = [];
+
+    // 1. Primary Source: The branch's own configured timings from when it was created!
+    if (targetBranch?.timings && String(targetBranch.timings).trim() !== '') {
+      const rawTimings = String(targetBranch.timings).trim();
+      const slots = rawTimings.includes('|') ? rawTimings.split('|').map(x => x.trim()) : [rawTimings];
+      slots.forEach(slot => {
+        if (slot) {
+          const cleanSlot = slot.replace(/^[-–—\s]+/, '').trim();
+          shiftResults.push(`${targetBranch.name} (${cleanSlot})`);
+        }
+      });
+    }
+
+    // 2. Custom schedules explicitly created for this branch in Training Schedules tab
     const branchShifts = customShifts.filter(s => {
-      const sKey = getBranchKey(s.branch || s.branchName || s.branch_name || s.branch_id);
-      const sName = resolveBranchName(s.branch || s.branchName || s.branch_name || s.branch_id).toLowerCase().trim();
-      return sKey === targetKey || (targetKey && sName.includes(targetKey)) || (targetName && sName.includes(targetName)) || (sName && targetName.includes(sName));
+      const sBranchVal = s.branch || s.branchName || s.branch_name || s.branch_id;
+      const sName = resolveBranchName(sBranchVal).toLowerCase().trim();
+      const sId = String(s.branch_id || s.branch || '');
+      return (targetId && sId === targetId) || (targetName && sName === targetName) || (targetName && sName.includes(targetName)) || (sName && targetName.includes(sName));
     });
 
     if (branchShifts.length > 0) {
@@ -166,18 +128,31 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
         if (pMatched.length > 0) filtered = pMatched;
       }
 
-      const formatted = filtered.map(s => {
-        if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
-        return s.name || s.time;
+      filtered.forEach(s => {
+        if (s.name && s.time && !s.name.includes(s.time)) {
+          shiftResults.push(`${s.name} (${s.time})`);
+        } else {
+          shiftResults.push(s.name || s.time);
+        }
       });
-      return Array.from(new Set(formatted));
     }
 
-    // If branch has no custom schedule saved, return that branch's clean program defaults
-    return getStandardProgramShifts(programFilter, branchFilter);
+    // 3. Return ONLY the branch's actual timing and configured schedules!
+    if (shiftResults.length > 0) {
+      return Array.from(new Set(shiftResults));
+    }
+
+    // 4. Clean fallback ONLY if no timing was ever entered for this branch
+    return [
+      `${resolveBranchName(branchFilter)} - Regular Batch (5:00 PM - 7:00 PM)`,
+      'Custom Shift / Flexible'
+    ];
   }
 
-  // Global All Branches view
+  // Global All Branches view: collect all shifts from custom schedules AND branch timings
+  const allShifts = [];
+
+  // 1. From custom training schedules
   if (customShifts.length > 0) {
     let list = customShifts;
     if (programFilter && programFilter !== 'All' && programFilter !== 'ALL') {
@@ -190,14 +165,50 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
       if (progMatched.length > 0) list = progMatched;
     }
 
-    const formatted = list.map(s => {
-      if (s.name && s.time && !s.name.includes(s.time)) return `${s.name} (${s.time})`;
-      return s.name || s.time;
+    list.forEach(s => {
+      if (s.name && s.time && !s.name.includes(s.time)) {
+        allShifts.push(`${s.name} (${s.time})`);
+      } else {
+        allShifts.push(s.name || s.time);
+      }
     });
-    return Array.from(new Set(formatted));
   }
 
-  return getStandardProgramShifts(programFilter, branchFilter);
+  // 2. From all active branches' configured timings
+  let branchesToScan = Array.isArray(branchesOverride) && branchesOverride.length > 0 ? branchesOverride : null;
+  if (!branchesToScan) {
+    try {
+      const stored = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+      branchesToScan = stored ? JSON.parse(stored) : INITIAL_BRANCHES;
+    } catch (e) {
+      branchesToScan = INITIAL_BRANCHES;
+    }
+  }
+
+  if (Array.isArray(branchesToScan)) {
+    branchesToScan.forEach(b => {
+      if (b.timings && String(b.timings).trim() !== '') {
+        const rawTimings = String(b.timings).trim();
+        const slots = rawTimings.includes('|') ? rawTimings.split('|').map(x => x.trim()) : [rawTimings];
+        slots.forEach(slot => {
+          if (slot) {
+            const cleanSlot = slot.replace(/^[-–—\s]+/, '').trim();
+            allShifts.push(`${b.name} (${cleanSlot})`);
+          }
+        });
+      }
+    });
+  }
+
+  if (allShifts.length > 0) {
+    return Array.from(new Set(allShifts));
+  }
+
+  return [
+    'Evening Batch (5:00 PM - 7:00 PM)',
+    'Morning Batch (6:00 AM - 7:30 AM)',
+    'Custom Shift / Flexible'
+  ];
 };
 
 export const BELT_LEVELS = [

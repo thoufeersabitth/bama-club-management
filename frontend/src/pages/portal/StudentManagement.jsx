@@ -804,7 +804,7 @@ export default function StudentManagement() {
     const rawBelt = String(student.currentBelt || student.current_belt || '').trim();
     const resolvedBelt = isKarate ? (rawBelt && rawBelt !== 'No Belt' ? rawBelt : 'White Belt') : 'No Belt';
 
-    const branchShifts = getDynamicShiftOptions(exactBranchName, courseProg);
+    const branchShifts = getDynamicShiftOptions(exactBranchName, courseProg, branchesList);
     const resolvedShift = student.shift || (branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)');
 
     setEditingStudent({
@@ -2382,7 +2382,7 @@ export default function StudentManagement() {
               const defaultBranchId = matchedB?.id || matchedB?.name || 'branch-pulikkal';
               const defaultBranchName = matchedB?.name || 'Pulikkal Branch (Head Office)';
 
-              const initialShifts = getDynamicShiftOptions(defaultBranchName, 'Karate (Shotokan)');
+              const initialShifts = getDynamicShiftOptions(defaultBranchName, 'Karate (Shotokan)', branchesList);
               const defaultShift = initialShifts.length > 0 ? initialShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
 
               const feeInfo = await getApplicableFees(defaultBranchId);
@@ -2453,7 +2453,9 @@ export default function StudentManagement() {
           </div>
           <div>
             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">TRAINING SHIFTS</span>
-            <strong className="text-xl font-black text-gray-900 leading-none block mt-0.5">{getDynamicShiftOptions().length} Batches</strong>
+            <strong className="text-xl font-black text-gray-900 leading-none block mt-0.5">
+              {getDynamicShiftOptions(activeBranch !== 'ALL' ? activeBranch : null, selectedProgram !== 'ALL' ? selectedProgram : null, branchesList).length} Batches
+            </strong>
           </div>
         </div>
 
@@ -2522,7 +2524,7 @@ export default function StudentManagement() {
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2 py-1.5 text-xs text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer transition shadow-sm truncate"
             >
               <option value="ALL">All Shifts</option>
-              {getDynamicShiftOptions().map(s => (
+              {getDynamicShiftOptions(activeBranch !== 'ALL' ? activeBranch : null, selectedProgram !== 'ALL' ? selectedProgram : null, branchesList).map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -3119,7 +3121,7 @@ export default function StudentManagement() {
                     onChange={(e) => {
                       const prog = e.target.value;
                       const isKarate = prog === 'Karate (Shotokan)';
-                      const shifts = getDynamicShiftOptions(formData.branch, prog);
+                      const shifts = getDynamicShiftOptions(formData.branch, prog, branchesList);
                       setFormData(prev => ({
                         ...prev,
                         program: prog,
@@ -3203,7 +3205,7 @@ export default function StudentManagement() {
                     const matchedB = branchesList.find(b => b.id === selVal || b.name === selVal);
                     const bId = matchedB?.id || selVal;
                     const bName = matchedB?.name || selVal;
-                    const branchShifts = getDynamicShiftOptions(bName, formData.program);
+                    const branchShifts = getDynamicShiftOptions(bName, formData.program, branchesList);
                     const defaultShift = branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
                     
                     const feeInfo = await getApplicableFees(bId);
@@ -3241,7 +3243,7 @@ export default function StudentManagement() {
                   {!formData.branch && !formData.branch_name ? (
                     <option value="">-- Select Dojo Branch First --</option>
                   ) : (
-                    getDynamicShiftOptions(formData.branch_name || formData.branch, formData.program).map(s => (
+                    getDynamicShiftOptions(formData.branch_name || formData.branch, formData.program, branchesList).map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))
                   )}
@@ -3738,7 +3740,7 @@ export default function StudentManagement() {
                     onChange={(e) => {
                       const prog = e.target.value;
                       const isKarate = prog === 'Karate (Shotokan)';
-                      const shifts = getDynamicShiftOptions(editingStudent.branch || editingStudent.branch_name, prog);
+                      const shifts = getDynamicShiftOptions(editingStudent.branch || editingStudent.branch_name, prog, branchesList);
                       setEditingStudent({
                         ...editingStudent,
                         program: prog,
@@ -3839,7 +3841,7 @@ export default function StudentManagement() {
                   {(() => {
                     const bTarget = editingStudent.branch || editingStudent.branch_name || 'Pulikkal Branch (Head Office)';
                     const pTarget = editingStudent.program || editingStudent.course || 'Karate (Shotokan)';
-                    const shiftList = getDynamicShiftOptions(bTarget, pTarget);
+                    const shiftList = getDynamicShiftOptions(bTarget, pTarget, branchesList);
                     if (editingStudent.shift && !shiftList.includes(editingStudent.shift)) {
                       shiftList.unshift(editingStudent.shift);
                     }

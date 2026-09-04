@@ -568,7 +568,7 @@ export default function AttendanceManagement() {
             className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate"
           >
             <option value="All">All Batches</option>
-            {getDynamicShiftOptions().map((s, idx) => (
+            {getDynamicShiftOptions(selectedBranch !== 'All' ? selectedBranch : null, null, branchesList).map((s, idx) => (
               <option key={idx} value={s}>{s}</option>
             ))}
           </select>
