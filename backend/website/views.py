@@ -55,9 +55,15 @@ class HeroBannerViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.AllowAny]
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
-    queryset = Announcement.objects.all().order_by('-date')
     serializer_class = AnnouncementSerializer
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = Announcement.objects.all().order_by('-date')
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category=category)
+        return qs
 
 class FAQViewSet(viewsets.ModelViewSet):
     queryset = FAQ.objects.all().order_by('order')

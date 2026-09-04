@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, filterOutDummyShifts, openWhatsApp } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -172,9 +172,11 @@ export default function BranchManagement() {
       updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
       updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
     } else {
+      const bCode = formData.code?.trim() || `BAMA-BR-${Math.floor(1000 + Math.random() * 9000)}`;
       const newB = {
         id: `branch-${Date.now()}`,
         ...formData,
+        code: bCode,
         facilities: facilityArray,
         image: photoUrl,
         img: photoUrl,
@@ -185,105 +187,6 @@ export default function BranchManagement() {
       const serverCreated = await createBranchBackend(newB);
       const finalBranch = serverCreated?.id ? serverCreated : newB;
       updatedList = [...branches, finalBranch];
-
-      // Auto-create complete standard shifts for all programs for this new branch
-      const bName = formData.name || 'Dojo Branch';
-      const instructorName = formData.branch_head || 'Sensei Abdul Rahman (5th Dan)';
-      
-      const newShiftsToCreate = [
-        {
-          id: `shift-${Date.now()}-1`,
-          name: `${bName} - Evening Karate Batch`,
-          program: 'Karate (Shotokan)',
-          branch: bName,
-          days: 'Mon, Wed, Fri',
-          time: '5:00 PM - 7:00 PM',
-          instructor: instructorName,
-          targetGroup: 'All Belts & Cadets',
-          status: 'Active'
-        },
-        {
-          id: `shift-${Date.now()}-2`,
-          name: `${bName} - Morning Karate Batch`,
-          program: 'Karate (Shotokan)',
-          branch: bName,
-          days: 'Tue, Thu, Sat',
-          time: '6:00 AM - 7:30 AM',
-          instructor: instructorName,
-          targetGroup: 'All Belts & Cadets',
-          status: 'Active'
-        },
-        {
-          id: `shift-${Date.now()}-3`,
-          name: `${bName} - Boxing Morning Session`,
-          program: 'Boxing',
-          branch: bName,
-          days: 'Mon, Wed, Fri',
-          time: '6:00 AM - 7:30 AM',
-          instructor: instructorName,
-          targetGroup: 'All Fitness & Cadets',
-          status: 'Active'
-        },
-        {
-          id: `shift-${Date.now()}-4`,
-          name: `${bName} - Kick Boxing Batch`,
-          program: 'Kick Boxing',
-          branch: bName,
-          days: 'Mon, Wed, Fri',
-          time: '7:00 PM - 8:30 PM',
-          instructor: instructorName,
-          targetGroup: 'Teens & Adults',
-          status: 'Active'
-        },
-        {
-          id: `shift-${Date.now()}-5`,
-          name: `${bName} - Ladies Special Batch`,
-          program: 'Ladies Special Batch',
-          branch: bName,
-          days: 'Mon, Wed, Fri',
-          time: '4:00 PM - 5:30 PM',
-          instructor: instructorName,
-          targetGroup: 'Ladies Only',
-          status: 'Active'
-        },
-        {
-          id: `shift-${Date.now()}-6`,
-          name: `${bName} - Personal Training (1-on-1)`,
-          program: 'Personal Training (1-on-1)',
-          branch: bName,
-          days: 'Flexible Days',
-          time: 'Flexible 1-on-1 Slots',
-          instructor: instructorName,
-          targetGroup: 'VIP / 1-on-1 Cadets',
-          status: 'Active'
-        }
-      ];
-
-      // If user typed custom timings in the branch modal, add a custom shift as well
-      if (formData.timings && String(formData.timings).trim() !== '' && !formData.timings.includes('5:00 PM - 7:00 PM')) {
-        newShiftsToCreate.unshift({
-          id: `shift-${Date.now()}-custom`,
-          name: `${bName} - Custom Batch`,
-          program: 'Karate (Shotokan)',
-          branch: bName,
-          days: 'Mon, Wed, Fri',
-          time: formData.timings,
-          instructor: instructorName,
-          targetGroup: 'All Belts & Cadets',
-          status: 'Active'
-        });
-      }
-
-      // Update state & localStorage synchronously
-      const updatedSchedules = [...schedules, ...newShiftsToCreate];
-      setSchedules(updatedSchedules);
-      localStorage.setItem('bama_training_schedules', JSON.stringify(updatedSchedules));
-
-      // Push to backend asynchronously
-      newShiftsToCreate.forEach(s => {
-        createTrainingScheduleBackend(s).catch(() => {});
-      });
-      window.dispatchEvent(new Event('bama_schedules_updated'));
     }
 
     setBranches(updatedList);
@@ -309,19 +212,19 @@ export default function BranchManagement() {
     if (editShift) {
       const updatedItem = { ...editShift, ...cleanShiftData };
       updated = schedules.map(s => s.id === editShift.id ? updatedItem : s);
-      updateTrainingScheduleBackend(editShift.id, updatedItem).catch(() => {});
+      await updateTrainingScheduleBackend(editShift.id, updatedItem);
     } else {
       const newS = {
         id: `shift-${Date.now()}`,
         ...cleanShiftData,
         status: 'Active'
       };
-      const serverCreated = await createTrainingScheduleBackend(newS);
-      const finalShift = serverCreated?.id ? serverCreated : newS;
-      updated = [...schedules, finalShift];
+      await createTrainingScheduleBackend(newS);
+      updated = [...schedules.filter(s => s.id !== newS.id), newS];
     }
     setSchedules(updated);
     localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
+    await saveTrainingSchedulesBackend(updated);
     window.dispatchEvent(new Event('bama_schedules_updated'));
     window.dispatchEvent(new Event('bama_data_updated'));
     setShowShiftModal(false);
@@ -379,10 +282,11 @@ export default function BranchManagement() {
     const targetShift = schedules.find(s => s.id === id);
     const shiftName = targetShift?.name || '';
     if (window.confirm(`Are you sure you want to delete "${shiftName || 'this training shift schedule'}"?`)) {
-      await deleteTrainingScheduleBackend(id, shiftName);
       const updated = schedules.filter(s => s.id !== id && s.name !== shiftName);
       setSchedules(updated);
       localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
+      await deleteTrainingScheduleBackend(id, shiftName);
+      await saveTrainingSchedulesBackend(updated);
       window.dispatchEvent(new Event('bama_schedules_updated'));
       window.dispatchEvent(new Event('bama_data_updated'));
     }

@@ -230,54 +230,6 @@ export const INITIAL_BRANCHES = [
     status: "Active",
     isHeadOffice: true,
     mapUrl: "https://maps.google.com/?q=Pulikkal+Malappuram"
-  },
-  {
-    id: "a9e9ccd7-27c4-4fd5-bf69-5a487cbf2b9e",
-    name: "Chungam Branch Dojo",
-    code: "CGM-02",
-    address: "Main Road Junction, Chungam, Malappuram, Kerala - 673638",
-    phone: "+91 98471 22334",
-    whatsapp: "+91 98471 22334",
-    email: "chungam@bama.org",
-    branch_head: "Sensei Muhammad Shafi (3rd Dan)",
-    head: "Sensei Muhammad Shafi (3rd Dan)",
-    timings: "Tue, Thu, Sat: 5:30 PM - 7:30 PM",
-    facilities: ["🥋 High-Density Mats", "🎯 Focus Strike Pads", "📢 Smart Sound System"],
-    status: "Active",
-    isHeadOffice: false,
-    mapUrl: "https://maps.google.com/?q=Chungam+Malappuram"
-  },
-  {
-    id: "67b5ad14-f63f-4be4-9df8-f541bff86b12",
-    name: "Feroke Branch",
-    code: "FRK-03",
-    address: "Station Road, Near Town Hall, Feroke, Kozhikode, Kerala - 673631",
-    phone: "+91 94462 88990",
-    whatsapp: "+91 94462 88990",
-    email: "feroke@bama.org",
-    branch_head: "Sensei Rajesh Kumar (4th Dan)",
-    head: "Sensei Rajesh Kumar (4th Dan)",
-    timings: "Sat & Sun: 7:00 AM - 9:30 AM & 4:00 PM - 6:00 PM",
-    facilities: ["🥋 Professional Tatami Flooring", "🥊 Sparring Gear Sets"],
-    status: "Active",
-    isHeadOffice: false,
-    mapUrl: "https://maps.google.com/?q=Feroke+Kozhikode"
-  },
-  {
-    id: "a2393611-68f4-435a-a8cb-38715bc30673",
-    name: "Mongam Branch Dojo",
-    code: "MNG-03",
-    address: "Dojo Complex, Near Bus Stand, Mongam, Malappuram, Kerala - 673642",
-    phone: "+91 98471 22334",
-    whatsapp: "+91 98471 22334",
-    email: "mongam@bama.in",
-    branch_head: "Sensei Muhammed Haneen (2nd Dan)",
-    head: "Sensei Muhammed Haneen (2nd Dan)",
-    timings: "Mon, Wed, Fri: 6:00 AM - 7:30 AM & 4:30 PM - 6:30 PM",
-    facilities: ["🥋 Professional Tatami Mats", "🥊 Heavy Kick Bags", "❄️ AC Dojo Hall"],
-    status: "Active",
-    isHeadOffice: false,
-    mapUrl: "https://maps.google.com/?q=Mongam+Malappuram"
   }
 ];
 

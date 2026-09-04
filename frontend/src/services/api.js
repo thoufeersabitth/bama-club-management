@@ -1102,6 +1102,7 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
         return true;
       });
       localStorage.setItem('bama_training_schedules', JSON.stringify(filtered));
+      saveTrainingSchedulesBackend(filtered).catch(() => {});
     }
   } catch (e) {}
 
@@ -1154,23 +1155,31 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
   } catch (err) {}
 };
 
-export const createTrainingScheduleBackend = async (shiftData) => {
+export const saveTrainingSchedulesBackend = async (schedules) => {
+  if (!Array.isArray(schedules)) return;
   try {
-    const payload = {
-      title: shiftData.name || 'Training Batch Shift',
-      content: JSON.stringify(shiftData),
-      category: 'TRAINING_SHIFT',
-      is_important: true
-    };
-    const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/', {
+    const existingRes = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      headers: { 'Accept': 'application/json' }
+    });
+    const existingData = existingRes.ok ? await existingRes.json() : {};
+    const updatedData = { ...existingData, training_schedules: schedules };
+    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(updatedData)
     });
-    if (res.ok) {
-      const serverData = await res.json();
-      return { ...shiftData, id: serverData.id };
-    }
+  } catch (e) {
+    console.error('Failed to sync training schedules to backend cms-config:', e);
+  }
+};
+
+export const createTrainingScheduleBackend = async (shiftData) => {
+  try {
+    const stored = localStorage.getItem('bama_training_schedules');
+    const existing = stored ? JSON.parse(stored) : [];
+    const updated = [...existing.filter(s => s.id !== shiftData.id), shiftData];
+    localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
+    await saveTrainingSchedulesBackend(updated);
   } catch (err) {
     console.error('Failed to create shift on backend:', err);
   }
@@ -1179,154 +1188,76 @@ export const createTrainingScheduleBackend = async (shiftData) => {
 
 export const updateTrainingScheduleBackend = async (id, shiftData) => {
   try {
-    const payload = {
-      title: shiftData.name || 'Training Batch Shift',
-      content: JSON.stringify(shiftData),
-      category: 'TRAINING_SHIFT',
-      is_important: true
-    };
-    if (typeof id === 'string' && id.length > 20) {
-      await fetch(`https://bama-club-backend.fly.dev/api/announcements/${id}/`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    }
+    const stored = localStorage.getItem('bama_training_schedules');
+    const existing = stored ? JSON.parse(stored) : [];
+    const updated = existing.map(s => s.id === id ? { ...s, ...shiftData } : s);
+    localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
+    await saveTrainingSchedulesBackend(updated);
   } catch (err) {
     console.error('Failed to update shift on backend:', err);
   }
 };
 
-const DUMMY_SHIFT_IDS = ['shift-101', 'shift-102', 'shift-103', 'shift-104', 'shift-105', 'shift-106'];
-const DUMMY_SHIFT_NAMES = [
-  'evening regular karate batch',
-  'morning fitness & kata batch',
-  'weekend intensive sparring & belt camp',
-  'chungam evening karate & kickboxing',
-  'mongam dawn kickboxing batch',
-  'feroke weekend karate camp'
-];
 
 export const filterOutDummyShifts = (list) => {
   if (!Array.isArray(list)) return [];
   return list.filter(s => {
     if (!s) return false;
-    const sId = String(s.id || '').trim().toLowerCase();
     const sName = String(s.name || '').toLowerCase().trim();
-    if (DUMMY_SHIFT_IDS.includes(sId) || DUMMY_SHIFT_NAMES.includes(sName)) return false;
-    if (sName.startsWith('general training batch') || sId.startsWith('shift-branch-') || sName.includes('general training batch')) return false;
+    if (sName.startsWith('general training batch')) return false;
     return true;
   });
 };
 
 export const fetchTrainingSchedules = async () => {
-  const branches = await fetchBranches();
-
-  // 1. Fetch deleted shifts tombstone from Fly.io PostgreSQL database (so Phone & Laptop stay 100% in sync)
-  const globalDeletedShifts = new Set();
-  try {
-    const localDeleted = JSON.parse(localStorage.getItem('bama_deleted_shift_ids') || '[]');
-    localDeleted.forEach(d => globalDeletedShifts.add(String(d).toLowerCase().trim()));
-  } catch (e) {}
-
-  try {
-    const delRes = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_SHIFT', {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-    if (delRes.ok) {
-      const delData = await delRes.json();
-      const delAnnouncements = delData.results || (Array.isArray(delData) ? delData : []);
-      delAnnouncements.forEach(a => {
-        if (a.content) {
-          try {
-            const parsed = JSON.parse(a.content);
-            if (parsed.deleted_id) globalDeletedShifts.add(String(parsed.deleted_id).toLowerCase().trim());
-            if (parsed.deleted_name) globalDeletedShifts.add(String(parsed.deleted_name).toLowerCase().trim());
-          } catch (e) {}
-        }
-        if (a.title && a.title.startsWith('DELETED_SHIFT:')) {
-          globalDeletedShifts.add(a.title.replace('DELETED_SHIFT:', '').toLowerCase().trim());
-        }
-      });
-    }
-  } catch (err) {}
-
-  // Store merged global deleted list locally
-  try {
-    localStorage.setItem('bama_deleted_shift_ids', JSON.stringify(Array.from(globalDeletedShifts)));
-  } catch (e) {}
-
-  const isDeleted = (shiftObj) => {
-    if (!shiftObj) return true;
-    const sId = String(shiftObj.id || '').toLowerCase().trim();
-    const sName = String(shiftObj.name || '').toLowerCase().trim();
-    if (sId && globalDeletedShifts.has(sId)) return true;
-    if (sName && globalDeletedShifts.has(sName)) return true;
-    return false;
-  };
-
   const scheduleMap = new Map();
-  let serverFetchedSuccessfully = false;
 
-  // 2. Fetch active shifts from live Fly.io PostgreSQL announcements API (Primary Single Source of Truth)
+  // 1. Fetch persistent schedules directly from Fly.io PostgreSQL cms-config
   try {
-    const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
     if (res.ok) {
-      serverFetchedSuccessfully = true;
       const data = await res.json();
-      const announcements = data.results || (Array.isArray(data) ? data : []);
-      announcements.forEach(a => {
-        if (a.category === 'TRAINING_SHIFT' && a.content) {
-          try {
-            const parsed = JSON.parse(a.content);
-            const shiftObj = {
-              ...parsed,
-              id: a.id,
-              name: parsed.name || a.title || 'Training Batch',
-              status: parsed.status || 'Active'
-            };
-            const key = String(shiftObj.name + (shiftObj.branch || '')).toLowerCase().trim();
-            if (key && !isDeleted(shiftObj) && !isDeleted({ id: a.id, name: a.title })) {
-              scheduleMap.set(key, shiftObj);
-            }
-          } catch (e) {}
-        }
-      });
+      if (Array.isArray(data.training_schedules) && data.training_schedules.length > 0) {
+        data.training_schedules.forEach(s => {
+          if (s && s.id) {
+            const key = String(s.name + (s.branch || '')).toLowerCase().trim();
+            scheduleMap.set(key || s.id, s);
+          }
+        });
+      }
     }
   } catch (err) {
-    console.error('Failed to fetch training schedules from Fly.io live server:', err);
+    console.error('Failed to fetch training schedules from Fly.io cms-config:', err);
   }
 
-  // 3. Fallback to existing localStorage shifts ONLY if server was completely offline/unreachable
-  if (!serverFetchedSuccessfully) {
-    try {
-      const stored = localStorage.getItem('bama_training_schedules');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          filterOutDummyShifts(parsed).forEach(s => {
+  // 2. Also merge with any local schedules from localStorage so user creations are NEVER lost!
+  try {
+    const stored = localStorage.getItem('bama_training_schedules');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(s => {
+          if (s && s.id) {
             const key = String(s.name + (s.branch || '')).toLowerCase().trim();
-            if (key && !scheduleMap.has(key) && !isDeleted(s)) {
-              if (typeof s.id === 'string' && s.id.length > 20) {
-                scheduleMap.set(key, s);
-              }
+            if (!scheduleMap.has(key || s.id)) {
+              scheduleMap.set(key || s.id, s);
             }
-          });
-        }
+          }
+        });
       }
+    }
+  } catch (e) {}
+
+  const finalSchedules = Array.from(scheduleMap.values());
+  
+  if (finalSchedules.length > 0) {
+    try {
+      localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
     } catch (e) {}
   }
-
-  const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values())).filter(s => !isDeleted(s));
-  
-  // Overwrite phone & laptop local storage with the exact clean database roster
-  try {
-    localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
-  } catch (e) {}
 
   return finalSchedules;
 };

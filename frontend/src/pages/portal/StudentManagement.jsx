@@ -484,31 +484,17 @@ export default function StudentManagement() {
 
     const admNoGenerated = `BAMA-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // Robust & Bulletproof Branch Target Resolution
-    const rawBranchInput = formData.branch_id || formData.branch || formData.branch_name || formData.branchName || user?.branch || 'Pulikkal Branch (Head Office)';
-    let branchTargetName = 'Pulikkal Branch (Head Office)';
-    let branchTargetId = '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
+    // Exact & Unaltered Branch Target Resolution from User Selection
+    const rawBranchInput = formData.branch_name || formData.branch || formData.branch_id || user?.branch || 'Pulikkal Branch (Head Office)';
+    const matchedB = branchesList.find(b => 
+      String(b.id) === String(formData.branch_id) ||
+      String(b.id) === String(formData.branch) ||
+      String(b.name).toLowerCase() === String(rawBranchInput).toLowerCase() ||
+      String(b.code).toLowerCase() === String(rawBranchInput).toLowerCase()
+    );
 
-    const rawStr = String(rawBranchInput).toLowerCase().trim();
-    if (rawStr.includes('chungam') || rawStr.includes('cgm') || rawStr.includes('dojo-02') || rawStr.includes('20c924cd') || rawStr.includes('a9e9ccd7')) {
-      branchTargetName = 'Chungam Branch Dojo';
-      branchTargetId = 'a9e9ccd7-27c4-4fd5-bf69-5a487cbf2b9e';
-    } else if (rawStr.includes('mongam') || rawStr.includes('dojo-03') || rawStr.includes('d4639193')) {
-      branchTargetName = 'Mongam Branch Dojo';
-      branchTargetId = 'd4639193-c693-46e2-a46e-5e25dcf427a1';
-    } else if (rawStr.includes('feroke') || rawStr.includes('dojo-04') || rawStr.includes('5f429f1f') || rawStr.includes('67b5ad14')) {
-      branchTargetName = 'Feroke Branch';
-      branchTargetId = '67b5ad14-f63f-4be4-9df8-f541bff86b12';
-    } else if (rawStr.includes('pulikkal') || rawStr.includes('plk') || rawStr.includes('dojo-01') || rawStr.includes('283e0cc2') || rawStr.includes('4d04730d')) {
-      branchTargetName = 'Pulikkal Branch (Head Office)';
-      branchTargetId = '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
-    } else {
-      const matchedB = branchesList.find(b => b.id === rawBranchInput || b.name === rawBranchInput || b.code === rawBranchInput);
-      if (matchedB) {
-        branchTargetName = matchedB.name;
-        branchTargetId = matchedB.id;
-      }
-    }
+    const branchTargetName = matchedB ? matchedB.name : (formData.branch_name || formData.branch || 'Pulikkal Branch (Head Office)');
+    const branchTargetId = matchedB ? matchedB.id : (formData.branch_id || branchTargetName);
 
     const feeFreq = formData.feeFrequency || 'MONTHLY';
     const coveredPaidMonths = monthlyFeePaidAmt >= monthlyFeeAmt 
@@ -810,12 +796,8 @@ export default function StudentManagement() {
 
   // Open Edit Modal & Pre-populate ALL Personal Details
   const handleOpenEditModal = (student) => {
-    const cleanBranch = student.branch_name || student.branch_detail?.name || student.branchName || (typeof student.branch === 'object' ? student.branch?.name : student.branch) || '';
-    const bStr = String(cleanBranch).toLowerCase();
-    let exactBranchName = cleanBranch || 'Pulikkal Branch (Head Office)';
-    if (bStr.includes('chungam')) exactBranchName = 'Chungam Branch Dojo';
-    else if (bStr.includes('mongam')) exactBranchName = 'Mongam Branch Dojo';
-    else if (bStr.includes('feroke')) exactBranchName = 'Feroke Branch';
+    const cleanBranch = student.branch_name || student.branch_detail?.name || student.branchName || (typeof student.branch === 'object' ? student.branch?.name : student.branch) || 'Pulikkal Branch (Head Office)';
+    const exactBranchName = cleanBranch;
 
     const courseProg = resolveStudentProgram(student);
     const isKarate = courseProg.toLowerCase().includes('karate');
@@ -868,23 +850,15 @@ export default function StudentManagement() {
     const pending = Math.max(0, feeAmt - initialPaid);
     const calculatedFeeStatus = pending === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
 
-    const rawEditBranch = editingStudent.branch_id || editingStudent.branch || editingStudent.branch_name || 'Pulikkal Branch (Head Office)';
-    let editBranchName = 'Pulikkal Branch (Head Office)';
-    let editBranchId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
-    const rawEditStr = String(rawEditBranch).toLowerCase().trim();
-    if (rawEditStr.includes('chungam') || rawEditStr.includes('cgm') || rawEditStr.includes('dojo-02') || rawEditStr.includes('20c924cd')) {
-      editBranchName = 'Chungam Branch Dojo';
-      editBranchId = '20c924cd-2dc7-4f82-a459-5e86286748c5';
-    } else if (rawEditStr.includes('mongam') || rawEditStr.includes('dojo-03') || rawEditStr.includes('d4639193')) {
-      editBranchName = 'Mongam Branch Dojo';
-      editBranchId = 'd4639193-c693-46e2-a46e-5e25dcf427a1';
-    } else if (rawEditStr.includes('feroke') || rawEditStr.includes('dojo-04') || rawEditStr.includes('5f429f1f')) {
-      editBranchName = 'Feroke Branch';
-      editBranchId = '5f429f1f-1a33-40af-a621-cae5ecbccb41';
-    } else if (rawEditStr.includes('pulikkal') || rawEditStr.includes('plk') || rawEditStr.includes('dojo-01') || rawEditStr.includes('283e0cc2')) {
-      editBranchName = 'Pulikkal Branch (Head Office)';
-      editBranchId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
-    }
+    const rawEditBranch = editingStudent.branch_name || editingStudent.branch || editingStudent.branch_id || 'Pulikkal Branch (Head Office)';
+    const matchedEditB = branchesList.find(b => 
+      String(b.id) === String(editingStudent.branch_id) ||
+      String(b.id) === String(editingStudent.branch) ||
+      String(b.name).toLowerCase() === String(rawEditBranch).toLowerCase() ||
+      String(b.code).toLowerCase() === String(rawEditBranch).toLowerCase()
+    );
+    const editBranchName = matchedEditB ? matchedEditB.name : (editingStudent.branch_name || editingStudent.branch || 'Pulikkal Branch (Head Office)');
+    const editBranchId = matchedEditB ? matchedEditB.id : (editingStudent.branch_id || editBranchName);
 
     const editProg = editingStudent.program || editingStudent.course || editingStudent.discipline || 'Karate (Shotokan)';
     const editIsKarate = editProg.toLowerCase().includes('karate');
