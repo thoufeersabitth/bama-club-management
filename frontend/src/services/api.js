@@ -1334,6 +1334,64 @@ export const updateExamScheduleBackend = async (id, data) => {
   }
 };
 
+export const fetchCompetitionsBackend = async () => {
+  try {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.competitions) && data.competitions.length > 0) return data.competitions;
+    }
+  } catch (err) {}
+  return null;
+};
+
+export const saveCompetitionsBackend = async (competitions) => {
+  try {
+    const existingRes = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      headers: { 'Accept': 'application/json' }
+    });
+    const existingData = existingRes.ok ? await existingRes.json() : {};
+    const updated = { ...existingData, competitions };
+    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(updated)
+    });
+  } catch (err) {}
+};
+
+export const fetchStaffBackend = async () => {
+  try {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.staff_list) && data.staff_list.length > 0) return data.staff_list;
+    }
+  } catch (err) {}
+  return null;
+};
+
+export const saveStaffBackend = async (staffList) => {
+  try {
+    const existingRes = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      headers: { 'Accept': 'application/json' }
+    });
+    const existingData = existingRes.ok ? await existingRes.json() : {};
+    const updated = { ...existingData, staff_list: staffList };
+    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(updated)
+    });
+  } catch (err) {}
+};
+
 export const fetchFormCategoryListsBackend = async (examId = null) => {
   try {
     const url = examId ? `/grading-registrations/form-category-lists/?exam=${examId}` : '/grading-registrations/form-category-lists/';
@@ -1362,6 +1420,26 @@ export const publicSubmitExamRegistrationBackend = async (data) => {
     // Fallback to standard creation
     const res = await api.post('/grading-registrations/', data);
     return res.data;
+  }
+};
+
+export const fetchAttendanceFromBackend = async (dateStr) => {
+  try {
+    const res = await api.get('/attendance/');
+    const all = res.data.results || (Array.isArray(res.data) ? res.data : []);
+    const forDate = all.filter(a => a.date === dateStr);
+    if (forDate.length === 0) return null;
+    const map = {};
+    forDate.forEach(a => {
+      const sId = a.student_detail?.id || a.student;
+      const sAdm = a.student_detail?.admissionNo || a.student_detail?.admission_no;
+      const stat = String(a.status || 'Present').toUpperCase();
+      if (sId) map[sId] = stat;
+      if (sAdm) map[sAdm] = stat;
+    });
+    return map;
+  } catch (err) {
+    return null;
   }
 };
 

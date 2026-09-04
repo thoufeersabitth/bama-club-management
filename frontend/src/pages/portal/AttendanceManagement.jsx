@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings } from 'lucide-react';
-import { fetchStudents, saveAttendanceToBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
+import { fetchStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -137,9 +137,20 @@ export default function AttendanceManagement() {
 
   // Load students & saved attendance for selected date
   useEffect(() => {
-    fetchStudents().then(data => {
+    fetchStudents().then(async (data) => {
       setStudents(data || []);
 
+      // 1. Try to fetch live attendance from Fly.io PostgreSQL backend first
+      try {
+        const serverAtt = await fetchAttendanceFromBackend(selectedDate);
+        if (serverAtt && Object.keys(serverAtt).length > 0) {
+          setAttendanceRecords(serverAtt);
+          localStorage.setItem(`bama_attendance_${selectedDate}`, JSON.stringify(serverAtt));
+          return;
+        }
+      } catch (e) {}
+
+      // 2. Fallback to localStorage
       try {
         const saved = localStorage.getItem(`bama_attendance_${selectedDate}`);
         if (saved) {
@@ -148,7 +159,7 @@ export default function AttendanceManagement() {
         }
       } catch (e) {}
 
-      // Default all cadets to PRESENT
+      // 3. Default all cadets to PRESENT
       const initial = {};
       (data || []).forEach(s => {
         initial[s.id || s.admissionNo] = 'PRESENT';

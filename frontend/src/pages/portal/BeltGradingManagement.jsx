@@ -4,7 +4,7 @@ import {
   Award, Shield, Trophy, Medal, Search, Plus, Calendar, MapPin, User,
   CheckCircle2, AlertCircle, Send, QrCode, Sparkles, ExternalLink, RefreshCw, FileText, Printer, X, Star, MessageSquare, ArrowRight, Filter
 } from 'lucide-react';
-import { fetchBeltGradings, fetchStudents, saveBeltGradingBackend, openWhatsApp } from '../../services/api';
+import { fetchBeltGradings, fetchStudents, saveBeltGradingBackend, openWhatsApp, createExamScheduleBackend, fetchExamSchedules, fetchCompetitionsBackend, saveCompetitionsBackend } from '../../services/api';
 import OfficeGrading from '../office/OfficeGrading';
 import { BELT_LEVELS, ACADEMY_INFO, UPCOMING_EVENTS } from '../../services/initialData';
 
@@ -84,6 +84,31 @@ export default function BeltGradingManagement() {
   useEffect(() => {
     fetchBeltGradings().then(data => setGradings(data || []));
     fetchStudents().then(stds => setStudentsList(stds || []));
+    fetchExamSchedules().then(serverExams => {
+      if (serverExams && serverExams.length > 0) {
+        const mapped = serverExams.map(ex => ({
+          id: ex.id,
+          type: 'BELT_EXAM',
+          title: ex.title || ex.exam_name || 'Color Belt & Dan Examination',
+          date: ex.exam_date || ex.date,
+          registration_end: ex.registration_end_date || ex.registration_end,
+          time: ex.time || '8:00 AM - 12:00 PM',
+          venue: ex.venue || 'Main Dojo, Pulikkal',
+          examiner: ex.chief_examiner || 'Sensei Abdul Rahman (5th Dan)',
+          targetBelts: [ex.eligible_belt || 'All Belts'],
+          registrationFee: parseFloat(ex.exam_fee) || 1000,
+          status: ex.status || 'Active',
+          whatsappAlertSent: false
+        }));
+        setEvents(prev => {
+          const ids = new Set(mapped.map(m => m.id));
+          return [...mapped, ...prev.filter(p => !ids.has(p.id))];
+        });
+      }
+    });
+    fetchCompetitionsBackend().then(comps => {
+      if (comps && comps.length > 0) setCompetitions(comps);
+    });
   }, []);
 
   // Create New Schedule Event
@@ -106,19 +131,18 @@ export default function BeltGradingManagement() {
     };
 
     try {
-      await fetch('/api/exam-schedules/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newEvt.title,
-          exam_date: newEvt.date,
-          registration_end_date: newEvt.registration_end,
-          exam_fee: newEvt.registrationFee,
-          venue: newEvt.venue,
-          chief_examiner: newEvt.examiner,
-          is_active: true
-        })
+      const created = await createExamScheduleBackend({
+        title: newEvt.title,
+        exam_date: newEvt.date,
+        registration_end_date: newEvt.registration_end,
+        exam_fee: newEvt.registrationFee,
+        venue: newEvt.venue,
+        chief_examiner: newEvt.examiner,
+        is_active: true
       });
+      if (created?.id) {
+        newEvt.id = created.id;
+      }
     } catch (err) {
       console.error('Error saving exam schedule to backend:', err);
     }
@@ -129,7 +153,7 @@ export default function BeltGradingManagement() {
   };
 
   // Record New Competition & Winners
-  const handleCreateCompetition = (e) => {
+  const handleCreateCompetition = async (e) => {
     e.preventDefault();
     const newComp = {
       id: `comp-${Date.now()}`,
@@ -144,7 +168,9 @@ export default function BeltGradingManagement() {
       whatsappAlertSent: false
     };
 
-    setCompetitions([newComp, ...competitions]);
+    const updatedComps = [newComp, ...competitions];
+    setCompetitions(updatedComps);
+    await saveCompetitionsBackend(updatedComps);
     setShowCompModal(false);
     setCompTitle('');
     setFirstWinner('');

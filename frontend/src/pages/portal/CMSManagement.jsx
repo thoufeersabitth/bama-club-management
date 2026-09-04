@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ACADEMY_INFO, INITIAL_BRANCHES } from '../../services/initialData';
 import { getCmsConfig, saveCmsConfig } from '../../services/cmsService';
+import { fetchBranches } from '../../services/api';
 
 const INITIAL_CMS_CONFIG = {
   hero: {
@@ -136,6 +137,9 @@ export default function CMSManagement() {
       if (cfg && Object.keys(cfg).length > 0) {
         setCmsConfig(cfg);
       }
+    });
+    fetchBranches().then(b => {
+      if (b && b.length > 0) setBranchesList(b);
     });
   }, []);
 

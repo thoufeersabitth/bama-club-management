@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, INITIAL_STAFF } from '../../services/initialData';
-import { fetchBranches, getStoredStaff, saveStoredStaff, createBackendUser, updateBackendUser, deleteBackendUser } from '../../services/api';
+import { fetchBranches, getStoredStaff, saveStoredStaff, createBackendUser, updateBackendUser, deleteBackendUser, fetchStaffBackend, saveStaffBackend } from '../../services/api';
 
 export default function AdminManagement() {
   const { user } = useAuth();
@@ -85,6 +85,14 @@ export default function AdminManagement() {
   });
 
   useEffect(() => {
+    fetchStaffBackend().then(serverStaff => {
+      if (serverStaff && Array.isArray(serverStaff) && serverStaff.length > 0) {
+        setStaffList(serverStaff);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('bama_staff_list', JSON.stringify(staffList));
     localStorage.setItem('bama_all_users', JSON.stringify(staffList.map(s => ({
       id: s.id,
@@ -96,6 +104,7 @@ export default function AdminManagement() {
       password: s.password || '123456',
       permissions: s.permissions
     }))));
+    saveStaffBackend(staffList).catch(() => {});
   }, [staffList]);
 
   // Automatic New Month Detection: Auto-Reset active class count on 1st of every month & archive previous month!
