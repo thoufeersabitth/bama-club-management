@@ -195,28 +195,8 @@ export const getStoredStudents = () => {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = filterOutDummyCadets(parsed).map(st => {
-            const rawB = st.branch_name || st.branchName || st.dojo_branch || st.dojoBranch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || '';
-            const rawId = st.branch_id || st.branchId || (typeof st.branch === 'object' ? st.branch?.id : '');
-            const bCombined = (String(rawB) + ' ' + String(rawId) + ' ' + String(st.branch || '')).toLowerCase().trim();
-
-            let normBranch = 'Pulikkal Branch (Head Office)';
-            let branchId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
-
-            if (bCombined.includes('chungam') || bCombined.includes('cgm') || bCombined.includes('dojo-02') || bCombined.includes('20c924cd')) {
-              normBranch = 'Chungam Branch Dojo';
-              branchId = '20c924cd-2dc7-4f82-a459-5e86286748c5';
-            } else if (bCombined.includes('mongam') || bCombined.includes('dojo-03') || bCombined.includes('d4639193')) {
-              normBranch = 'Mongam Branch Dojo';
-              branchId = 'd4639193-c693-46e2-a46e-5e25dcf427a1';
-            } else if (bCombined.includes('feroke') || bCombined.includes('dojo-04') || bCombined.includes('5f429f1f')) {
-              normBranch = 'Feroke Branch';
-              branchId = '5f429f1f-1a33-40af-a621-cae5ecbccb41';
-            } else if (bCombined.includes('pulikkal') || bCombined.includes('plk') || bCombined.includes('dojo-01') || bCombined.includes('283e0cc2')) {
-              normBranch = 'Pulikkal Branch (Head Office)';
-              branchId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
-            } else if (rawB && rawB.length > 0 && !rawB.includes('-')) {
-              normBranch = rawB;
-            }
+            const normBranch = st.branch_name || st.branchName || st.dojo_branch || st.dojoBranch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || 'Pulikkal Branch (Head Office)';
+            const branchId = st.branch_id || st.branchId || (typeof st.branch === 'object' ? st.branch?.id : st.branch) || normBranch;
 
             const adm = st.admissionNo || st.admission_no || st.registration_no || '';
             const admFee = parseFloat(st.admissionFee ?? st.admission_fee ?? 1000);
@@ -280,28 +260,8 @@ export const saveStoredStudents = (students) => {
   try {
     if (!Array.isArray(students)) return;
     const normalized = students.map(st => {
-      const rawB = st.branch_name || st.branchName || st.dojo_branch || st.dojoBranch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || '';
-      const rawId = st.branch_id || st.branchId || (typeof st.branch === 'object' ? st.branch?.id : '');
-      const bCombined = (String(rawB) + ' ' + String(rawId) + ' ' + String(st.branch || '')).toLowerCase().trim();
-
-      let normBranch = 'Pulikkal Branch (Head Office)';
-      let branchId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
-
-      if (bCombined.includes('chungam') || bCombined.includes('cgm') || bCombined.includes('dojo-02') || bCombined.includes('20c924cd')) {
-        normBranch = 'Chungam Branch Dojo';
-        branchId = '20c924cd-2dc7-4f82-a459-5e86286748c5';
-      } else if (bCombined.includes('mongam') || bCombined.includes('dojo-03') || bCombined.includes('d4639193')) {
-        normBranch = 'Mongam Branch Dojo';
-        branchId = 'd4639193-c693-46e2-a46e-5e25dcf427a1';
-      } else if (bCombined.includes('feroke') || bCombined.includes('dojo-04') || bCombined.includes('5f429f1f')) {
-        normBranch = 'Feroke Branch';
-        branchId = '5f429f1f-1a33-40af-a621-cae5ecbccb41';
-      } else if (bCombined.includes('pulikkal') || bCombined.includes('plk') || bCombined.includes('dojo-01') || bCombined.includes('283e0cc2')) {
-        normBranch = 'Pulikkal Branch (Head Office)';
-        branchId = '283e0cc2-0009-494f-a3e1-7d8b14356213';
-      } else if (rawB && rawB.length > 0 && !rawB.includes('-')) {
-        normBranch = rawB;
-      }
+      const normBranch = st.branch_name || st.branchName || st.dojo_branch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || 'Pulikkal Branch (Head Office)';
+      const branchId = st.branch_id || st.branchId || (typeof st.branch === 'object' ? st.branch?.id : st.branch) || normBranch;
 
       const adm = st.admissionNo || st.admission_no || st.registration_no || '';
       const admFee = parseFloat(st.admissionFee ?? st.admission_fee ?? 1000);
