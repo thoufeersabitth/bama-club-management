@@ -898,32 +898,30 @@ export const fetchBranches = async () => {
     console.error('Failed to fetch branches from Fly.io live server:', err);
   }
 
-  // 2. If server was offline or empty, fallback to local storage cache keys
-  if (!fetchedFromServer) {
-    try {
-      const saved = localStorage.getItem('bama_custom_branches');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          parsed.forEach(b => {
-            const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-            if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
-              branchMap.set(key, b);
-            }
-          });
-        }
+  // 2. Always merge any local custom branches that might still be syncing or cached
+  try {
+    const saved = localStorage.getItem('bama_custom_branches');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed.forEach(b => {
+          const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+          if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+            branchMap.set(key, b);
+          }
+        });
       }
-    } catch (e) {}
-
-    // Only inject default INITIAL_BRANCHES if absolutely nothing was found anywhere
-    if (branchMap.size === 0) {
-      INITIAL_BRANCHES.forEach(b => {
-        const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-        if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
-          branchMap.set(key, b);
-        }
-      });
     }
+  } catch (e) {}
+
+  // 3. Fallback to INITIAL_BRANCHES only if absolutely nothing was found anywhere
+  if (branchMap.size === 0) {
+    INITIAL_BRANCHES.forEach(b => {
+      const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+      if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+        branchMap.set(key, b);
+      }
+    });
   }
 
   const cleaned = sanitizeBranches(Array.from(branchMap.values()).filter(b => 
@@ -935,6 +933,32 @@ export const fetchBranches = async () => {
   } catch (e) {}
 
   return cleaned.length > 0 ? cleaned : INITIAL_BRANCHES;
+};
+
+// Generate a guaranteed unique branch code (e.g. BAMA-DOJO-11) that never collides with existing dojos
+export const generateUniqueBranchCode = (existingBranches = []) => {
+  const existingCodes = new Set(
+    (existingBranches || []).map(b => String(b.code || '').toUpperCase().trim()).filter(Boolean)
+  );
+  
+  let maxNum = 0;
+  for (const code of existingCodes) {
+    const match = code.match(/BAMA-DOJO-?(\d+)/i) || code.match(/DOJO-?(\d+)/i) || code.match(/-(\d+)$/);
+    if (match && match[1]) {
+      const n = parseInt(match[1], 10);
+      if (!isNaN(n) && n > maxNum) {
+        maxNum = n;
+      }
+    }
+  }
+
+  let nextNum = Math.max(maxNum + 1, (existingBranches?.length || 0) + 1);
+  let candidate = nextNum < 10 ? `BAMA-DOJO-0${nextNum}` : `BAMA-DOJO-${nextNum}`;
+  while (existingCodes.has(candidate)) {
+    nextNum++;
+    candidate = nextNum < 10 ? `BAMA-DOJO-0${nextNum}` : `BAMA-DOJO-${nextNum}`;
+  }
+  return candidate;
 };
 
 export const createBranchBackend = async (branchData) => {

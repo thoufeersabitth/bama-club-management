@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -30,6 +30,7 @@ export default function BranchManagement() {
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [editBranch, setEditBranch] = useState(null);
+  const [savingBranch, setSavingBranch] = useState(false);
 
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [editShift, setEditShift] = useState(null);
@@ -154,7 +155,7 @@ export default function BranchManagement() {
   const resetForm = () => {
     setFormData({
       name: '',
-      code: `BAMA-DOJO-0${branches.length + 1}`,
+      code: generateUniqueBranchCode(branches),
       address: '',
       phone: '+91 95440 85442',
       whatsapp: '+91 95440 85442',
@@ -170,51 +171,64 @@ export default function BranchManagement() {
 
   const handleCreateOrUpdateBranch = async (e) => {
     e.preventDefault();
-    const facilityArray = typeof formData.facilities === 'string'
-      ? formData.facilities.split(',').map(f => f.trim()).filter(Boolean)
-      : formData.facilities;
+    setSavingBranch(true);
+    try {
+      const facilityArray = typeof formData.facilities === 'string'
+        ? formData.facilities.split(',').map(f => f.trim()).filter(Boolean)
+        : formData.facilities;
 
-    const photoUrl = formData.image || '/assets/prog_adults.jpg';
+      const photoUrl = formData.image || '/assets/prog_adults.jpg';
 
-    let updatedList = [];
-    if (editBranch) {
-      const updatedItem = {
-        ...editBranch,
-        ...formData,
-        facilities: facilityArray,
-        image: photoUrl,
-        img: photoUrl,
-        photo: photoUrl
-      };
-      updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
-      updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
-    } else {
-      const bCode = formData.code?.trim() || `BAMA-BR-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newB = {
-        id: `branch-${Date.now()}`,
-        ...formData,
-        code: bCode,
-        facilities: facilityArray,
-        image: photoUrl,
-        img: photoUrl,
-        photo: photoUrl,
-        status: 'Active'
-      };
-      
-      const serverCreated = await createBranchBackend(newB);
-      const finalBranch = serverCreated?.id ? serverCreated : newB;
-      updatedList = [...branches, finalBranch];
+      let updatedList = [];
+      if (editBranch) {
+        const updatedItem = {
+          ...editBranch,
+          ...formData,
+          facilities: facilityArray,
+          image: photoUrl,
+          img: photoUrl,
+          photo: photoUrl
+        };
+        updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
+        updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
+      } else {
+        // Ensure a collision-free code
+        let bCode = formData.code?.trim();
+        const existingCodes = new Set(branches.map(b => String(b.code || '').toUpperCase().trim()));
+        if (!bCode || existingCodes.has(bCode.toUpperCase())) {
+          bCode = generateUniqueBranchCode(branches);
+        }
+
+        const newB = {
+          id: `branch-${Date.now()}`,
+          ...formData,
+          code: bCode,
+          facilities: facilityArray,
+          image: photoUrl,
+          img: photoUrl,
+          photo: photoUrl,
+          status: 'Active'
+        };
+        
+        const serverCreated = await createBranchBackend(newB);
+        const finalBranch = serverCreated?.id ? serverCreated : newB;
+        updatedList = [...branches.filter(b => b.id !== finalBranch.id), finalBranch];
+      }
+
+      setBranches(updatedList);
+      localStorage.setItem('bama_custom_branches', JSON.stringify(updatedList));
+      localStorage.setItem('bama_branches', JSON.stringify(updatedList));
+      window.dispatchEvent(new Event('bama_branches_updated'));
+      window.dispatchEvent(new Event('bama_data_updated'));
+
+      setShowAddModal(false);
+      setEditBranch(null);
+      resetForm();
+    } catch (err) {
+      console.error('Failed to save branch:', err);
+    } finally {
+      setSavingBranch(false);
     }
-
-    setBranches(updatedList);
-    localStorage.setItem('bama_custom_branches', JSON.stringify(updatedList));
-    localStorage.setItem('bama_branches', JSON.stringify(updatedList));
-    window.dispatchEvent(new Event('bama_branches_updated'));
-    window.dispatchEvent(new Event('bama_data_updated'));
-
-    setShowAddModal(false);
-    setEditBranch(null);
-    resetForm();
   };
 
   const handleCreateOrUpdateShift = async (e) => {
@@ -1013,8 +1027,9 @@ export default function BranchManagement() {
               </button>
             </div>
 
-            {/* Modal Scrollable Body */}
-            <form id="branchDojoForm" onSubmit={handleCreateOrUpdateBranch} className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs">
+            <form id="branchDojoForm" onSubmit={handleCreateOrUpdateBranch} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              {/* Modal Scrollable Body */}
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 text-xs flex-1">
               {/* Photo Upload & Preview */}
               <div className="space-y-2 bg-gray-50 p-3.5 rounded-2xl border border-gray-200">
                 <label className="block text-gray-800 font-black mb-1 flex items-center gap-1.5">
@@ -1295,25 +1310,27 @@ export default function BranchManagement() {
                   Mark as Primary Head Office Dojo
                 </label>
               </div>
-            </form>
+            </div>
 
             {/* Modal Sticky Bottom Actions Footer */}
             <div className="p-4 sm:px-6 sm:py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3 z-10">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-100 cursor-pointer shadow-xs transition"
+                disabled={savingBranch}
+                className="px-4 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold text-xs rounded-xl hover:bg-gray-100 cursor-pointer shadow-xs transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                form="branchDojoForm"
-                className="px-6 py-2.5 bg-gradient-to-r from-red-600 via-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black text-xs rounded-xl shadow-md shadow-red-600/20 flex items-center gap-2 cursor-pointer transition active:scale-95"
+                disabled={savingBranch}
+                className="px-6 py-2.5 bg-gradient-to-r from-red-600 via-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-black text-xs rounded-xl shadow-md shadow-red-600/20 flex items-center gap-2 cursor-pointer transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Building2 className="w-4 h-4" /> {editBranch ? 'Save Changes' : 'Create Dojo Branch'}
+                <Building2 className="w-4 h-4" /> {savingBranch ? 'Saving Dojo Branch...' : (editBranch ? 'Save Changes' : 'Create Dojo Branch')}
               </button>
             </div>
+          </form>
           </div>
         </div>
       )}
