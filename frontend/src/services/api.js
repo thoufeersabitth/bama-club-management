@@ -975,7 +975,7 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
     const codeKey = branchCode ? String(branchCode).toUpperCase().trim() : '';
     const nameKey = branchName ? String(branchName).toLowerCase().trim() : '';
 
-    // 1. Instantly update local cache
+    // 1. Instantly update local cache with multiple key aliases
     let localImages = {};
     try {
       localImages = JSON.parse(localStorage.getItem('bama_branch_images') || '{}');
@@ -989,47 +989,57 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
       localStorage.setItem('bama_branch_images', JSON.stringify(localImages));
     } catch (e) {}
 
-    // 2. Persist to Fly.io live PostgreSQL database via fast dedicated micro-record (<1KB payload)
+    // 2. Dual Cloud Persistence:
+    // A) Fast dedicated micro-record in Fly.io PostgreSQL FAQs
     const targetQuestion = `BRANCH_PHOTO:${codeKey || idKey || nameKey}`;
-    try {
-      const acGet = new AbortController();
-      const getTimeout = setTimeout(() => acGet.abort(), 4000);
-      const getRes = await fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
-        headers: { 'Accept': 'application/json' },
-        cache: 'no-store',
-        signal: acGet.signal
-      });
-      clearTimeout(getTimeout);
-      const getData = getRes.ok ? await getRes.json() : {};
-      const results = getData.results || (Array.isArray(getData) ? getData : []);
-      const existing = results.find(f => f.question === targetQuestion);
+    (async () => {
+      try {
+        const acGet = new AbortController();
+        const getTimeout = setTimeout(() => acGet.abort(), 12000);
+        const getRes = await fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
+          headers: { 'Accept': 'application/json' },
+          cache: 'no-store',
+          signal: acGet.signal
+        });
+        clearTimeout(getTimeout);
+        const getData = getRes.ok ? await getRes.json() : {};
+        const results = getData.results || (Array.isArray(getData) ? getData : []);
+        const existing = results.find(f => f.question === targetQuestion);
 
-      const acPost = new AbortController();
-      const postTimeout = setTimeout(() => acPost.abort(), 5000);
-      if (existing && existing.id) {
-        await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' }),
-          signal: acPost.signal
-        });
-      } else {
-        await fetch('https://bama-club-backend.fly.dev/api/faqs/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            question: targetQuestion,
-            answer: imageUrl,
-            category: 'BRANCH_PHOTO',
-            order: 999
-          }),
-          signal: acPost.signal
-        });
+        const acPost = new AbortController();
+        const postTimeout = setTimeout(() => acPost.abort(), 12000);
+        if (existing && existing.id) {
+          await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' }),
+            signal: acPost.signal
+          });
+        } else {
+          await fetch('https://bama-club-backend.fly.dev/api/faqs/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              question: targetQuestion,
+              answer: imageUrl,
+              category: 'BRANCH_PHOTO',
+              order: 999
+            }),
+            signal: acPost.signal
+          });
+        }
+        clearTimeout(postTimeout);
+      } catch (dbErr) {
+        console.warn('Failed to save branch image to PostgreSQL FAQ storage:', dbErr);
       }
-      clearTimeout(postTimeout);
-    } catch (dbErr) {
-      console.warn('Failed to save branch image to PostgreSQL FAQ storage:', dbErr);
-    }
+    })();
+
+    // B) Central cms-config branch_images registry in PostgreSQL
+    const imagesToMerge = {};
+    if (idKey) imagesToMerge[idKey] = imageUrl;
+    if (codeKey) imagesToMerge[codeKey] = imageUrl;
+    if (nameKey) imagesToMerge[nameKey] = imageUrl;
+    syncAllBranchImagesBackend(imagesToMerge).catch(() => {});
 
     invalidateBranchesCache();
     window.dispatchEvent(new Event('bama_branches_updated'));
@@ -1061,10 +1071,10 @@ export const fetchBranches = async (forceRefresh = false) => {
     }
   } catch (e) {}
 
-  // 1. Fetch directly from Fly.io live PostgreSQL server FIRST
+  // 1. Fetch directly from Fly.io live PostgreSQL server: branches, faqs, and cms-config concurrently
   let fetchedFromServer = false;
   try {
-    const [res, faqsRes] = await Promise.all([
+    const [res, faqsRes, cmsRes] = await Promise.all([
       fetch(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
@@ -1072,9 +1082,14 @@ export const fetchBranches = async (forceRefresh = false) => {
       fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
+      }).catch(() => null),
+      fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
       }).catch(() => null)
     ]);
 
+    // Extract images from FAQs micro-records
     if (faqsRes && faqsRes.ok) {
       try {
         const faqsData = await faqsRes.json();
@@ -1087,11 +1102,48 @@ export const fetchBranches = async (forceRefresh = false) => {
             cloudBranchImages[rawKey.toLowerCase()] = f.answer;
           }
         });
-        try {
-          localStorage.setItem('bama_branch_images', JSON.stringify(cloudBranchImages));
-        } catch (e) {}
       } catch (e) {}
     }
+
+    // Extract images from CMS config branch_images dictionary & branches array
+    if (cmsRes && cmsRes.ok) {
+      try {
+        const cmsData = await cmsRes.json();
+        if (cmsData?.branch_images && typeof cmsData.branch_images === 'object') {
+          Object.entries(cmsData.branch_images).forEach(([k, v]) => {
+            if (k && v) {
+              const kTrim = String(k).trim();
+              cloudBranchImages[kTrim] = v;
+              cloudBranchImages[kTrim.toLowerCase()] = v;
+              cloudBranchImages[kTrim.toUpperCase()] = v;
+            }
+          });
+        }
+        if (Array.isArray(cmsData?.branches)) {
+          cmsData.branches.forEach(cb => {
+            const cbImg = cb.image || cb.img || cb.photo;
+            if (cbImg && !cbImg.startsWith('/assets/')) {
+              if (cb.id) {
+                cloudBranchImages[String(cb.id)] = cbImg;
+                cloudBranchImages[String(cb.id).toLowerCase()] = cbImg;
+              }
+              if (cb.code) {
+                cloudBranchImages[String(cb.code)] = cbImg;
+                cloudBranchImages[String(cb.code).toUpperCase()] = cbImg;
+              }
+              if (cb.name) {
+                cloudBranchImages[String(cb.name)] = cbImg;
+                cloudBranchImages[String(cb.name).toLowerCase()] = cbImg;
+              }
+            }
+          });
+        }
+      } catch (e) {}
+    }
+
+    try {
+      localStorage.setItem('bama_branch_images', JSON.stringify(cloudBranchImages));
+    } catch (e) {}
 
     if (res && res.ok) {
       const data = await res.json();
@@ -1105,15 +1157,28 @@ export const fetchBranches = async (forceRefresh = false) => {
             const codeKey = String(b.code || '').toUpperCase().trim();
             const nameKey = String(b.name || '').toLowerCase().trim();
             
-            const resolvedImg = cloudBranchImages[b.id] ||
-                                cloudBranchImages[idKey] ||
-                                cloudBranchImages[b.code] ||
-                                cloudBranchImages[codeKey] ||
-                                cloudBranchImages[b.name] ||
-                                cloudBranchImages[nameKey] ||
-                                (b.image && !b.image.startsWith('/assets/') ? b.image : null) ||
-                                (b.photo && !b.photo.startsWith('/assets/') ? b.photo : null) ||
-                                ((b.is_head_office ?? b.isHeadOffice) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+            let resolvedImg = cloudBranchImages[b.id] ||
+                              cloudBranchImages[idKey] ||
+                              cloudBranchImages[b.code] ||
+                              cloudBranchImages[codeKey] ||
+                              cloudBranchImages[b.name] ||
+                              cloudBranchImages[nameKey];
+
+            if (!resolvedImg) {
+              const foundKey = Object.keys(cloudBranchImages).find(k => {
+                const kLow = k.toLowerCase().trim();
+                return kLow.length > 3 && (nameKey.includes(kLow) || kLow.includes(nameKey) || codeKey === k.toUpperCase().trim());
+              });
+              if (foundKey) {
+                resolvedImg = cloudBranchImages[foundKey];
+              }
+            }
+
+            if (!resolvedImg) {
+              resolvedImg = (b.image && !b.image.startsWith('/assets/') ? b.image : null) ||
+                            (b.photo && !b.photo.startsWith('/assets/') ? b.photo : null) ||
+                            ((b.is_head_office ?? b.isHeadOffice) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+            }
 
             branchMap.set(key, {
               ...b,

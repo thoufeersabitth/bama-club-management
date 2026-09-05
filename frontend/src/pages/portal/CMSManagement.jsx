@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { ACADEMY_INFO, INITIAL_BRANCHES } from '../../services/initialData';
 import { getCmsConfig, saveCmsConfig } from '../../services/cmsService';
-import { fetchBranches } from '../../services/api';
+import { fetchBranches, saveBranchImageBackend } from '../../services/api';
 
 const INITIAL_CMS_CONFIG = {
   hero: {
@@ -257,6 +257,12 @@ export default function CMSManagement() {
     const updatedCms = { ...cmsConfig, branches: updated };
     setCmsConfig(updatedCms);
     await saveCmsConfig(updatedCms);
+
+    if (photoUrl && !photoUrl.startsWith('/assets/')) {
+      const targetId = editingBranch ? editingBranch.id : (updated[updated.length - 1]?.id);
+      saveBranchImageBackend(targetId, photoUrl, branchForm.code, branchForm.name).catch(() => {});
+    }
+
     window.dispatchEvent(new Event('bama_branches_updated'));
     window.dispatchEvent(new Event('bama_data_updated'));
     window.dispatchEvent(new Event('cms_updated'));
@@ -905,6 +911,7 @@ export default function CMSManagement() {
                             const updatedCms = { ...cmsConfig, branches: updated };
                             setCmsConfig(updatedCms);
                             await saveCmsConfig(updatedCms);
+                            saveBranchImageBackend(branch.id, dataUrl, branch.code, branch.name).catch(() => {});
                             window.dispatchEvent(new Event('bama_branches_updated'));
                             window.dispatchEvent(new Event('bama_data_updated'));
                             window.dispatchEvent(new Event('cms_updated'));
