@@ -1206,40 +1206,49 @@ export const generateUniqueBranchCode = (existingBranches = []) => {
   return candidate;
 };
 
-export const createBranchBackend = async (branchData) => {
-  try {
-    const payload = {
-      name: branchData.name || 'New Dojo Branch',
-      code: branchData.code || generateUniqueBranchCode([]),
-      address: branchData.address || 'Kerala, India',
-      phone: (branchData.phone || '+91 9544085442').slice(0, 20),
-      whatsapp: (branchData.whatsapp || branchData.phone || '+91 9544085442').slice(0, 20),
-      email: branchData.email?.trim() || '',
-      branch_head: branchData.branch_head || branchData.head || 'Sensei Abdul Rahman (5th Dan)',
-      is_head_office: !!branchData.isHeadOffice,
-      timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
-      status: branchData.status || 'Active'
-    };
-    const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      const serverData = await res.json();
-      const finalImg = branchData.image || branchData.photo || branchData.img;
-      if (finalImg && !finalImg.startsWith('/assets/')) {
-        saveBranchImageBackend(serverData.id, finalImg, serverData.code, serverData.name).catch(() => {});
+export const createBranchBackend = async (branchData, retryCount = 2) => {
+  const payload = {
+    name: branchData.name || 'New Dojo Branch',
+    code: branchData.code || generateUniqueBranchCode([]),
+    address: branchData.address || 'Kerala, India',
+    phone: (branchData.phone || '+91 9544085442').slice(0, 20),
+    whatsapp: (branchData.whatsapp || branchData.phone || '+91 9544085442').slice(0, 20),
+    email: branchData.email?.trim() || '',
+    branch_head: branchData.branch_head || branchData.head || 'Sensei Abdul Rahman (5th Dan)',
+    is_head_office: !!branchData.isHeadOffice,
+    timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
+    status: branchData.status || 'Active'
+  };
+
+  for (let attempt = 0; attempt <= retryCount; attempt++) {
+    try {
+      const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const serverData = await res.json();
+        const finalImg = branchData.image || branchData.photo || branchData.img;
+        if (finalImg && !finalImg.startsWith('/assets/')) {
+          saveBranchImageBackend(serverData.id, finalImg, serverData.code, serverData.name).catch(() => {});
+        }
+        return { 
+          success: true, 
+          ...branchData, 
+          ...serverData,
+          image: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'),
+          img: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'),
+          photo: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg')
+        };
       }
-      return { 
-        success: true, 
-        ...branchData, 
-        ...serverData,
-        image: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'),
-        img: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'),
-        photo: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg')
-      };
-    } else {
+
+      // If server returned 500/502/503/504 or SSL dropped and we can retry:
+      if ((res.status >= 500 || res.status === 408) && attempt < retryCount) {
+        await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+        continue;
+      }
+
       const errText = await res.text();
       let errMsg = errText;
       try {
@@ -1247,13 +1256,21 @@ export const createBranchBackend = async (branchData) => {
         errMsg = Object.entries(errJson)
           .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
           .join(' | ');
-      } catch (e) {}
+      } catch (e) {
+        if (errText.includes('OperationalError') || errText.includes('SSL connection') || errText.includes('<!DOCTYPE')) {
+          errMsg = 'Server connection was momentarily waking up. Please tap "Save Branch Dojo" again.';
+        }
+      }
       console.error('Failed to create branch on backend:', res.status, errMsg);
       return { error: true, message: errMsg, ...branchData };
+    } catch (err) {
+      if (attempt < retryCount) {
+        await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+        continue;
+      }
+      console.error('Failed to create branch on backend:', err);
+      return { error: true, message: err.message || 'Connection error. Please try again.', ...branchData };
     }
-  } catch (err) {
-    console.error('Failed to create branch on backend:', err);
-    return { error: true, message: err.message, ...branchData };
   }
 };
 

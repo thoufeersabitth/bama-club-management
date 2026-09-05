@@ -250,8 +250,11 @@ export default function BranchManagement() {
         
         const serverResult = await createBranchBackend(newB);
         if (serverResult?.error) {
-          alert(`Failed to create branch: ${serverResult.message}`);
-          setBannerMessage({ type: 'error', text: `Failed to create branch: ${serverResult.message}` });
+          const cleanMsg = typeof serverResult.message === 'string' && !serverResult.message.includes('<')
+            ? serverResult.message
+            : 'Connection was momentarily reconnecting to database. Please tap "Save Branch Dojo" once more.';
+          setBannerMessage({ type: 'error', text: cleanMsg });
+          alert(`⚠️ ${cleanMsg}`);
           setSavingBranch(false);
           return;
         }
