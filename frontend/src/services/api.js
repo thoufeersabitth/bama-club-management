@@ -968,11 +968,20 @@ export const syncAllBranchImagesBackend = async (imagesMap) => {
   }
 };
 
+// Validate that a branch photo string is a real, uncorrupted image (reject dummy/corrupted 1x1 pixels)
+export const isValidBranchImage = (img) => {
+  if (!img || typeof img !== 'string') return false;
+  if (img.startsWith('/assets/')) return false;
+  if (img.startsWith('http://') || img.startsWith('https://')) return img.length > 10;
+  if (img.startsWith('data:image/')) return img.length > 500;
+  return false;
+};
+
 // Intelligent branch photo resolver across all storage formats and caches
 export const getBranchPhotoUrl = (b) => {
   if (!b) return '/assets/prog_kids.jpg';
   const customImg = b.image || b.img || b.photo;
-  if (customImg && !customImg.startsWith('/assets/')) return customImg;
+  if (isValidBranchImage(customImg)) return customImg;
 
   try {
     const local = JSON.parse(localStorage.getItem('bama_branch_images') || '{}');
@@ -980,25 +989,25 @@ export const getBranchPhotoUrl = (b) => {
     const codeKey = String(b.code || '').toUpperCase().trim();
     const nameKey = String(b.name || '').toLowerCase().trim();
 
-    if (b.id && local[b.id]) return local[b.id];
-    if (idKey && local[idKey]) return local[idKey];
-    if (b.code && local[b.code]) return local[b.code];
-    if (codeKey && local[codeKey]) return local[codeKey];
-    if (b.name && local[b.name]) return local[b.name];
-    if (nameKey && local[nameKey]) return local[nameKey];
+    if (b.id && isValidBranchImage(local[b.id])) return local[b.id];
+    if (idKey && isValidBranchImage(local[idKey])) return local[idKey];
+    if (b.code && isValidBranchImage(local[b.code])) return local[b.code];
+    if (codeKey && isValidBranchImage(local[codeKey])) return local[codeKey];
+    if (b.name && isValidBranchImage(local[b.name])) return local[b.name];
+    if (nameKey && isValidBranchImage(local[nameKey])) return local[nameKey];
 
     const matchKey = Object.keys(local).find(k => {
       const kLow = k.toLowerCase().trim();
       return kLow.length > 3 && (nameKey.includes(kLow) || kLow.includes(nameKey) || codeKey === k.toUpperCase().trim());
     });
-    if (matchKey && local[matchKey]) return local[matchKey];
+    if (matchKey && isValidBranchImage(local[matchKey])) return local[matchKey];
   } catch (e) {}
 
   return (b.is_head_office ?? b.isHeadOffice) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg';
 };
 
 export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = '', branchName = '') => {
-  if (!imageUrl || imageUrl.startsWith('/assets/')) return;
+  if (!isValidBranchImage(imageUrl)) return;
   try {
     const idKey = branchId ? String(branchId).toLowerCase().trim() : '';
     const codeKey = branchCode ? String(branchCode).toUpperCase().trim() : '';
@@ -1044,7 +1053,7 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
     try {
       const acGet = new AbortController();
       const getTimeout = setTimeout(() => acGet.abort(), 12000);
-      const getRes = await fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
+      const getRes = await fetch(`https://bama-club-backend.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store',
         signal: acGet.signal
@@ -1127,7 +1136,7 @@ export const fetchBranches = async (forceRefresh = false) => {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }).catch(() => null),
-      fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
+      fetch(`https://bama-club-backend.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }).catch(() => null),
@@ -1143,7 +1152,7 @@ export const fetchBranches = async (forceRefresh = false) => {
         const faqsData = await faqsRes.json();
         const list = faqsData.results || (Array.isArray(faqsData) ? faqsData : []);
         list.forEach(f => {
-          if (f.question && f.question.startsWith('BRANCH_PHOTO:') && f.answer) {
+          if (f.question && f.question.startsWith('BRANCH_PHOTO:') && isValidBranchImage(f.answer)) {
             const rawKey = f.question.replace('BRANCH_PHOTO:', '').trim();
             cloudBranchImages[rawKey] = f.answer;
             cloudBranchImages[rawKey.toUpperCase()] = f.answer;
@@ -1159,7 +1168,7 @@ export const fetchBranches = async (forceRefresh = false) => {
         const cmsData = await cmsRes.json();
         if (cmsData?.branch_images && typeof cmsData.branch_images === 'object') {
           Object.entries(cmsData.branch_images).forEach(([k, v]) => {
-            if (k && v) {
+            if (k && isValidBranchImage(v)) {
               const kTrim = String(k).trim();
               cloudBranchImages[kTrim] = v;
               cloudBranchImages[kTrim.toLowerCase()] = v;
@@ -1170,7 +1179,7 @@ export const fetchBranches = async (forceRefresh = false) => {
         if (Array.isArray(cmsData?.branches)) {
           cmsData.branches.forEach(cb => {
             const cbImg = cb.image || cb.img || cb.photo;
-            if (cbImg && !cbImg.startsWith('/assets/')) {
+            if (isValidBranchImage(cbImg)) {
               if (cb.id) {
                 cloudBranchImages[String(cb.id)] = cbImg;
                 cloudBranchImages[String(cb.id).toLowerCase()] = cbImg;
@@ -1217,14 +1226,14 @@ export const fetchBranches = async (forceRefresh = false) => {
                 const kLow = k.toLowerCase().trim();
                 return kLow.length > 3 && (nameKey.includes(kLow) || kLow.includes(nameKey) || codeKey === k.toUpperCase().trim());
               });
-              if (foundKey) {
+              if (foundKey && isValidBranchImage(cloudBranchImages[foundKey])) {
                 resolvedImg = cloudBranchImages[foundKey];
               }
             }
 
-            if (!resolvedImg) {
-              resolvedImg = (b.image && !b.image.startsWith('/assets/') ? b.image : null) ||
-                            (b.photo && !b.photo.startsWith('/assets/') ? b.photo : null) ||
+            if (!resolvedImg || !isValidBranchImage(resolvedImg)) {
+              resolvedImg = (isValidBranchImage(b.image) ? b.image : null) ||
+                            (isValidBranchImage(b.photo) ? b.photo : null) ||
                             ((b.is_head_office ?? b.isHeadOffice) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
             }
 
@@ -1255,7 +1264,7 @@ export const fetchBranches = async (forceRefresh = false) => {
           if (!b) return;
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
           const customImg = b.image || b.img || b.photo;
-          if (customImg && !customImg.startsWith('/assets/')) {
+          if (isValidBranchImage(customImg)) {
             const idKey = String(b.id || '').toLowerCase().trim();
             const codeKey = String(b.code || '').toUpperCase().trim();
             const nameKey = String(b.name || '').toLowerCase().trim();
@@ -1265,7 +1274,7 @@ export const fetchBranches = async (forceRefresh = false) => {
           }
           if (key && branchMap.has(key)) {
             const existing = branchMap.get(key);
-            if (customImg && (customImg !== existing.image || !existing.image || existing.image.startsWith('/assets/'))) {
+            if (isValidBranchImage(customImg) && (customImg !== existing.image || !isValidBranchImage(existing.image))) {
               branchMap.set(key, {
                 ...existing,
                 image: customImg,
@@ -1275,7 +1284,7 @@ export const fetchBranches = async (forceRefresh = false) => {
             }
           } else if (!fetchedFromServer && key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
             // ONLY if server was offline: use cached branch
-            const finalImg = customImg || b.image || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+            const finalImg = isValidBranchImage(customImg) ? customImg : (b.image && isValidBranchImage(b.image) ? b.image : ((b.isHeadOffice || b.is_head_office) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'));
             branchMap.set(key, {
               ...b,
               image: finalImg,
