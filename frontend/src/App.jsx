@@ -32,7 +32,7 @@ import { saveTrainingSchedulesBackend } from './services/api';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_05_clean_v3';
+    const APP_VERSION = 'bama_v2026_09_05_live_img_v5';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       try {
         const storedSchedules = localStorage.getItem('bama_training_schedules');
@@ -50,6 +50,7 @@ export default function App() {
       localStorage.removeItem('bama_students_list');
       localStorage.removeItem('bama_custom_branches');
       localStorage.removeItem('bama_branches');
+      localStorage.removeItem('bama_branch_images');
       localStorage.removeItem('bama_cms_config');
       localStorage.setItem('bama_app_cache_version', APP_VERSION);
     }
@@ -58,7 +59,7 @@ export default function App() {
     const checkFreshness = async () => {
       try {
         const res = await fetch(`/?_chk=${Date.now()}`, { method: 'HEAD', cache: 'no-store' });
-        const serverEtag = res.headers.get('etag') || res.headers.get('last-modified');
+        const serverEtag = res.headers.get('etag') || res.headers.get('last-modified') || res.headers.get('x-vercel-id');
         const storedEtag = sessionStorage.getItem('bama_app_etag');
         if (serverEtag) {
           if (storedEtag && storedEtag !== serverEtag) {

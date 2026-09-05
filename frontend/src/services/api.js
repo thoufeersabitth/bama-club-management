@@ -975,6 +975,7 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
     const codeKey = branchCode ? String(branchCode).toUpperCase().trim() : '';
     const nameKey = branchName ? String(branchName).toLowerCase().trim() : '';
 
+    // 1. Instantly update local cache
     let localImages = {};
     try {
       localImages = JSON.parse(localStorage.getItem('bama_branch_images') || '{}');
@@ -988,32 +989,43 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
       localStorage.setItem('bama_branch_images', JSON.stringify(localImages));
     } catch (e) {}
 
-    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-    const existingData = existingRes.ok ? await existingRes.json() : {};
-    const existingImages = (existingData && typeof existingData.branch_images === 'object' && existingData.branch_images !== null) ? existingData.branch_images : {};
-    
-    const updatedImages = { ...existingImages };
-    if (branchId) updatedImages[String(branchId)] = imageUrl;
-    if (idKey) updatedImages[idKey] = imageUrl;
-    if (codeKey) updatedImages[codeKey] = imageUrl;
-    if (nameKey) updatedImages[nameKey] = imageUrl;
+    // 2. Persist to Fly.io live PostgreSQL database via fast dedicated micro-record (<1KB payload)
+    const targetQuestion = `BRANCH_PHOTO:${codeKey || idKey || nameKey}`;
+    try {
+      const getRes = await fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      const getData = getRes.ok ? await getRes.json() : {};
+      const results = getData.results || (Array.isArray(getData) ? getData : []);
+      const existing = results.find(f => f.question === targetQuestion);
 
-    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        ...existingData,
-        branch_images: updatedImages
-      })
-    });
+      if (existing && existing.id) {
+        await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' })
+        });
+      } else {
+        await fetch('https://bama-club-backend.fly.dev/api/faqs/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            question: targetQuestion,
+            answer: imageUrl,
+            category: 'BRANCH_PHOTO',
+            order: 999
+          })
+        });
+      }
+    } catch (dbErr) {
+      console.warn('Failed to save branch image to PostgreSQL FAQ storage:', dbErr);
+    }
 
     invalidateBranchesCache();
     window.dispatchEvent(new Event('bama_branches_updated'));
   } catch (err) {
-    console.warn('Failed to save branch image to backend cms-config:', err);
+    console.warn('Failed to save branch image:', err);
   }
 };
 
@@ -1043,26 +1055,32 @@ export const fetchBranches = async (forceRefresh = false) => {
   // 1. Fetch directly from Fly.io live PostgreSQL server FIRST
   let fetchedFromServer = false;
   try {
-    const [res, cmsRes] = await Promise.all([
+    const [res, faqsRes] = await Promise.all([
       fetch(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }).catch(() => null),
-      fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }).catch(() => null)
     ]);
 
-    if (cmsRes && cmsRes.ok) {
+    if (faqsRes && faqsRes.ok) {
       try {
-        const cmsData = await cmsRes.json();
-        if (cmsData && typeof cmsData.branch_images === 'object' && cmsData.branch_images !== null) {
-          cloudBranchImages = { ...cloudBranchImages, ...cmsData.branch_images };
-          try {
-            localStorage.setItem('bama_branch_images', JSON.stringify(cloudBranchImages));
-          } catch (e) {}
-        }
+        const faqsData = await faqsRes.json();
+        const list = faqsData.results || (Array.isArray(faqsData) ? faqsData : []);
+        list.forEach(f => {
+          if (f.question && f.question.startsWith('BRANCH_PHOTO:') && f.answer) {
+            const rawKey = f.question.replace('BRANCH_PHOTO:', '').trim();
+            cloudBranchImages[rawKey] = f.answer;
+            cloudBranchImages[rawKey.toUpperCase()] = f.answer;
+            cloudBranchImages[rawKey.toLowerCase()] = f.answer;
+          }
+        });
+        try {
+          localStorage.setItem('bama_branch_images', JSON.stringify(cloudBranchImages));
+        } catch (e) {}
       } catch (e) {}
     }
 

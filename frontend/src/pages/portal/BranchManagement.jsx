@@ -22,6 +22,7 @@ export default function BranchManagement() {
   });
   const [studentsList, setStudentsList] = useState(getStoredStudents);
   const [syncingSchedules, setSyncingSchedules] = useState(false);
+  const [syncingBranches, setSyncingBranches] = useState(false);
   const [schedules, setSchedules] = useState(() => {
     try {
       const stored = localStorage.getItem('bama_training_schedules');
@@ -154,7 +155,7 @@ export default function BranchManagement() {
     } catch (e) {}
 
     const loadAll = () => {
-      fetchBranches().then(data => {
+      fetchBranches(true).then(data => {
         if (data && data.length > 0) {
           setBranches(data);
         } else {
@@ -371,6 +372,33 @@ export default function BranchManagement() {
       });
     } finally {
       setSyncingSchedules(false);
+    }
+  };
+
+  const handleCloudSyncBranches = async () => {
+    setSyncingBranches(true);
+    setBannerMessage(null);
+    try {
+      localStorage.removeItem('bama_custom_branches');
+      localStorage.removeItem('bama_branches');
+      localStorage.removeItem('bama_branch_images');
+      const freshBranches = await fetchBranches(true);
+      if (freshBranches && freshBranches.length > 0) {
+        setBranches(freshBranches);
+        safeLocalStorageSet('bama_custom_branches', freshBranches);
+        safeLocalStorageSet('bama_branches', freshBranches);
+        setBannerMessage({
+          type: 'success',
+          text: `Cloud Sync Complete: ${freshBranches.length} branch dojo(s) and photos synchronized fresh from cloud!`
+        });
+      }
+    } catch (err) {
+      setBannerMessage({
+        type: 'error',
+        text: `Sync error: ${err.message || 'Failed to sync branches with cloud'}`
+      });
+    } finally {
+      setSyncingBranches(false);
     }
   };
 
@@ -733,12 +761,24 @@ export default function BranchManagement() {
 
         <div className="flex items-center gap-2 flex-nowrap flex-shrink-0 justify-end ml-auto">
           {activeTab === 'BRANCHES' ? (
-            <button
-              onClick={() => { resetForm(); setEditBranch(null); setShowAddModal(true); }}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-red-600/20 transition cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add New Branch Dojo
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCloudSyncBranches}
+                disabled={syncingBranches}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition cursor-pointer whitespace-nowrap"
+                title="Force reload all branch dojos and official photos fresh from cloud"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingBranches ? 'animate-spin' : ''}`} />
+                {syncingBranches ? 'Syncing...' : '🔄 Cloud Sync Branches'}
+              </button>
+              <button
+                onClick={() => { resetForm(); setEditBranch(null); setShowAddModal(true); }}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-red-600/20 transition cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add New Branch Dojo
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <button
