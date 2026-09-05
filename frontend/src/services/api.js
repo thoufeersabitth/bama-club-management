@@ -1102,12 +1102,15 @@ export const fetchBranches = async () => {
           }
           if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
             const finalImg = customImg || b.image || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
-            branchMap.set(key, {
+            const branchObj = {
               ...b,
               image: finalImg,
               img: finalImg,
               photo: finalImg
-            });
+            };
+            branchMap.set(key, branchObj);
+            // Proactively sync this un-synced branch to Fly.io live server so other devices (phone) can see it!
+            createBranchBackend(branchObj).catch(() => {});
           } else if (key && branchMap.has(key)) {
             const existing = branchMap.get(key);
             if ((!existing.image || existing.image.startsWith('/assets/')) && customImg && !customImg.startsWith('/assets/')) {
