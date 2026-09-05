@@ -28,11 +28,22 @@ import ReportsAnalytics from './pages/portal/ReportsAnalytics';
 import CMSManagement from './pages/portal/CMSManagement';
 import SettingsPortal from './pages/portal/SettingsPortal';
 import OfficeGrading from './pages/office/OfficeGrading';
+import { saveTrainingSchedulesBackend } from './services/api';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_05_live_sync_v2';
+    const APP_VERSION = 'bama_v2026_09_05_clean_v3';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
+      try {
+        const storedSchedules = localStorage.getItem('bama_training_schedules');
+        if (storedSchedules) {
+          const parsed = JSON.parse(storedSchedules);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            saveTrainingSchedulesBackend(parsed).catch(() => {});
+          }
+        }
+      } catch (e) {}
+
       localStorage.removeItem('bama_cadets_roster');
       localStorage.removeItem('bama_students');
       localStorage.removeItem('bama_cadets');

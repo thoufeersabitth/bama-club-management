@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Plus, MapPin, Phone, Mail, Clock, Shield, Check, X, Search,
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
-  Sparkles, Eye, Camera, Upload, Image as ImageIcon
+  Sparkles, Eye, Camera, Upload, Image as ImageIcon, RefreshCw
 } from 'lucide-react';
 import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
@@ -12,6 +12,7 @@ export default function BranchManagement() {
   const navigate = useNavigate();
   const [branches, setBranches] = useState([]);
   const [studentsList, setStudentsList] = useState([]);
+  const [syncingSchedules, setSyncingSchedules] = useState(false);
   const [schedules, setSchedules] = useState(() => {
     try {
       const stored = localStorage.getItem('bama_training_schedules');
@@ -153,7 +154,11 @@ export default function BranchManagement() {
       });
 
       fetchTrainingSchedules().then(schs => {
-        setSchedules(schs || []);
+        const cleanedShifts = filterOutDummyShifts(schs || []);
+        setSchedules(cleanedShifts);
+        if (cleanedShifts.length > 0) {
+          saveTrainingSchedulesBackend(cleanedShifts).catch(() => {});
+        }
       });
 
       fetchStudents().then(stds => setStudentsList(stds || []));
@@ -324,6 +329,33 @@ export default function BranchManagement() {
     window.dispatchEvent(new Event('bama_data_updated'));
     setShowShiftModal(false);
     setEditShift(null);
+  };
+
+  const handleCloudSyncSchedules = async () => {
+    setSyncingSchedules(true);
+    setBannerMessage(null);
+    try {
+      if (schedules.length > 0) {
+        await saveTrainingSchedulesBackend(schedules);
+      }
+      const latest = await fetchTrainingSchedules();
+      const cleaned = filterOutDummyShifts(latest || []);
+      setSchedules(cleaned);
+      localStorage.setItem('bama_training_schedules', JSON.stringify(cleaned));
+      window.dispatchEvent(new Event('bama_schedules_updated'));
+      window.dispatchEvent(new Event('bama_data_updated'));
+      setBannerMessage({
+        type: 'success',
+        text: `Cloud Sync Complete: ${cleaned.length} training batch schedule(s) synchronized across phone & laptop!`
+      });
+    } catch (err) {
+      setBannerMessage({
+        type: 'error',
+        text: `Sync error: ${err.message || 'Failed to sync with cloud'}`
+      });
+    } finally {
+      setSyncingSchedules(false);
+    }
   };
 
   const openEdit = (b) => {
@@ -692,23 +724,35 @@ export default function BranchManagement() {
               <Plus className="w-3.5 h-3.5" /> Add New Branch Dojo
             </button>
           ) : (
-            <button
-              onClick={() => {
-                setEditShift(null);
-                setShiftData({
-                  name: '',
-                  branch: 'Pulikkal Branch (Head Office)',
-                  days: 'Mon, Wed, Fri',
-                  time: '5:00 PM - 7:00 PM',
-                  instructor: 'Sensei Abdul Rahman (5th Dan)',
-                  targetGroup: 'All Belts & Cadets'
-                });
-                setShowShiftModal(true);
-              }}
-              className="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-600/20 transition cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add New Training Shift Schedule
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCloudSyncSchedules}
+                disabled={syncingSchedules}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition cursor-pointer whitespace-nowrap"
+                title="Synchronize training batches between phone & laptop via cloud"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncingSchedules ? 'animate-spin' : ''}`} />
+                {syncingSchedules ? 'Syncing...' : '🔄 Cloud Sync Batches'}
+              </button>
+              <button
+                onClick={() => {
+                  setEditShift(null);
+                  setShiftData({
+                    name: '',
+                    branch: 'Pulikkal Branch (Head Office)',
+                    days: 'Mon, Wed, Fri',
+                    time: '5:00 PM - 7:00 PM',
+                    instructor: 'Sensei Abdul Rahman (5th Dan)',
+                    targetGroup: 'All Belts & Cadets'
+                  });
+                  setShowShiftModal(true);
+                }}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-600/20 transition cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add New Training Shift Schedule
+              </button>
+            </div>
           )}
         </div>
       </div>

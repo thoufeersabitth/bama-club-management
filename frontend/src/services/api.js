@@ -911,9 +911,40 @@ export const deleteStudent = async (id, admissionNo) => {
 
 export const sanitizeBranches = (list) => {
   if (!Array.isArray(list)) return [];
+  const dummyNames = [
+    'ghjgkhlj',
+    'ccccccccccc',
+    'zxdfcghv',
+    'akhil',
+    'test',
+    'asdf',
+    'qwerty'
+  ];
+  const dummyCodes = ['BAMA-DOJO-08', 'BAMA-DOJO-11', 'BAMA-DOJO-12', 'BAMA-DOJO-13'];
+  const dummyAddresses = ['xdtfcygvuhb', 'cfghvjbkn', 'vbkk'];
+
   return list.filter(b => {
+    if (!b) return false;
     const name = String(b?.name || '').toLowerCase().trim();
-    return !name.includes('ghjgkhlj') && name !== 'ghjgkhlj';
+    const code = String(b?.code || '').toUpperCase().trim();
+    const addr = String(b?.address || '').toLowerCase().trim();
+
+    // Check dummy names
+    if (dummyNames.some(d => name === d || name.includes(d))) return false;
+
+    // Check dummy codes
+    if (dummyCodes.includes(code)) return false;
+
+    // Check dummy addresses
+    if (dummyAddresses.includes(addr)) return false;
+
+    // Check repeating characters (e.g. ccccc)
+    if (/(.)\1{3,}/.test(name)) return false;
+
+    // Reject duplicate pulikkal (Head office is 'Pulikkal Branch (Head Office)' with code PLK-01)
+    if (name === 'pulikkal' && code !== 'PLK-01') return false;
+
+    return true;
   });
 };
 
@@ -1082,7 +1113,7 @@ export const fetchBranches = async () => {
     console.error('Failed to fetch branches from Fly.io live server:', err);
   }
 
-  // 2. Always merge any local custom branches that might still be syncing or cached
+  // 2. Extract any custom images from local storage, or merge offline branches ONLY if server was completely unreachable
   try {
     const saved = localStorage.getItem('bama_custom_branches');
     if (saved) {
@@ -1090,6 +1121,7 @@ export const fetchBranches = async () => {
       if (Array.isArray(parsed) && parsed.length > 0) {
         let hasUnsyncedImages = false;
         parsed.forEach(b => {
+          if (!b) return;
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
           const customImg = b.image || b.img || b.photo;
           if (customImg && !customImg.startsWith('/assets/')) {
@@ -1100,18 +1132,7 @@ export const fetchBranches = async () => {
             if (codeKey && !cloudBranchImages[codeKey]) { cloudBranchImages[codeKey] = customImg; hasUnsyncedImages = true; }
             if (nameKey && !cloudBranchImages[nameKey]) { cloudBranchImages[nameKey] = customImg; hasUnsyncedImages = true; }
           }
-          if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
-            const finalImg = customImg || b.image || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
-            const branchObj = {
-              ...b,
-              image: finalImg,
-              img: finalImg,
-              photo: finalImg
-            };
-            branchMap.set(key, branchObj);
-            // Proactively sync this un-synced branch to Fly.io live server so other devices (phone) can see it!
-            createBranchBackend(branchObj).catch(() => {});
-          } else if (key && branchMap.has(key)) {
+          if (key && branchMap.has(key)) {
             const existing = branchMap.get(key);
             if ((!existing.image || existing.image.startsWith('/assets/')) && customImg && !customImg.startsWith('/assets/')) {
               branchMap.set(key, {
@@ -1121,6 +1142,15 @@ export const fetchBranches = async () => {
                 photo: customImg
               });
             }
+          } else if (!fetchedFromServer && key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+            // ONLY if server was offline: use cached branch
+            const finalImg = customImg || b.image || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+            branchMap.set(key, {
+              ...b,
+              image: finalImg,
+              img: finalImg,
+              photo: finalImg
+            });
           }
         });
 
@@ -1386,20 +1416,23 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
 };
 
 export const saveTrainingSchedulesBackend = async (schedules) => {
-  if (!Array.isArray(schedules)) return;
+  if (!Array.isArray(schedules)) return false;
   try {
-    const existingRes = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
-      headers: { 'Accept': 'application/json' }
+    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
     });
     const existingData = existingRes.ok ? await existingRes.json() : {};
     const updatedData = { ...existingData, training_schedules: schedules };
-    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+    const res = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(updatedData)
     });
+    return res.ok;
   } catch (e) {
     console.error('Failed to sync training schedules to backend cms-config:', e);
+    return false;
   }
 };
 
