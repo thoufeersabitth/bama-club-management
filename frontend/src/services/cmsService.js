@@ -34,7 +34,23 @@ export const saveCmsConfig = async (config) => {
   } catch (e) {}
 
   try {
-    const res = await api.post('/cms-config/', config, { timeout: 20000 });
+    let existingBranchImages = {};
+    try {
+      const cur = await api.get(`/cms-config/?_t=${Date.now()}`, { timeout: 7000 });
+      if (cur?.data && typeof cur.data.branch_images === 'object' && cur.data.branch_images !== null) {
+        existingBranchImages = cur.data.branch_images;
+      }
+    } catch (e) {}
+
+    const payload = {
+      ...config,
+      branch_images: {
+        ...existingBranchImages,
+        ...(config.branch_images || {})
+      }
+    };
+
+    const res = await api.post('/cms-config/', payload, { timeout: 20000 });
     if (res.data && res.data.data) {
       try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(res.data.data));

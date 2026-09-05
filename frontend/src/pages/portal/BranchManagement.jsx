@@ -101,8 +101,8 @@ export default function BranchManagement() {
         const img = new Image();
         img.onload = () => {
           try {
-            const targetWidth = 600;
-            const targetHeight = 338; // Standard 16:9 widescreen banner
+            const targetWidth = 540;
+            const targetHeight = 304; // Standard 16:9 widescreen banner
             const targetAspect = targetWidth / targetHeight;
             const sourceAspect = img.width / img.height;
 
@@ -130,7 +130,7 @@ export default function BranchManagement() {
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
 
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
             callback(compressedDataUrl);
           } catch (err) {
             callback(rawDataUrl);
@@ -212,7 +212,7 @@ export default function BranchManagement() {
         ? formData.facilities.split(',').map(f => f.trim()).filter(Boolean)
         : formData.facilities;
 
-      const photoUrl = formData.image || '/assets/prog_adults.jpg';
+      const photoUrl = formData.image || (editBranch?.image || '/assets/prog_adults.jpg');
 
       let updatedList = [];
       if (editBranch) {
@@ -220,17 +220,17 @@ export default function BranchManagement() {
           ...editBranch,
           ...formData,
           facilities: facilityArray,
-          image: photoUrl || editBranch.image,
-          img: photoUrl || editBranch.img,
-          photo: photoUrl || editBranch.photo
+          image: photoUrl,
+          img: photoUrl,
+          photo: photoUrl
         };
-        if (photoUrl && !photoUrl.startsWith('/assets/')) {
+        if (photoUrl) {
           try {
             await saveBranchImageBackend(editBranch.id, photoUrl, updatedItem.code, updatedItem.name);
           } catch (e) {}
         }
         updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
-        updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
+        await updateBranchBackend(editBranch.id, updatedItem);
         setBannerMessage({ type: 'success', text: `Branch "${formData.name}" updated successfully!` });
       } else {
         // Prevent duplicate branch names (case-insensitive)
@@ -273,11 +273,11 @@ export default function BranchManagement() {
         const finalBranch = {
           ...newB,
           ...(serverResult?.id ? serverResult : {}),
-          image: photoUrl || newB.image,
-          img: photoUrl || newB.img,
-          photo: photoUrl || newB.photo
+          image: photoUrl,
+          img: photoUrl,
+          photo: photoUrl
         };
-        if (photoUrl && !photoUrl.startsWith('/assets/')) {
+        if (photoUrl) {
           try {
             await saveBranchImageBackend(finalBranch.id, photoUrl, finalBranch.code, finalBranch.name);
           } catch (e) {}
