@@ -911,38 +911,22 @@ export const deleteStudent = async (id, admissionNo) => {
 
 export const sanitizeBranches = (list) => {
   if (!Array.isArray(list)) return [];
-  const dummyNames = [
-    'ghjgkhlj',
-    'ccccccccccc',
-    'zxdfcghv',
-    'akhil',
-    'test',
-    'asdf',
-    'qwerty'
+  const permanentlyDeletedIds = [
+    '4905b133-5da0-471c-902d-3332ae47da4f',
+    'bab104eb-b16e-476d-8239-334ed2d7c554',
+    '22fbe518-2bd4-424b-85c8-63f0c2deeb57',
+    'c7dbc185-183c-4c2f-99d7-74181f5e85b3',
+    '4eb4f5ac-e712-4b1e-a7ca-16ee9d8ceb0d'
   ];
-  const dummyCodes = ['BAMA-DOJO-08', 'BAMA-DOJO-11', 'BAMA-DOJO-12', 'BAMA-DOJO-13'];
-  const dummyAddresses = ['xdtfcygvuhb', 'cfghvjbkn', 'vbkk'];
 
   return list.filter(b => {
-    if (!b) return false;
-    const name = String(b?.name || '').toLowerCase().trim();
-    const code = String(b?.code || '').toUpperCase().trim();
-    const addr = String(b?.address || '').toLowerCase().trim();
+    if (!b || !b.name) return false;
+    const bId = String(b.id || '').trim();
+    if (permanentlyDeletedIds.includes(bId)) return false;
 
-    // Check dummy names
-    if (dummyNames.some(d => name === d || name.includes(d))) return false;
-
-    // Check dummy codes
-    if (dummyCodes.includes(code)) return false;
-
-    // Check dummy addresses
-    if (dummyAddresses.includes(addr)) return false;
-
-    // Check repeating characters (e.g. ccccc)
-    if (/(.)\1{3,}/.test(name)) return false;
-
-    // Reject duplicate pulikkal (Head office is 'Pulikkal Branch (Head Office)' with code PLK-01)
-    if (name === 'pulikkal' && code !== 'PLK-01') return false;
+    // Filter out only specific deleted dummy test names
+    const name = String(b.name).toLowerCase().trim();
+    if (['ccccccccccc', 'zxdfcghv', 'ghjgkhlj'].includes(name)) return false;
 
     return true;
   });
@@ -1219,6 +1203,13 @@ export const createBranchBackend = async (branchData, retryCount = 2) => {
     timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
     status: branchData.status || 'Active'
   };
+
+  try {
+    const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_branch_ids') || '[]');
+    const toRemove = [branchData.name, branchData.code, branchData.id].filter(Boolean).map(x => String(x).toLowerCase().trim());
+    const filtered = deletedIds.filter(x => !toRemove.includes(String(x).toLowerCase().trim()));
+    localStorage.setItem('bama_deleted_branch_ids', JSON.stringify(filtered));
+  } catch (e) {}
 
   for (let attempt = 0; attempt <= retryCount; attempt++) {
     try {
