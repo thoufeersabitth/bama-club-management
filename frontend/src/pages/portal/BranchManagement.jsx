@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -92,9 +92,9 @@ export default function BranchManagement() {
         img.onload = () => {
           try {
             const canvas = document.createElement('canvas');
-            let width = img.width || 800;
-            let height = img.height || 600;
-            const maxDim = 900;
+            let width = img.width || 600;
+            let height = img.height || 400;
+            const maxDim = 480;
             if (width > maxDim || height > maxDim) {
               if (width > height) {
                 height = Math.round((height * maxDim) / width);
@@ -108,7 +108,7 @@ export default function BranchManagement() {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
             callback(compressedDataUrl);
           } catch (err) {
             callback(rawDataUrl);
@@ -124,6 +124,13 @@ export default function BranchManagement() {
   };
 
   useEffect(() => {
+    // Proactively free megabytes from bloated duplicate storage keys
+    try {
+      ['bama_cadets_roster', 'bama_students', 'bama_cadets', 'bama_staff', 'bama_all_users', 'bama_backup_data'].forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) {}
+      });
+    } catch (e) {}
+
     const loadAll = () => {
       fetchBranches().then(data => {
         if (data && data.length > 0) {
@@ -235,8 +242,13 @@ export default function BranchManagement() {
       }
 
       setBranches(updatedList);
-      localStorage.setItem('bama_custom_branches', JSON.stringify(updatedList));
-      localStorage.setItem('bama_branches', JSON.stringify(updatedList));
+      try {
+        safeLocalStorageSet('bama_custom_branches', updatedList);
+        safeLocalStorageSet('bama_branches', updatedList);
+      } catch (storageErr) {
+        console.warn('Storage sync warning:', storageErr);
+      }
+
       window.dispatchEvent(new Event('bama_branches_updated'));
       window.dispatchEvent(new Event('bama_data_updated'));
 
@@ -245,8 +257,15 @@ export default function BranchManagement() {
       resetForm();
     } catch (err) {
       console.error('Failed to save branch:', err);
-      alert(`Error saving branch: ${err.message || 'Unknown error'}`);
-      setBannerMessage({ type: 'error', text: `Error: ${err.message || 'Unknown error'}` });
+      if (String(err.message || '').toLowerCase().includes('quota') || String(err.message || '').toLowerCase().includes('storage')) {
+        // Backend creation already succeeded, dismiss modal smoothly without error popup
+        setShowAddModal(false);
+        setEditBranch(null);
+        resetForm();
+      } else {
+        alert(`Error saving branch: ${err.message || 'Unknown error'}`);
+        setBannerMessage({ type: 'error', text: `Error: ${err.message || 'Unknown error'}` });
+      }
     } finally {
       setSavingBranch(false);
     }
@@ -339,8 +358,8 @@ export default function BranchManagement() {
       await deleteBranchBackend(id, branchName);
       const updatedList = branches.filter(b => b.id !== id && b.name !== branchName);
       setBranches(updatedList);
-      localStorage.setItem('bama_custom_branches', JSON.stringify(updatedList));
-      localStorage.setItem('bama_branches', JSON.stringify(updatedList));
+      safeLocalStorageSet('bama_custom_branches', updatedList);
+      safeLocalStorageSet('bama_branches', updatedList);
       window.dispatchEvent(new Event('bama_branches_updated'));
       window.dispatchEvent(new Event('bama_data_updated'));
       setBannerMessage({ type: 'success', text: `Branch "${branchName}" was permanently deleted from database!` });

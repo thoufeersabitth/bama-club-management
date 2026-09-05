@@ -28,6 +28,65 @@ export const filterOutDummyCadets = (list) => {
   });
 };
 
+// Safely set localStorage with automatic quota management & garbage collection
+export const safeLocalStorageSet = (key, value) => {
+  const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+  try {
+    localStorage.setItem(key, strVal);
+  } catch (err) {
+    console.warn(`[Storage] Quota exceeded on setting "${key}". Freeing redundant cache...`, err);
+    try {
+      // 1. Remove redundant duplicate keys
+      const redundantKeys = [
+        'bama_cadets_roster',
+        'bama_students',
+        'bama_cadets',
+        'bama_staff',
+        'bama_all_users',
+        'bama_backup_data',
+        'bama_temp_cache'
+      ];
+      redundantKeys.forEach(k => {
+        if (k !== key) {
+          try { localStorage.removeItem(k); } catch (e) {}
+        }
+      });
+
+      // 2. Retry setting key
+      localStorage.setItem(key, strVal);
+    } catch (retryErr) {
+      console.warn(`[Storage] Second quota retry failed for "${key}". Stripping heavy base64 images...`);
+      try {
+        // 3. Strip heavy base64 images from payload so essential data is preserved
+        let parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        if (Array.isArray(parsed)) {
+          const stripped = parsed.map(item => {
+            if (!item || typeof item !== 'object') return item;
+            const copy = { ...item };
+            ['image', 'img', 'photo', 'banner', 'avatar'].forEach(prop => {
+              if (typeof copy[prop] === 'string' && copy[prop].startsWith('data:image')) {
+                copy[prop] = ''; // drop heavy base64
+              }
+            });
+            return copy;
+          });
+          localStorage.setItem(key, JSON.stringify(stripped));
+        } else if (parsed && typeof parsed === 'object') {
+          const copy = { ...parsed };
+          ['image', 'img', 'photo', 'banner', 'avatar'].forEach(prop => {
+            if (typeof copy[prop] === 'string' && copy[prop].startsWith('data:image')) {
+              copy[prop] = '';
+            }
+          });
+          localStorage.setItem(key, JSON.stringify(copy));
+        }
+      } catch (finalErr) {
+        console.error(`[Storage] Failed to store "${key}" even after image stripping:`, finalErr);
+      }
+    }
+  }
+};
+
 // Helper for global academy fee default settings
 const MONTH_ORDER = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -311,10 +370,10 @@ export const saveStoredStudents = (students) => {
     });
     const cleaned = filterOutDummyCadets(normalized);
     const serialized = JSON.stringify(cleaned);
-    localStorage.setItem('bama_cadets_roster', serialized);
-    localStorage.setItem('bama_students', serialized);
-    localStorage.setItem('bama_cadets', serialized);
-    localStorage.setItem('bama_students_list', serialized);
+    safeLocalStorageSet('bama_students_list', serialized);
+    ['bama_cadets_roster', 'bama_students', 'bama_cadets'].forEach(k => {
+      try { localStorage.removeItem(k); } catch(e) {}
+    });
   } catch (e) {}
 };
 
@@ -556,10 +615,10 @@ export const fetchStudents = async (params = {}) => {
       });
 
       const serialized = JSON.stringify(normalizedServer);
-      localStorage.setItem('bama_cadets_roster', serialized);
-      localStorage.setItem('bama_students', serialized);
-      localStorage.setItem('bama_cadets', serialized);
-      localStorage.setItem('bama_students_list', serialized);
+      safeLocalStorageSet('bama_students_list', serialized);
+      ['bama_cadets_roster', 'bama_students', 'bama_cadets'].forEach(k => {
+        try { localStorage.removeItem(k); } catch(e) {}
+      });
       return normalizedServer;
     }
   } catch (err) {
@@ -927,10 +986,8 @@ export const fetchBranches = async () => {
   const cleaned = sanitizeBranches(Array.from(branchMap.values()).filter(b => 
     !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())
   ));
-  try {
-    localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
-    localStorage.setItem('bama_branches', JSON.stringify(cleaned));
-  } catch (e) {}
+  safeLocalStorageSet('bama_custom_branches', cleaned);
+  safeLocalStorageSet('bama_branches', cleaned);
 
   return cleaned.length > 0 ? cleaned : INITIAL_BRANCHES;
 };
@@ -1041,8 +1098,8 @@ export const deleteBranchBackend = async (id, branchName = '') => {
     if (saved) {
       const parsed = JSON.parse(saved);
       const filtered = parsed.filter(b => b.id !== id && b.name !== branchName);
-      localStorage.setItem('bama_custom_branches', JSON.stringify(filtered));
-      localStorage.setItem('bama_branches', JSON.stringify(filtered));
+      safeLocalStorageSet('bama_custom_branches', filtered);
+      safeLocalStorageSet('bama_branches', filtered);
     }
   } catch (e) {}
 
