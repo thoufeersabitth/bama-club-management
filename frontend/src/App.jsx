@@ -31,14 +31,47 @@ import OfficeGrading from './pages/office/OfficeGrading';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_08_26_final_sync';
+    const APP_VERSION = 'bama_v2026_09_05_live_sync_v2';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       localStorage.removeItem('bama_cadets_roster');
       localStorage.removeItem('bama_students');
       localStorage.removeItem('bama_cadets');
       localStorage.removeItem('bama_students_list');
+      localStorage.removeItem('bama_custom_branches');
+      localStorage.removeItem('bama_branches');
+      localStorage.removeItem('bama_cms_config');
       localStorage.setItem('bama_app_cache_version', APP_VERSION);
     }
+
+    // Auto-update checker: when mobile phone resumes/wakes up or tab becomes visible
+    const checkFreshness = async () => {
+      try {
+        const res = await fetch(`/?_chk=${Date.now()}`, { method: 'HEAD', cache: 'no-store' });
+        const serverEtag = res.headers.get('etag') || res.headers.get('last-modified');
+        const storedEtag = sessionStorage.getItem('bama_app_etag');
+        if (serverEtag) {
+          if (storedEtag && storedEtag !== serverEtag) {
+            sessionStorage.setItem('bama_app_etag', serverEtag);
+            window.location.reload();
+          } else {
+            sessionStorage.setItem('bama_app_etag', serverEtag);
+          }
+        }
+      } catch (e) {}
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        checkFreshness();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, []);
 
   return (
