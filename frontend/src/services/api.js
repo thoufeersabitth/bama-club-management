@@ -371,6 +371,8 @@ export const saveStoredStudents = (students) => {
     const cleaned = filterOutDummyCadets(normalized);
     const serialized = JSON.stringify(cleaned);
     safeLocalStorageSet('bama_students_list', serialized);
+    _studentsCache = cleaned;
+    _studentsCacheTime = Date.now();
     ['bama_cadets_roster', 'bama_students', 'bama_cadets'].forEach(k => {
       try { localStorage.removeItem(k); } catch(e) {}
     });
@@ -466,7 +468,36 @@ export const fetchDashboardStats = async () => {
   }
 };
 
+// High-Performance In-Memory Caches & TTL (Zero-Delay Instant UI Loading)
+let _studentsCache = null;
+let _studentsCacheTime = 0;
+let _branchesCache = null;
+let _branchesCacheTime = 0;
+let _schedulesCache = null;
+let _schedulesCacheTime = 0;
+const CACHE_TTL_MS = 25000; // 25 seconds fast cache
+
+export const invalidateStudentsCache = () => {
+  _studentsCache = null;
+  _studentsCacheTime = 0;
+};
+
+export const invalidateBranchesCache = () => {
+  _branchesCache = null;
+  _branchesCacheTime = 0;
+};
+
+export const invalidateSchedulesCache = () => {
+  _schedulesCache = null;
+  _schedulesCacheTime = 0;
+};
+
 export const fetchStudents = async (params = {}) => {
+  const hasCustomParams = Object.keys(params).length > 0;
+  if (!hasCustomParams && _studentsCache && (Date.now() - _studentsCacheTime < CACHE_TTL_MS)) {
+    return _studentsCache;
+  }
+
   // 1. Gather all globally deleted students from Fly.io PostgreSQL database + local storage
   const globalDeletedStudentIds = new Set();
   try {
@@ -477,82 +508,45 @@ export const fetchStudents = async (params = {}) => {
   } catch (e) {}
 
   try {
-    const delRes = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_STUDENT', {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-    if (delRes.ok) {
-      const delData = await delRes.json();
-      const delAnnouncements = delData.results || (Array.isArray(delData) ? delData : []);
-      delAnnouncements.forEach(a => {
-        if (a.content) {
-          try {
-            const parsed = JSON.parse(a.content);
-            if (parsed.deleted_id) globalDeletedStudentIds.add(String(parsed.deleted_id).toLowerCase().trim());
-            if (parsed.deleted_adm) globalDeletedStudentIds.add(String(parsed.deleted_adm).toLowerCase().trim());
-          } catch (e) {}
-        }
-        if (a.title && a.title.startsWith('DELETED_STUDENT:')) {
-          globalDeletedStudentIds.add(a.title.replace('DELETED_STUDENT:', '').toLowerCase().trim());
-        }
-      });
-    }
-  } catch (err) {}
-
-  // 2. Synchronize any local deletions to Fly.io PostgreSQL backend
-  try {
-    const localDeleted = JSON.parse(localStorage.getItem('bama_deleted_student_ids') || '[]');
-    if (localDeleted.length > 0) {
-      for (const delIdent of localDeleted) {
-        if (delIdent) {
-          fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(delIdent)}/`, { method: 'DELETE' }).catch(() => {});
-          fetch('https://bama-club-backend.fly.dev/api/announcements/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({
-              title: `DELETED_STUDENT:${delIdent}`,
-              content: JSON.stringify({ deleted_id: delIdent, deleted_adm: delIdent, deleted_at: new Date().toISOString() }),
-              category: 'DELETED_STUDENT',
-              is_important: false
-            })
-          }).catch(() => {});
-        }
-      }
-    }
-  } catch (e) {}
-
-  // Store merged global deleted list locally
-  try {
-    localStorage.setItem('bama_deleted_student_ids', JSON.stringify(Array.from(globalDeletedStudentIds)));
-  } catch (e) {}
-
-  try {
-    let allServerData = [];
     const url = new URL('https://bama-club-backend.fly.dev/api/students/');
     url.searchParams.set('page_size', '1000');
     url.searchParams.set('_t', Date.now().toString());
 
-    let nextUrl = url.toString();
-    while (nextUrl) {
-      const res = await fetch(nextUrl, {
+    // Run student fetch AND deleted announcements in PARALLEL for 2x faster load
+    const [studentsRes, delRes] = await Promise.all([
+      fetch(url.toString(), {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      });
+      }).catch(() => null),
+      fetch(`https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_STUDENT&_t=${Date.now()}`, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      }).catch(() => null)
+    ]);
 
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          allServerData = data;
-          break;
-        } else if (data && Array.isArray(data.results)) {
-          allServerData = [...allServerData, ...data.results];
-          nextUrl = data.next ? data.next : null;
-        } else {
-          break;
-        }
-      } else {
-        break;
-      }
+    if (delRes && delRes.ok) {
+      try {
+        const delData = await delRes.json();
+        const delAnnouncements = delData.results || (Array.isArray(delData) ? delData : []);
+        delAnnouncements.forEach(a => {
+          if (a.content) {
+            try {
+              const parsed = JSON.parse(a.content);
+              if (parsed.deleted_id) globalDeletedStudentIds.add(String(parsed.deleted_id).toLowerCase().trim());
+              if (parsed.deleted_adm) globalDeletedStudentIds.add(String(parsed.deleted_adm).toLowerCase().trim());
+            } catch (e) {}
+          }
+          if (a.title && a.title.startsWith('DELETED_STUDENT:')) {
+            globalDeletedStudentIds.add(a.title.replace('DELETED_STUDENT:', '').toLowerCase().trim());
+          }
+        });
+      } catch (e) {}
+    }
+
+    let allServerData = [];
+    if (studentsRes && studentsRes.ok) {
+      const data = await studentsRes.json();
+      allServerData = data.results || (Array.isArray(data) ? data : []);
     }
 
     if (allServerData && allServerData.length > 0) {
@@ -616,16 +610,18 @@ export const fetchStudents = async (params = {}) => {
 
       const serialized = JSON.stringify(normalizedServer);
       safeLocalStorageSet('bama_students_list', serialized);
-      ['bama_cadets_roster', 'bama_students', 'bama_cadets'].forEach(k => {
-        try { localStorage.removeItem(k); } catch(e) {}
-      });
+      _studentsCache = normalizedServer;
+      _studentsCacheTime = Date.now();
       return normalizedServer;
     }
   } catch (err) {
     console.error('Failed to fetch students from live server:', err);
   }
 
-  return getStoredStudents();
+  const fallback = getStoredStudents();
+  _studentsCache = fallback;
+  _studentsCacheTime = Date.now();
+  return fallback;
 };
 
 export const createStudent = async (data) => {
@@ -1014,7 +1010,11 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
   }
 };
 
-export const fetchBranches = async () => {
+export const fetchBranches = async (forceRefresh = false) => {
+  if (!forceRefresh && _branchesCache && (Date.now() - _branchesCacheTime < CACHE_TTL_MS)) {
+    return _branchesCache;
+  }
+
   const branchMap = new Map();
 
   const deletedBranchIds = (() => {
@@ -1158,10 +1158,10 @@ export const fetchBranches = async () => {
   const cleaned = sanitizeBranches(Array.from(branchMap.values()).filter(b => 
     !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())
   ));
-  safeLocalStorageSet('bama_custom_branches', cleaned);
-  safeLocalStorageSet('bama_branches', cleaned);
-
-  return cleaned.length > 0 ? cleaned : INITIAL_BRANCHES;
+  const result = cleaned.length > 0 ? cleaned : INITIAL_BRANCHES;
+  _branchesCache = result;
+  _branchesCacheTime = Date.now();
+  return result;
 };
 
 // Generate a guaranteed unique branch code (e.g. BAMA-DOJO-11) that never collides with existing dojos
@@ -1226,6 +1226,7 @@ export const createBranchBackend = async (branchData, retryCount = 2) => {
             await saveBranchImageBackend(serverData.id, finalImg, serverData.code, serverData.name);
           } catch (e) {}
         }
+        invalidateBranchesCache();
         return { 
           success: true, 
           ...branchData, 
@@ -1294,12 +1295,14 @@ export const updateBranchBackend = async (id, branchData) => {
         body: JSON.stringify(payload)
       });
     }
+    invalidateBranchesCache();
   } catch (err) {
     console.error('Failed to update branch on backend:', err);
   }
 };
 
 export const deleteBranchBackend = async (id, branchName = '') => {
+  invalidateBranchesCache();
   try {
     const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_branch_ids') || '[]');
     if (id) deletedIds.push(String(id));
@@ -1427,6 +1430,7 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
 
 export const saveTrainingSchedulesBackend = async (schedules) => {
   if (!Array.isArray(schedules)) return false;
+  invalidateSchedulesCache();
   try {
     const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
@@ -1447,6 +1451,7 @@ export const saveTrainingSchedulesBackend = async (schedules) => {
 };
 
 export const createTrainingScheduleBackend = async (shiftData) => {
+  invalidateSchedulesCache();
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     const existing = stored ? JSON.parse(stored) : [];
@@ -1460,6 +1465,7 @@ export const createTrainingScheduleBackend = async (shiftData) => {
 };
 
 export const updateTrainingScheduleBackend = async (id, shiftData) => {
+  invalidateSchedulesCache();
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     const existing = stored ? JSON.parse(stored) : [];
@@ -1482,7 +1488,11 @@ export const filterOutDummyShifts = (list) => {
   });
 };
 
-export const fetchTrainingSchedules = async () => {
+export const fetchTrainingSchedules = async (forceRefresh = false) => {
+  if (!forceRefresh && _schedulesCache && (Date.now() - _schedulesCacheTime < CACHE_TTL_MS)) {
+    return _schedulesCache;
+  }
+
   const scheduleMap = new Map();
   let serverSchedulesCount = 0;
 
@@ -1539,6 +1549,8 @@ export const fetchTrainingSchedules = async () => {
     }
   }
 
+  _schedulesCache = finalSchedules;
+  _schedulesCacheTime = Date.now();
   return finalSchedules;
 };
 

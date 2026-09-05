@@ -71,15 +71,24 @@ export default function App() {
       } catch (e) {}
     };
 
+    // Pre-warm backend and keep-alive ping so Fly.io never goes to sleep while app is open
+    const pingBackend = () => {
+      fetch('https://bama-club-backend.fly.dev/api/branches/?_ping=1', { method: 'HEAD', cache: 'no-store' }).catch(() => {});
+    };
+    pingBackend();
+    const keepAliveInterval = setInterval(pingBackend, 3.5 * 60 * 1000);
+
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         checkFreshness();
+        pingBackend();
       }
     };
 
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
+      clearInterval(keepAliveInterval);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
