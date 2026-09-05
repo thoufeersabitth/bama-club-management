@@ -726,7 +726,7 @@ export default function Home() {
 
       {/* 6. OUR BRANCHES SECTION PRO MAX */}
       {(() => {
-        const activeBranches = sanitizeBranches((cms?.branches && cms.branches.length > 0) ? cms.branches : branches);
+        const activeBranches = sanitizeBranches(branches && branches.length > 0 ? branches : (cms?.branches && cms.branches.length > 0 ? cms.branches : INITIAL_BRANCHES));
 
         return (
           <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-gray-900 relative overflow-hidden">
@@ -742,25 +742,22 @@ export default function Home() {
               </p>
             </div>
 
-            {/* MOBILE ONLY: Continuous Auto-Moving Ribbon Track (< md) */}
-            <div className="block md:hidden relative w-full overflow-hidden mt-6">
-              <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#07080C] to-transparent z-20 pointer-events-none"></div>
-              <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#07080C] to-transparent z-20 pointer-events-none"></div>
-
-              <div className="animate-ribbon-loop gap-6 py-4 px-2">
-                {[...activeBranches, ...activeBranches, ...activeBranches].map((b, idx) => {
+            {/* MOBILE ONLY: Smooth Touch-Swipeable Dojo Track (< md) */}
+            <div className="block md:hidden relative w-full mt-6">
+              <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-4 px-2">
+                {activeBranches.map((b, idx) => {
                   const branchImg = b.image || b.img || b.photo || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
                   return (
                     <div
                       key={`mob-br-${b.id}-${idx}`}
-                      className="w-72 flex-shrink-0 bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl overflow-hidden shadow-2xl border border-gray-800/90 flex flex-col justify-between hover:border-amber-400 transition-all duration-500 group cursor-pointer"
+                      className="w-[280px] flex-shrink-0 snap-center bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl overflow-hidden shadow-2xl border border-gray-800/90 flex flex-col justify-between"
                     >
                       <div>
                         <div className="h-44 bg-gray-900 relative overflow-hidden">
                           <img
                             src={branchImg}
                             alt={b.name}
-                            className="w-full h-full object-cover opacity-90 brightness-95 group-hover:scale-105 transition-transform duration-500"
+                            className="w-full h-full object-cover opacity-90 brightness-95"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#0F111D] via-transparent to-black/40"></div>
                           <span className="absolute top-3 left-3 px-3 py-1 bg-red-950/90 backdrop-blur-md text-amber-300 border border-red-800 text-[9px] font-black font-mono rounded-full uppercase tracking-wider shadow-lg">
@@ -774,7 +771,7 @@ export default function Home() {
                         </div>
 
                         <div className="p-5 space-y-3">
-                          <h3 className="text-lg font-black text-white uppercase tracking-wider group-hover:text-amber-400 transition-colors">
+                          <h3 className="text-lg font-black text-white uppercase tracking-wider text-amber-400">
                             {b.name}
                           </h3>
                           <p className="text-xs text-gray-300 font-medium flex items-start gap-2">
@@ -803,11 +800,20 @@ export default function Home() {
                   );
                 })}
               </div>
+              <div className="flex items-center justify-between px-2 pt-2 text-[11px] text-gray-400 font-medium">
+                <span>👈 Swipe to view all {activeBranches.length} branches 👉</span>
+                <button
+                  onClick={() => navigate('/branches')}
+                  className="text-amber-400 font-bold hover:underline"
+                >
+                  View All ({activeBranches.length}) →
+                </button>
+              </div>
             </div>
 
-            {/* Interactive Auto-Sliding Track for > 3 Branches OR Grid for <= 3 */}
+            {/* DESKTOP ONLY: Interactive Auto-Sliding Track for > 3 Branches OR Grid for <= 3 */}
             {activeBranches.length > 3 ? (
-              <div className="relative group/slider mt-6">
+              <div className="hidden md:block relative group/slider mt-6">
                 {/* Left Arrow Button */}
                 <button
                   type="button"

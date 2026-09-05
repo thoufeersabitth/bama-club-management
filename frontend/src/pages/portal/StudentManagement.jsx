@@ -3856,18 +3856,42 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Row 3.5: Branch Dojo (Locked in Edit Profile) */}
+              {/* Row 3.5: Branch Dojo (Select & Transfer Branch) */}
               <div>
                 <label className="block text-gray-700 font-bold mb-1 truncate flex items-center justify-between">
                   <span className="text-xs font-bold text-gray-700">Branch Dojo *</span>
-                  <span className="text-[9px] text-amber-800 font-black bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-300 ml-1">🔒 Locked</span>
+                  <span className="text-[9px] text-emerald-800 font-black bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-300 ml-1">✓ Change Branch</span>
                 </label>
-                <input
-                  type="text"
-                  disabled={true}
-                  value={editingStudent.branch_name || editingStudent.branch || 'Pulikkal Branch (Head Office)'}
-                  className="w-full bg-gray-100 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-700 font-bold text-xs cursor-not-allowed transition truncate shadow-inner"
-                />
+                <select
+                  value={editingStudent.branch_id || editingStudent.branch || editingStudent.branch_name || ''}
+                  onChange={(e) => {
+                    const selectedVal = e.target.value;
+                    const matchedB = branchesList.find(b => 
+                      String(b.id) === String(selectedVal) || 
+                      String(b.name).toLowerCase() === String(selectedVal).toLowerCase() ||
+                      String(b.code).toLowerCase() === String(selectedVal).toLowerCase()
+                    );
+                    const bName = matchedB ? matchedB.name : selectedVal;
+                    const bId = matchedB ? matchedB.id : selectedVal;
+                    const bShifts = getDynamicShiftOptions(bName, editingStudent.program || 'Karate (Shotokan)', branchesList);
+                    setEditingStudent({
+                      ...editingStudent,
+                      branch: bId,
+                      branch_id: bId,
+                      branch_name: bName,
+                      branchName: bName,
+                      dojo_branch: bName,
+                      shift: bShifts[0] || editingStudent.shift
+                    });
+                  }}
+                  className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:outline-none focus:border-red-500 cursor-pointer shadow-sm"
+                >
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.id || b.name}>
+                      {b.name} ({b.code || 'DOJO'})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Row 4: Training Shift Batch Field */}
