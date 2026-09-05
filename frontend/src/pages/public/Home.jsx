@@ -39,9 +39,7 @@ export default function Home() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = sanitizeBranches(parsed);
-          localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
           setBranches(cleaned);
-          return;
         }
       }
     } catch (e) {}

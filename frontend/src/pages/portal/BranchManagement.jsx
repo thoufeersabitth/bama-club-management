@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -194,10 +194,13 @@ export default function BranchManagement() {
           ...editBranch,
           ...formData,
           facilities: facilityArray,
-          image: photoUrl,
-          img: photoUrl,
-          photo: photoUrl
+          image: photoUrl || editBranch.image,
+          img: photoUrl || editBranch.img,
+          photo: photoUrl || editBranch.photo
         };
+        if (photoUrl && !photoUrl.startsWith('/assets/')) {
+          saveBranchImageBackend(editBranch.id, photoUrl, updatedItem.code, updatedItem.name).catch(() => {});
+        }
         updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
         updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
         setBannerMessage({ type: 'success', text: `Branch "${formData.name}" updated successfully!` });
@@ -236,7 +239,16 @@ export default function BranchManagement() {
           return;
         }
 
-        const finalBranch = serverResult?.id ? serverResult : newB;
+        const finalBranch = {
+          ...newB,
+          ...(serverResult?.id ? serverResult : {}),
+          image: photoUrl || newB.image,
+          img: photoUrl || newB.img,
+          photo: photoUrl || newB.photo
+        };
+        if (photoUrl && !photoUrl.startsWith('/assets/')) {
+          saveBranchImageBackend(finalBranch.id, photoUrl, finalBranch.code, finalBranch.name).catch(() => {});
+        }
         updatedList = [...branches.filter(b => b.id !== finalBranch.id), finalBranch];
         setBannerMessage({ type: 'success', text: `Branch "${formData.name}" created successfully (Code: ${bCode})!` });
       }

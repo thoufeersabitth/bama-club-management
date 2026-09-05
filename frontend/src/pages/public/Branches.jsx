@@ -34,12 +34,10 @@ export default function Branches() {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = sanitizeBranches(parsed);
-          localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
           setBranches(cleaned);
           fetchStudents().then(stData => {
             if (stData && stData.length > 0) setStudents(stData);
           });
-          return;
         }
       }
     } catch (e) {}

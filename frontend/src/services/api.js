@@ -917,6 +917,88 @@ export const sanitizeBranches = (list) => {
   });
 };
 
+export const syncAllBranchImagesBackend = async (imagesMap) => {
+  if (!imagesMap || typeof imagesMap !== 'object' || Object.keys(imagesMap).length === 0) return;
+  try {
+    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    const existingData = existingRes.ok ? await existingRes.json() : {};
+    const existingImages = (existingData && typeof existingData.branch_images === 'object' && existingData.branch_images !== null) ? existingData.branch_images : {};
+    const mergedImages = { ...existingImages, ...imagesMap };
+    
+    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        ...existingData,
+        branch_images: mergedImages
+      })
+    });
+  } catch (err) {
+    console.warn('Failed to bulk sync branch images to backend cms-config:', err);
+  }
+};
+
+export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = '', branchName = '') => {
+  if (!imageUrl) return;
+  try {
+    let localImages = {};
+    try {
+      localImages = JSON.parse(localStorage.getItem('bama_branch_images') || '{}');
+    } catch (e) {}
+    
+    if (branchId) {
+      localImages[String(branchId)] = imageUrl;
+      localImages[String(branchId).toLowerCase().trim()] = imageUrl;
+    }
+    if (branchCode) {
+      localImages[String(branchCode)] = imageUrl;
+      localImages[String(branchCode).toUpperCase().trim()] = imageUrl;
+    }
+    if (branchName) {
+      localImages[String(branchName)] = imageUrl;
+      localImages[String(branchName).toLowerCase().trim()] = imageUrl;
+    }
+    try {
+      localStorage.setItem('bama_branch_images', JSON.stringify(localImages));
+    } catch (e) {}
+
+    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    const existingData = existingRes.ok ? await existingRes.json() : {};
+    const existingImages = (existingData && typeof existingData.branch_images === 'object' && existingData.branch_images !== null) ? existingData.branch_images : {};
+    
+    const updatedImages = { ...existingImages };
+    if (branchId) {
+      updatedImages[String(branchId)] = imageUrl;
+      updatedImages[String(branchId).toLowerCase().trim()] = imageUrl;
+    }
+    if (branchCode) {
+      updatedImages[String(branchCode)] = imageUrl;
+      updatedImages[String(branchCode).toUpperCase().trim()] = imageUrl;
+    }
+    if (branchName) {
+      updatedImages[String(branchName)] = imageUrl;
+      updatedImages[String(branchName).toLowerCase().trim()] = imageUrl;
+    }
+
+    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        ...existingData,
+        branch_images: updatedImages
+      })
+    });
+  } catch (err) {
+    console.warn('Failed to save branch image to backend cms-config:', err);
+  }
+};
+
 export const fetchBranches = async () => {
   const branchMap = new Map();
 
@@ -928,14 +1010,41 @@ export const fetchBranches = async () => {
     }
   })();
 
+  let cloudBranchImages = {};
+  try {
+    const localImgCache = JSON.parse(localStorage.getItem('bama_branch_images') || '{}');
+    if (localImgCache && typeof localImgCache === 'object') {
+      cloudBranchImages = { ...localImgCache };
+    }
+  } catch (e) {}
+
   // 1. Fetch directly from Fly.io live PostgreSQL server FIRST
   let fetchedFromServer = false;
   try {
-    const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
-      headers: { 'Accept': 'application/json' },
-      cache: 'no-store'
-    });
-    if (res.ok) {
+    const [res, cmsRes] = await Promise.all([
+      fetch(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      }).catch(() => null),
+      fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      }).catch(() => null)
+    ]);
+
+    if (cmsRes && cmsRes.ok) {
+      try {
+        const cmsData = await cmsRes.json();
+        if (cmsData && typeof cmsData.branch_images === 'object' && cmsData.branch_images !== null) {
+          cloudBranchImages = { ...cloudBranchImages, ...cmsData.branch_images };
+          try {
+            localStorage.setItem('bama_branch_images', JSON.stringify(cloudBranchImages));
+          } catch (e) {}
+        }
+      } catch (e) {}
+    }
+
+    if (res && res.ok) {
       const data = await res.json();
       const serverBranches = data.results || (Array.isArray(data) ? data : []);
       if (Array.isArray(serverBranches) && serverBranches.length > 0) {
@@ -943,11 +1052,27 @@ export const fetchBranches = async () => {
         serverBranches.forEach(b => {
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
           if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+            const idKey = String(b.id || '').toLowerCase().trim();
+            const codeKey = String(b.code || '').toUpperCase().trim();
+            const nameKey = String(b.name || '').toLowerCase().trim();
+            
+            const resolvedImg = cloudBranchImages[b.id] ||
+                                cloudBranchImages[idKey] ||
+                                cloudBranchImages[b.code] ||
+                                cloudBranchImages[codeKey] ||
+                                cloudBranchImages[b.name] ||
+                                cloudBranchImages[nameKey] ||
+                                (b.image && !b.image.startsWith('/assets/') ? b.image : null) ||
+                                (b.photo && !b.photo.startsWith('/assets/') ? b.photo : null) ||
+                                ((b.is_head_office ?? b.isHeadOffice) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+
             branchMap.set(key, {
               ...b,
               isHeadOffice: b.is_head_office ?? b.isHeadOffice,
               head: b.branch_head || b.head,
-              image: b.image || b.photo || '/assets/prog_adults.jpg'
+              image: resolvedImg,
+              img: resolvedImg,
+              photo: resolvedImg
             });
           }
         });
@@ -963,12 +1088,42 @@ export const fetchBranches = async () => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        let hasUnsyncedImages = false;
         parsed.forEach(b => {
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
+          const customImg = b.image || b.img || b.photo;
+          if (customImg && !customImg.startsWith('/assets/')) {
+            const idKey = String(b.id || '').toLowerCase().trim();
+            const codeKey = String(b.code || '').toUpperCase().trim();
+            const nameKey = String(b.name || '').toLowerCase().trim();
+            if (idKey && !cloudBranchImages[idKey]) { cloudBranchImages[idKey] = customImg; hasUnsyncedImages = true; }
+            if (codeKey && !cloudBranchImages[codeKey]) { cloudBranchImages[codeKey] = customImg; hasUnsyncedImages = true; }
+            if (nameKey && !cloudBranchImages[nameKey]) { cloudBranchImages[nameKey] = customImg; hasUnsyncedImages = true; }
+          }
           if (key && !branchMap.has(key) && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
-            branchMap.set(key, b);
+            const finalImg = customImg || b.image || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+            branchMap.set(key, {
+              ...b,
+              image: finalImg,
+              img: finalImg,
+              photo: finalImg
+            });
+          } else if (key && branchMap.has(key)) {
+            const existing = branchMap.get(key);
+            if ((!existing.image || existing.image.startsWith('/assets/')) && customImg && !customImg.startsWith('/assets/')) {
+              branchMap.set(key, {
+                ...existing,
+                image: customImg,
+                img: customImg,
+                photo: customImg
+              });
+            }
           }
         });
+
+        if (hasUnsyncedImages) {
+          syncAllBranchImagesBackend(cloudBranchImages).catch(() => {});
+        }
       }
     }
   } catch (e) {}
@@ -1039,7 +1194,18 @@ export const createBranchBackend = async (branchData) => {
     });
     if (res.ok) {
       const serverData = await res.json();
-      return { success: true, ...branchData, ...serverData };
+      const finalImg = branchData.image || branchData.photo || branchData.img;
+      if (finalImg && !finalImg.startsWith('/assets/')) {
+        saveBranchImageBackend(serverData.id, finalImg, serverData.code, serverData.name).catch(() => {});
+      }
+      return { 
+        success: true, 
+        ...branchData, 
+        ...serverData,
+        image: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'),
+        img: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'),
+        photo: finalImg || (branchData.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg')
+      };
     } else {
       const errText = await res.text();
       let errMsg = errText;
@@ -1060,6 +1226,11 @@ export const createBranchBackend = async (branchData) => {
 
 export const updateBranchBackend = async (id, branchData) => {
   try {
+    const finalImg = branchData.image || branchData.photo || branchData.img;
+    if (finalImg && !finalImg.startsWith('/assets/')) {
+      saveBranchImageBackend(id, finalImg, branchData.code, branchData.name).catch(() => {});
+    }
+
     const payload = {
       name: branchData.name || 'Dojo Branch',
       code: branchData.code || `BAMA-DOJO-${Math.floor(10 + Math.random() * 90)}`,
