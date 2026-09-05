@@ -1441,6 +1441,7 @@ export const filterOutDummyShifts = (list) => {
 
 export const fetchTrainingSchedules = async () => {
   const scheduleMap = new Map();
+  let serverSchedulesCount = 0;
 
   // 1. Fetch persistent schedules directly from Fly.io PostgreSQL cms-config
   try {
@@ -1451,6 +1452,7 @@ export const fetchTrainingSchedules = async () => {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.training_schedules) && data.training_schedules.length > 0) {
+        serverSchedulesCount = data.training_schedules.length;
         data.training_schedules.forEach(s => {
           if (s && s.id) {
             const key = String(s.name + (s.branch || '')).toLowerCase().trim();
@@ -1487,6 +1489,11 @@ export const fetchTrainingSchedules = async () => {
     try {
       localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
     } catch (e) {}
+
+    // Automatically sync merged schedules to Fly.io cloud backend so both phone and laptop share the exact same schedules!
+    if (finalSchedules.length > serverSchedulesCount) {
+      saveTrainingSchedulesBackend(finalSchedules).catch(() => {});
+    }
   }
 
   return finalSchedules;
