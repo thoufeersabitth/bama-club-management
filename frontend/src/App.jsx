@@ -33,7 +33,7 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_05_live_img_v9';
+    const APP_VERSION = 'bama_v2026_09_05_live_img_v10';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       try {
         const storedSchedules = localStorage.getItem('bama_training_schedules');

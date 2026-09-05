@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Globe, Save, CheckCircle2, Sparkles, Image as ImageIcon, Plus, Trash2, Edit,
   Shield, Award, Users, MapPin, ExternalLink, Bell, Eye, Layers, Flame, Target, Dumbbell, Star, Camera, Upload, X, Building2,
-  Clock, Phone, Mail, Check, Search
+  Clock, Phone, Mail, Check, Search, Loader2
 } from 'lucide-react';
 import { ACADEMY_INFO, INITIAL_BRANCHES } from '../../services/initialData';
 import { getCmsConfig, saveCmsConfig } from '../../services/cmsService';
@@ -169,6 +169,10 @@ export default function CMSManagement() {
     img: '/assets/prog_adults.jpg',
     isHeadOffice: false
   });
+  const [uploadingBranchId, setUploadingBranchId] = useState(null);
+  const [photoUploadSuccessId, setPhotoUploadSuccessId] = useState(null);
+  const [isProcessingModalPhoto, setIsProcessingModalPhoto] = useState(false);
+  const [isSavingBranchCMS, setIsSavingBranchCMS] = useState(false);
 
   // New Program Course Form State
   const [showProgramModal, setShowProgramModal] = useState(false);
@@ -186,9 +190,10 @@ export default function CMSManagement() {
   });
 
   // Smart Image Compression & Conversion to Base64 (Prevents LocalStorage Quota Crashes)
-  const handleImageFilePick = (e, callback) => {
+  const handleImageFilePick = (e, callback, onStart, onError) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
+      if (onStart) onStart();
       const reader = new FileReader();
       reader.onload = (event) => {
         const rawDataUrl = event.target.result;
@@ -229,59 +234,75 @@ export default function CMSManagement() {
           }
         };
         img.onerror = () => {
+          if (onError) onError();
           callback(rawDataUrl);
         };
         img.src = rawDataUrl;
       };
+      reader.onerror = () => {
+        if (onError) onError();
+      };
       reader.readAsDataURL(file);
+    } else {
+      if (onError) onError();
     }
   };
 
   // Branch CMS Save Handler
   const handleSaveBranchCMS = async (e) => {
     e.preventDefault();
-    const photoUrl = branchForm.img || branchForm.image || '/assets/prog_adults.jpg';
-    let updated = branchesList;
-    if (editingBranch) {
-      updated = branchesList.map(b => b.id === editingBranch.id ? {
-        ...b,
-        ...branchForm,
-        image: photoUrl,
-        img: photoUrl,
-        photo: photoUrl
-      } : b);
-    } else {
-      const newB = {
-        id: `branch-${Date.now()}`,
-        ...branchForm,
-        image: photoUrl,
-        img: photoUrl,
-        photo: photoUrl,
-        status: 'Active'
-      };
-      updated = [...branchesList, newB];
+    setIsSavingBranchCMS(true);
+    try {
+      const photoUrl = branchForm.img || branchForm.image || '/assets/prog_adults.jpg';
+      let updated = branchesList;
+      let targetId = '';
+      if (editingBranch) {
+        targetId = editingBranch.id;
+        updated = branchesList.map(b => b.id === editingBranch.id ? {
+          ...b,
+          ...branchForm,
+          image: photoUrl,
+          img: photoUrl,
+          photo: photoUrl
+        } : b);
+      } else {
+        targetId = `branch-${Date.now()}`;
+        const newB = {
+          id: targetId,
+          ...branchForm,
+          image: photoUrl,
+          img: photoUrl,
+          photo: photoUrl,
+          status: 'Active'
+        };
+        updated = [...branchesList, newB];
+      }
+      setBranchesList(updated);
+      localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
+      localStorage.setItem('bama_branches', JSON.stringify(updated));
+
+      // Save photo to backend and await so it is 100% synced before closing
+      if (photoUrl && !photoUrl.startsWith('/assets/')) {
+        await saveBranchImageBackend(targetId, photoUrl, branchForm.code, branchForm.name).catch(() => {});
+      }
+
+      const updatedCms = { ...cmsConfig, branches: updated };
+      setCmsConfig(updatedCms);
+      await saveCmsConfig(updatedCms).catch(() => {});
+
+      window.dispatchEvent(new Event('bama_branches_updated'));
+      window.dispatchEvent(new Event('bama_data_updated'));
+      window.dispatchEvent(new Event('cms_updated'));
+      setShowBranchModal(false);
+      setEditingBranch(null);
+      setSaveNotification(true);
+      setTimeout(() => setSaveNotification(false), 3000);
+    } catch (err) {
+      console.error('Failed to save branch CMS:', err);
+      alert('Failed to save branch. Please check connection and try again.');
+    } finally {
+      setIsSavingBranchCMS(false);
     }
-    setBranchesList(updated);
-    localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
-    localStorage.setItem('bama_branches', JSON.stringify(updated));
-
-    // Save image directly first for fast cross-device sync
-    const targetId = editingBranch ? editingBranch.id : (updated[updated.length - 1]?.id);
-    if (photoUrl && !photoUrl.startsWith('/assets/')) {
-      saveBranchImageBackend(targetId, photoUrl, branchForm.code, branchForm.name).catch(() => {});
-    }
-
-    const updatedCms = { ...cmsConfig, branches: updated };
-    setCmsConfig(updatedCms);
-    saveCmsConfig(updatedCms).catch(() => {});
-
-    window.dispatchEvent(new Event('bama_branches_updated'));
-    window.dispatchEvent(new Event('bama_data_updated'));
-    window.dispatchEvent(new Event('cms_updated'));
-    setShowBranchModal(false);
-    setEditingBranch(null);
-    setSaveNotification(true);
-    setTimeout(() => setSaveNotification(false), 3000);
   };
 
   // Save Config to LocalStorage & Central Django Backend
@@ -892,6 +913,31 @@ export default function CMSManagement() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+
+                    {/* Active Uploading / Syncing Loading Overlay */}
+                    {uploadingBranchId === branch.id && (
+                      <div className="absolute inset-0 bg-black/85 backdrop-blur-xs z-30 flex flex-col items-center justify-center p-3 text-center transition-all animate-fadeIn">
+                        <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center mb-2 shadow-lg shadow-amber-500/20">
+                          <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
+                        </div>
+                        <p className="text-white font-black text-xs tracking-wide">Syncing Photo Live...</p>
+                        <p className="text-[10px] text-amber-300 font-medium mt-0.5">Uploading to Cloud & Mobile</p>
+                        <div className="w-32 h-1.5 bg-white/20 rounded-full mt-2.5 overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-amber-400 to-red-500 animate-pulse w-full rounded-full" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload Success Overlay */}
+                    {photoUploadSuccessId === branch.id && (
+                      <div className="absolute inset-0 bg-emerald-950/90 backdrop-blur-xs z-30 flex flex-col items-center justify-center p-3 text-center transition-all animate-fadeIn">
+                        <div className="w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center mb-1.5 shadow-lg shadow-emerald-500/30">
+                          <Check className="w-6 h-6 stroke-[3]" />
+                        </div>
+                        <p className="text-white font-black text-xs">Photo Live & Synced!</p>
+                        <p className="text-[10px] text-emerald-300 font-medium">Updated across all devices</p>
+                      </div>
+                    )}
                     
                     {/* Branch Code & Badge */}
                     <div className="absolute top-3 left-3 flex items-center gap-1.5">
@@ -906,35 +952,50 @@ export default function CMSManagement() {
                     </div>
 
                     {/* Instant Image Upload Button overlay on photo */}
-                    <label
-                      className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/80 hover:bg-red-600 text-white rounded-xl text-[11px] font-bold border border-white/30 backdrop-blur-xs flex items-center gap-1.5 cursor-pointer shadow-md transition"
-                      title="Upload Photo for this Branch"
-                    >
-                      <Camera className="w-3.5 h-3.5" /> Change Photo
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onClick={(e) => { e.target.value = null; }}
-                        onChange={(e) => {
-                          handleImageFilePick(e, async (dataUrl) => {
-                            const updated = branchesList.map(b => b.id === branch.id ? { ...b, image: dataUrl, img: dataUrl, photo: dataUrl } : b);
-                            setBranchesList(updated);
-                            localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
-                            localStorage.setItem('bama_branches', JSON.stringify(updated));
-                            await saveBranchImageBackend(branch.id, dataUrl, branch.code, branch.name);
-                            const updatedCms = { ...cmsConfig, branches: updated };
-                            setCmsConfig(updatedCms);
-                            saveCmsConfig(updatedCms).catch(() => {});
-                            window.dispatchEvent(new Event('bama_branches_updated'));
-                            window.dispatchEvent(new Event('bama_data_updated'));
-                            window.dispatchEvent(new Event('cms_updated'));
-                            setSaveNotification(true);
-                            setTimeout(() => setSaveNotification(false), 3000);
-                          });
-                        }}
-                        className="hidden"
-                      />
-                    </label>
+                    {uploadingBranchId !== branch.id && (
+                      <label
+                        className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/80 hover:bg-red-600 text-white rounded-xl text-[11px] font-bold border border-white/30 backdrop-blur-xs flex items-center gap-1.5 cursor-pointer shadow-md transition group/btn"
+                        title="Upload Photo for this Branch"
+                      >
+                        <Camera className="w-3.5 h-3.5 text-amber-400 group-hover/btn:rotate-12 transition-transform" /> Change Photo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onClick={(e) => { e.target.value = null; }}
+                          onChange={(e) => {
+                            handleImageFilePick(
+                              e,
+                              async (dataUrl) => {
+                                try {
+                                  const updated = branchesList.map(b => b.id === branch.id ? { ...b, image: dataUrl, img: dataUrl, photo: dataUrl } : b);
+                                  setBranchesList(updated);
+                                  localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
+                                  localStorage.setItem('bama_branches', JSON.stringify(updated));
+                                  await saveBranchImageBackend(branch.id, dataUrl, branch.code, branch.name);
+                                  const updatedCms = { ...cmsConfig, branches: updated };
+                                  setCmsConfig(updatedCms);
+                                  saveCmsConfig(updatedCms).catch(() => {});
+                                  setUploadingBranchId(null);
+                                  setPhotoUploadSuccessId(branch.id);
+                                  setTimeout(() => setPhotoUploadSuccessId(null), 2500);
+                                  window.dispatchEvent(new Event('bama_branches_updated'));
+                                  window.dispatchEvent(new Event('bama_data_updated'));
+                                  window.dispatchEvent(new Event('cms_updated'));
+                                  setSaveNotification(true);
+                                  setTimeout(() => setSaveNotification(false), 3000);
+                                } catch (err) {
+                                  setUploadingBranchId(null);
+                                  alert('Failed to sync photo. Please check your connection.');
+                                }
+                              },
+                              () => setUploadingBranchId(branch.id),
+                              () => setUploadingBranchId(null)
+                            );
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
                   </div>
 
                   {/* Branch Details */}
@@ -1208,11 +1269,23 @@ export default function CMSManagement() {
                   <Camera className="w-4 h-4 text-red-600" /> Official Dojo Photo / Banner *
                 </label>
 
-                {branchForm.img && (
-                  <div className="h-40 w-full rounded-xl overflow-hidden border border-gray-300 relative shadow-sm">
+                <div className="h-40 w-full rounded-xl overflow-hidden border border-gray-300 relative shadow-sm bg-gray-100 flex items-center justify-center">
+                  {isProcessingModalPhoto && (
+                    <div className="absolute inset-0 bg-black/75 backdrop-blur-xs z-20 flex flex-col items-center justify-center p-2 text-center text-white">
+                      <Loader2 className="w-8 h-8 text-amber-400 animate-spin mb-1.5" />
+                      <span className="text-xs font-bold">Optimizing Photo...</span>
+                      <span className="text-[10px] text-gray-300">Cropping to 16:9 widescreen banner</span>
+                    </div>
+                  )}
+                  {branchForm.img ? (
                     <img src={branchForm.img} alt="Dojo Preview" className="w-full h-full object-cover" />
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-400 text-xs flex flex-col items-center gap-1">
+                      <ImageIcon className="w-6 h-6 text-gray-300" />
+                      <span>No photo selected yet</span>
+                    </div>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-2 pt-1">
                   <label className="px-3.5 py-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-900 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition">
@@ -1220,8 +1293,19 @@ export default function CMSManagement() {
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={isProcessingModalPhoto}
                       onClick={(e) => { e.target.value = null; }}
-                      onChange={(e) => handleImageFilePick(e, (dataUrl) => setBranchForm(prev => ({ ...prev, img: dataUrl })))}
+                      onChange={(e) => {
+                        handleImageFilePick(
+                          e,
+                          (dataUrl) => {
+                            setBranchForm(prev => ({ ...prev, img: dataUrl }));
+                            setIsProcessingModalPhoto(false);
+                          },
+                          () => setIsProcessingModalPhoto(true),
+                          () => setIsProcessingModalPhoto(false)
+                        );
+                      }}
                       className="hidden"
                     />
                   </label>
@@ -1335,9 +1419,19 @@ export default function CMSManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white font-black text-xs rounded-xl shadow-md shadow-red-600/20 flex items-center gap-2 cursor-pointer"
+                  disabled={isSavingBranchCMS || isProcessingModalPhoto}
+                  className="px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white font-black text-xs rounded-xl shadow-md shadow-red-600/20 flex items-center gap-2 cursor-pointer transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save className="w-4 h-4" /> Save Branch & Photo
+                  {isSavingBranchCMS ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Syncing & Saving to Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" /> Save Branch & Photo
+                    </>
+                  )}
                 </button>
               </div>
             </form>
