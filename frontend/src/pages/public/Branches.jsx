@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Phone, Mail, Clock, Shield, Users, ExternalLink, Sparkles, Navigation } from 'lucide-react';
 import { INITIAL_BRANCHES } from '../../services/initialData';
-import { fetchBranches, fetchStudents, sanitizeBranches } from '../../services/api';
+import { fetchBranches, fetchStudents, sanitizeBranches, getBranchPhotoUrl } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import useScrollReveal from '../../hooks/useScrollReveal';
 
@@ -134,7 +134,7 @@ export default function Branches() {
       {/* Branch Cards */}
       <div className="space-y-10">
         {branchList.map((b, idx) => {
-          const branchImg = b.image || b.img || b.photo || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+          const branchImg = getBranchPhotoUrl(b);
           return (
             <div
               key={b.id}

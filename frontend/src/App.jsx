@@ -33,7 +33,7 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_05_live_img_v7';
+    const APP_VERSION = 'bama_v2026_09_05_live_img_v9';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       try {
         const storedSchedules = localStorage.getItem('bama_training_schedules');
@@ -45,16 +45,12 @@ export default function App() {
         }
       } catch (e) {}
 
+      // Clean only stale cadet/user cache, preserve branches and branch photos
       localStorage.removeItem('bama_cadets_roster');
       localStorage.removeItem('bama_students');
       localStorage.removeItem('bama_cadets');
       localStorage.removeItem('bama_students_list');
-      localStorage.removeItem('bama_branch_images');
-      localStorage.removeItem('bama_cms_config');
-      try {
-        localStorage.setItem('bama_custom_branches', JSON.stringify(INITIAL_BRANCHES));
-        localStorage.setItem('bama_branches', JSON.stringify(INITIAL_BRANCHES));
-      } catch (e) {}
+      localStorage.removeItem('bama_backup_data');
       localStorage.setItem('bama_app_cache_version', APP_VERSION);
     }
 

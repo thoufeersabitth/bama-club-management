@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon, RefreshCw
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -824,7 +824,7 @@ export default function BranchManagement() {
           {filteredBranches.map((b) => {
             const cadetCount = getBranchCadetCount(b);
             const facList = Array.isArray(b.facilities) ? b.facilities : (b.facilities || '').split(',').map(f => f.trim()).filter(Boolean);
-            const branchImg = b.image || b.img || b.photo || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+            const branchImg = getBranchPhotoUrl(b);
 
             return (
               <div
@@ -850,6 +850,32 @@ export default function BranchManagement() {
                       </span>
                     )}
                   </div>
+
+                  {/* Direct Change Photo Button Overlay */}
+                  <label
+                    className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/80 hover:bg-red-600 text-white rounded-xl text-[11px] font-bold border border-white/30 backdrop-blur-xs flex items-center gap-1.5 cursor-pointer shadow-md transition"
+                    title={`Upload new photo for ${b.name}`}
+                  >
+                    <Camera className="w-3.5 h-3.5 text-amber-400" /> Change Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onClick={(e) => { e.target.value = null; }}
+                      onChange={(e) => {
+                        handleImageFilePick(e, async (dataUrl) => {
+                          const updated = branches.map(item => item.id === b.id ? { ...item, image: dataUrl, img: dataUrl, photo: dataUrl } : item);
+                          setBranches(updated);
+                          safeLocalStorageSet('bama_custom_branches', updated);
+                          safeLocalStorageSet('bama_branches', updated);
+                          setBannerMessage({ type: 'success', text: `📸 Syncing photo for ${b.name} to cloud...` });
+                          await saveBranchImageBackend(b.id, dataUrl, b.code, b.name);
+                          setBannerMessage({ type: 'success', text: `✅ Photo for ${b.name} synced live to cloud and mobile!` });
+                          setTimeout(() => setBannerMessage(null), 4000);
+                        });
+                      }}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
 
                 <div className="space-y-3">
@@ -1251,7 +1277,8 @@ export default function BranchManagement() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => handleImageFilePick(e, (dataUrl) => setFormData({ ...formData, image: dataUrl }))}
+                      onClick={(e) => { e.target.value = null; }}
+                      onChange={(e) => handleImageFilePick(e, (dataUrl) => setFormData(prev => ({ ...prev, image: dataUrl })))}
                       className="hidden"
                     />
                   </label>

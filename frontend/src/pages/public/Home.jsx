@@ -10,7 +10,7 @@ import { ACADEMY_INFO, BELT_LEVELS, INITIAL_BRANCHES } from '../../services/init
 import KarateBeltIcon from '../../components/common/KarateBeltIcon';
 import { getCmsConfig } from '../../services/cmsService';
 import useScrollReveal from '../../hooks/useScrollReveal';
-import { fetchBranches, sanitizeBranches } from '../../services/api';
+import { fetchBranches, sanitizeBranches, getBranchPhotoUrl } from '../../services/api';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -752,7 +752,7 @@ export default function Home() {
             <div className="block md:hidden relative w-full mt-6">
               <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-4 px-2">
                 {activeBranches.map((b, idx) => {
-                  const branchImg = b.image || b.img || b.photo || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+                  const branchImg = getBranchPhotoUrl(b);
                   return (
                     <div
                       key={`mob-br-${b.id}-${idx}`}
@@ -848,7 +848,7 @@ export default function Home() {
                   className="flex gap-6 overflow-x-auto scrollbar-none scroll-smooth pb-6 px-2"
                 >
                   {activeBranches.map((b, idx) => {
-                    const branchImg = b.image || b.img || b.photo || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+                    const branchImg = getBranchPhotoUrl(b);
                     return (
                       <div
                         key={`slide-br-${b.id}`}
@@ -911,7 +911,7 @@ export default function Home() {
               /* LAPTOP / DESKTOP ONLY: Dynamic Responsive Grid (>= md) */
               <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-8 mt-6">
                 {activeBranches.map((b, idx) => {
-                  const branchImg = b.image || b.img || b.photo || (b.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+                  const branchImg = getBranchPhotoUrl(b);
                   return (
                     <div
                       key={`desk-br-${b.id}`}

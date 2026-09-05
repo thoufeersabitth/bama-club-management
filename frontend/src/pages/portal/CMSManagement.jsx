@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { ACADEMY_INFO, INITIAL_BRANCHES } from '../../services/initialData';
 import { getCmsConfig, saveCmsConfig } from '../../services/cmsService';
-import { fetchBranches, saveBranchImageBackend } from '../../services/api';
+import { fetchBranches, saveBranchImageBackend, getBranchPhotoUrl } from '../../services/api';
 
 const INITIAL_CMS_CONFIG = {
   hero: {
@@ -195,24 +195,34 @@ export default function CMSManagement() {
         const img = new Image();
         img.onload = () => {
           try {
-            const canvas = document.createElement('canvas');
-            let width = img.width || 800;
-            let height = img.height || 600;
-            const maxDim = 900;
-            if (width > maxDim || height > maxDim) {
-              if (width > height) {
-                height = Math.round((height * maxDim) / width);
-                width = maxDim;
-              } else {
-                width = Math.round((width * maxDim) / height);
-                height = maxDim;
-              }
+            const targetWidth = 540;
+            const targetHeight = 304; // Standard 16:9 widescreen banner
+            const targetAspect = targetWidth / targetHeight;
+            const sourceAspect = img.width / img.height;
+
+            let sx = 0;
+            let sy = 0;
+            let sWidth = img.width;
+            let sHeight = img.height;
+
+            // Smart Center Crop calculation:
+            if (sourceAspect > targetAspect) {
+              sWidth = Math.round(img.height * targetAspect);
+              sx = Math.round((img.width - sWidth) / 2);
+            } else {
+              sHeight = Math.round(img.width / targetAspect);
+              sy = Math.round((img.height - sHeight) / 2);
             }
-            canvas.width = width;
-            canvas.height = height;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
             callback(compressedDataUrl);
           } catch (err) {
             callback(rawDataUrl);
@@ -254,14 +264,16 @@ export default function CMSManagement() {
     setBranchesList(updated);
     localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
     localStorage.setItem('bama_branches', JSON.stringify(updated));
-    const updatedCms = { ...cmsConfig, branches: updated };
-    setCmsConfig(updatedCms);
-    await saveCmsConfig(updatedCms);
 
+    // Save image directly first for fast cross-device sync
+    const targetId = editingBranch ? editingBranch.id : (updated[updated.length - 1]?.id);
     if (photoUrl && !photoUrl.startsWith('/assets/')) {
-      const targetId = editingBranch ? editingBranch.id : (updated[updated.length - 1]?.id);
       saveBranchImageBackend(targetId, photoUrl, branchForm.code, branchForm.name).catch(() => {});
     }
+
+    const updatedCms = { ...cmsConfig, branches: updated };
+    setCmsConfig(updatedCms);
+    saveCmsConfig(updatedCms).catch(() => {});
 
     window.dispatchEvent(new Event('bama_branches_updated'));
     window.dispatchEvent(new Event('bama_data_updated'));
@@ -866,7 +878,7 @@ export default function CMSManagement() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {branchesList.map((branch) => {
-              const branchImg = branch.image || branch.img || branch.photo || (branch.isHeadOffice ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
+              const branchImg = getBranchPhotoUrl(branch);
               return (
                 <div
                   key={branch.id}
@@ -902,16 +914,17 @@ export default function CMSManagement() {
                       <input
                         type="file"
                         accept="image/*"
+                        onClick={(e) => { e.target.value = null; }}
                         onChange={(e) => {
                           handleImageFilePick(e, async (dataUrl) => {
                             const updated = branchesList.map(b => b.id === branch.id ? { ...b, image: dataUrl, img: dataUrl, photo: dataUrl } : b);
                             setBranchesList(updated);
                             localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
                             localStorage.setItem('bama_branches', JSON.stringify(updated));
+                            await saveBranchImageBackend(branch.id, dataUrl, branch.code, branch.name);
                             const updatedCms = { ...cmsConfig, branches: updated };
                             setCmsConfig(updatedCms);
-                            await saveCmsConfig(updatedCms);
-                            saveBranchImageBackend(branch.id, dataUrl, branch.code, branch.name).catch(() => {});
+                            saveCmsConfig(updatedCms).catch(() => {});
                             window.dispatchEvent(new Event('bama_branches_updated'));
                             window.dispatchEvent(new Event('bama_data_updated'));
                             window.dispatchEvent(new Event('cms_updated'));
@@ -1207,7 +1220,8 @@ export default function CMSManagement() {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => handleImageFilePick(e, (dataUrl) => setBranchForm({ ...branchForm, img: dataUrl }))}
+                      onClick={(e) => { e.target.value = null; }}
+                      onChange={(e) => handleImageFilePick(e, (dataUrl) => setBranchForm(prev => ({ ...prev, img: dataUrl })))}
                       className="hidden"
                     />
                   </label>
