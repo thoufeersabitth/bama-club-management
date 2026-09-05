@@ -225,14 +225,36 @@ export default function BranchManagement() {
           img: photoUrl,
           photo: photoUrl
         };
-        if (photoUrl) {
-          try {
-            await saveBranchImageBackend(editBranch.id, photoUrl, updatedItem.code, updatedItem.name);
-          } catch (e) {}
-        }
+
+        // 1. Instant optimistic update: update state & localStorage immediately
         updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
-        await updateBranchBackend(editBranch.id, updatedItem);
+        setBranches(updatedList);
+        try {
+          safeLocalStorageSet('bama_custom_branches', updatedList);
+          safeLocalStorageSet('bama_branches', updatedList);
+        } catch (storageErr) {}
+
+        window.dispatchEvent(new Event('bama_branches_updated'));
+        window.dispatchEvent(new Event('bama_data_updated'));
+
+        // 2. Dismiss modal immediately (0ms delay)
+        setShowAddModal(false);
+        setEditBranch(null);
+        resetForm();
         setBannerMessage({ type: 'success', text: `Branch "${formData.name}" updated successfully!` });
+
+        // 3. Background server synchronization (never blocks UI)
+        (async () => {
+          try {
+            if (photoUrl) {
+              await saveBranchImageBackend(editBranch.id, photoUrl, updatedItem.code, updatedItem.name);
+            }
+            await updateBranchBackend(editBranch.id, updatedItem);
+          } catch (e) {
+            console.warn('Background branch update warning:', e);
+          }
+        })();
+        return;
       } else {
         // Prevent duplicate branch names (case-insensitive)
         const nameDuplicate = branches.find(b => b.name?.trim().toLowerCase() === formData.name?.trim().toLowerCase());
@@ -259,59 +281,42 @@ export default function BranchManagement() {
           photo: photoUrl,
           status: 'Active'
         };
-        
-        const serverResult = await createBranchBackend(newB);
-        if (serverResult?.error) {
-          const cleanMsg = typeof serverResult.message === 'string' && !serverResult.message.includes('<')
-            ? serverResult.message
-            : 'Connection was momentarily reconnecting to database. Please tap "Save Branch Dojo" once more.';
-          setBannerMessage({ type: 'error', text: cleanMsg });
-          alert(`⚠️ ${cleanMsg}`);
-          setSavingBranch(false);
-          return;
-        }
 
-        const finalBranch = {
-          ...newB,
-          ...(serverResult?.id ? serverResult : {}),
-          image: photoUrl,
-          img: photoUrl,
-          photo: photoUrl
-        };
-        if (photoUrl) {
-          try {
-            await saveBranchImageBackend(finalBranch.id, photoUrl, finalBranch.code, finalBranch.name);
-          } catch (e) {}
-        }
-        updatedList = [...branches.filter(b => b.id !== finalBranch.id), finalBranch];
-        setBannerMessage({ type: 'success', text: `Branch "${formData.name}" created successfully (Code: ${bCode})!` });
-      }
+        // 1. Instant optimistic creation
+        updatedList = [...branches.filter(b => b.id !== newB.id), newB];
+        setBranches(updatedList);
+        try {
+          safeLocalStorageSet('bama_custom_branches', updatedList);
+          safeLocalStorageSet('bama_branches', updatedList);
+        } catch (storageErr) {}
 
-      setBranches(updatedList);
-      try {
-        safeLocalStorageSet('bama_custom_branches', updatedList);
-        safeLocalStorageSet('bama_branches', updatedList);
-      } catch (storageErr) {
-        console.warn('Storage sync warning:', storageErr);
-      }
+        window.dispatchEvent(new Event('bama_branches_updated'));
+        window.dispatchEvent(new Event('bama_data_updated'));
 
-      window.dispatchEvent(new Event('bama_branches_updated'));
-      window.dispatchEvent(new Event('bama_data_updated'));
-
-      setShowAddModal(false);
-      setEditBranch(null);
-      resetForm();
-    } catch (err) {
-      console.error('Failed to save branch:', err);
-      if (String(err.message || '').toLowerCase().includes('quota') || String(err.message || '').toLowerCase().includes('storage')) {
-        // Backend creation already succeeded, dismiss modal smoothly without error popup
         setShowAddModal(false);
         setEditBranch(null);
         resetForm();
-      } else {
-        alert(`Error saving branch: ${err.message || 'Unknown error'}`);
-        setBannerMessage({ type: 'error', text: `Error: ${err.message || 'Unknown error'}` });
+        setBannerMessage({ type: 'success', text: `Branch "${formData.name}" created successfully (Code: ${bCode})!` });
+
+        // 2. Background server creation
+        (async () => {
+          try {
+            const serverResult = await createBranchBackend(newB);
+            const finalId = serverResult?.id || newB.id;
+            if (photoUrl) {
+              await saveBranchImageBackend(finalId, photoUrl, bCode, formData.name);
+            }
+          } catch (e) {
+            console.warn('Background branch create warning:', e);
+          }
+        })();
+        return;
       }
+    } catch (err) {
+      console.error('Failed to save branch:', err);
+      setShowAddModal(false);
+      setEditBranch(null);
+      resetForm();
     } finally {
       setSavingBranch(false);
     }

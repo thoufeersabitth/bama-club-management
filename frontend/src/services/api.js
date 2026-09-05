@@ -992,19 +992,26 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
     // 2. Persist to Fly.io live PostgreSQL database via fast dedicated micro-record (<1KB payload)
     const targetQuestion = `BRANCH_PHOTO:${codeKey || idKey || nameKey}`;
     try {
+      const acGet = new AbortController();
+      const getTimeout = setTimeout(() => acGet.abort(), 4000);
       const getRes = await fetch(`https://bama-club-backend.fly.dev/api/faqs/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
-        cache: 'no-store'
+        cache: 'no-store',
+        signal: acGet.signal
       });
+      clearTimeout(getTimeout);
       const getData = getRes.ok ? await getRes.json() : {};
       const results = getData.results || (Array.isArray(getData) ? getData : []);
       const existing = results.find(f => f.question === targetQuestion);
 
+      const acPost = new AbortController();
+      const postTimeout = setTimeout(() => acPost.abort(), 5000);
       if (existing && existing.id) {
         await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' })
+          body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' }),
+          signal: acPost.signal
         });
       } else {
         await fetch('https://bama-club-backend.fly.dev/api/faqs/', {
@@ -1015,9 +1022,11 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
             answer: imageUrl,
             category: 'BRANCH_PHOTO',
             order: 999
-          })
+          }),
+          signal: acPost.signal
         });
       }
+      clearTimeout(postTimeout);
     } catch (dbErr) {
       console.warn('Failed to save branch image to PostgreSQL FAQ storage:', dbErr);
     }
@@ -1295,13 +1304,6 @@ export const createBranchBackend = async (branchData, retryCount = 2) => {
 
 export const updateBranchBackend = async (id, branchData) => {
   try {
-    const finalImg = branchData.image || branchData.photo || branchData.img;
-    if (finalImg) {
-      try {
-        await saveBranchImageBackend(id, finalImg, branchData.code, branchData.name);
-      } catch (e) {}
-    }
-
     const payload = {
       name: branchData.name || 'Dojo Branch',
       code: branchData.code || `BAMA-DOJO-${Math.floor(10 + Math.random() * 90)}`,
@@ -1318,7 +1320,10 @@ export const updateBranchBackend = async (id, branchData) => {
     let targetBackendId = (typeof id === 'string' && id.length > 20) ? id : null;
     if (!targetBackendId) {
       try {
-        const bRes = await fetch('https://bama-club-backend.fly.dev/api/branches/');
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 4000);
+        const bRes = await fetch('https://bama-club-backend.fly.dev/api/branches/', { signal: ac.signal });
+        clearTimeout(timeout);
         if (bRes.ok) {
           const bData = await bRes.json();
           const list = bData.results || (Array.isArray(bData) ? bData : []);
@@ -1332,11 +1337,15 @@ export const updateBranchBackend = async (id, branchData) => {
     }
 
     if (targetBackendId) {
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 5000);
       await fetch(`https://bama-club-backend.fly.dev/api/branches/${targetBackendId}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: ac.signal
       });
+      clearTimeout(timeout);
     }
     invalidateBranchesCache();
   } catch (err) {
