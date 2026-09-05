@@ -1195,6 +1195,10 @@ export const fetchBranches = async (forceRefresh = false) => {
   const result = cleaned.length > 0 ? cleaned : INITIAL_BRANCHES;
   _branchesCache = result;
   _branchesCacheTime = Date.now();
+  try {
+    safeLocalStorageSet('bama_custom_branches', result);
+    safeLocalStorageSet('bama_branches', result);
+  } catch (e) {}
   return result;
 };
 

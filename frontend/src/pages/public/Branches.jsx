@@ -42,10 +42,16 @@ export default function Branches() {
       }
     } catch (e) {}
 
-    fetchBranches().then(data => {
+    fetchBranches(true).then(data => {
       if (data && data.length > 0) {
         const cleaned = sanitizeBranches(data);
-        setBranches(cleaned);
+        if (cleaned.length > 0) {
+          setBranches(cleaned);
+          try {
+            localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
+            localStorage.setItem('bama_branches', JSON.stringify(cleaned));
+          } catch (e) {}
+        }
       }
     });
 
