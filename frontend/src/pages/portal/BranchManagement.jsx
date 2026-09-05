@@ -81,7 +81,7 @@ export default function BranchManagement() {
     targetGroup: 'All Belts & Cadets'
   });
 
-  // Smart Image Compression & Conversion to Base64
+  // Smart Image Auto-Crop to 16:9 Banner, High-Def Compression & Base64
   const handleImageFilePick = (e, callback) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
@@ -91,24 +91,36 @@ export default function BranchManagement() {
         const img = new Image();
         img.onload = () => {
           try {
-            const canvas = document.createElement('canvas');
-            let width = img.width || 600;
-            let height = img.height || 400;
-            const maxDim = 480;
-            if (width > maxDim || height > maxDim) {
-              if (width > height) {
-                height = Math.round((height * maxDim) / width);
-                width = maxDim;
-              } else {
-                width = Math.round((width * maxDim) / height);
-                height = maxDim;
-              }
+            const targetWidth = 600;
+            const targetHeight = 338; // Standard 16:9 widescreen banner
+            const targetAspect = targetWidth / targetHeight;
+            const sourceAspect = img.width / img.height;
+
+            let sx = 0;
+            let sy = 0;
+            let sWidth = img.width;
+            let sHeight = img.height;
+
+            // Smart Center Crop calculation:
+            if (sourceAspect > targetAspect) {
+              // Source is wider than 16:9 -> trim extra left/right
+              sWidth = Math.round(img.height * targetAspect);
+              sx = Math.round((img.width - sWidth) / 2);
+            } else {
+              // Source is taller than 16:9 (e.g. portrait/vertical phone photos) -> trim extra top/bottom
+              sHeight = Math.round(img.width / targetAspect);
+              sy = Math.round((img.height - sHeight) / 2);
             }
-            canvas.width = width;
-            canvas.height = height;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
             callback(compressedDataUrl);
           } catch (err) {
             callback(rawDataUrl);

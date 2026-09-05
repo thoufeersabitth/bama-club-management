@@ -136,8 +136,8 @@ export default function Branches() {
               className="reveal-on-scroll zoom-in bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-6 sm:p-8 border border-gray-800/90 shadow-2xl hover:border-amber-400 transition-all duration-500 hover:-translate-y-2 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative overflow-hidden group"
             >
               {/* Dojo Image Column */}
-              <div className="lg:col-span-4 flex flex-col space-y-3">
-                <div className="h-56 sm:h-64 lg:h-full min-h-[200px] w-full rounded-2xl overflow-hidden relative border border-gray-800/80 shadow-inner group/img bg-black/40">
+              <div className="lg:col-span-4 flex flex-col justify-between space-y-3">
+                <div className="w-full aspect-[16/10] sm:aspect-[16/9] lg:h-[240px] rounded-2xl overflow-hidden relative border border-gray-800/80 shadow-inner group/img bg-black/40">
                   <img
                     src={branchImg}
                     alt={b.name}
@@ -163,6 +163,20 @@ export default function Branches() {
                     <span className="font-mono text-white text-[10px]">
                       {b.name.split(' ')[0]} Hub
                     </span>
+                  </div>
+                </div>
+
+                {/* Dojo Facilities & Amenities Badges */}
+                <div className="bg-black/40 border border-gray-800/70 rounded-2xl p-3 space-y-2">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-400" /> Dojo Facilities
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Array.isArray(b.facilities) && b.facilities.length > 0 ? b.facilities : ['🥋 Safety Tatami Mats', '🥊 Heavy Bags', '🏆 Sparring Ring', '❄️ AC Hall']).slice(0, 4).map((f, fIdx) => (
+                      <span key={`fac-${fIdx}`} className="text-[10px] font-semibold bg-gray-900/80 text-gray-300 border border-gray-700/60 px-2 py-0.5 rounded-lg">
+                        {f}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
