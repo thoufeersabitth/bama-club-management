@@ -1222,7 +1222,9 @@ export const createBranchBackend = async (branchData, retryCount = 2) => {
         const serverData = await res.json();
         const finalImg = branchData.image || branchData.photo || branchData.img;
         if (finalImg && !finalImg.startsWith('/assets/')) {
-          saveBranchImageBackend(serverData.id, finalImg, serverData.code, serverData.name).catch(() => {});
+          try {
+            await saveBranchImageBackend(serverData.id, finalImg, serverData.code, serverData.name);
+          } catch (e) {}
         }
         return { 
           success: true, 

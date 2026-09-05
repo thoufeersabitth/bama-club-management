@@ -216,7 +216,9 @@ export default function BranchManagement() {
           photo: photoUrl || editBranch.photo
         };
         if (photoUrl && !photoUrl.startsWith('/assets/')) {
-          saveBranchImageBackend(editBranch.id, photoUrl, updatedItem.code, updatedItem.name).catch(() => {});
+          try {
+            await saveBranchImageBackend(editBranch.id, photoUrl, updatedItem.code, updatedItem.name);
+          } catch (e) {}
         }
         updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
         updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
@@ -267,7 +269,9 @@ export default function BranchManagement() {
           photo: photoUrl || newB.photo
         };
         if (photoUrl && !photoUrl.startsWith('/assets/')) {
-          saveBranchImageBackend(finalBranch.id, photoUrl, finalBranch.code, finalBranch.name).catch(() => {});
+          try {
+            await saveBranchImageBackend(finalBranch.id, photoUrl, finalBranch.code, finalBranch.name);
+          } catch (e) {}
         }
         updatedList = [...branches.filter(b => b.id !== finalBranch.id), finalBranch];
         setBannerMessage({ type: 'success', text: `Branch "${formData.name}" created successfully (Code: ${bCode})!` });
