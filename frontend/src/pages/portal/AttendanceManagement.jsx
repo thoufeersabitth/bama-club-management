@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings } from 'lucide-react';
-import { fetchStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
+import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AttendanceManagement() {
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState(getStoredStudents);
   const [branchesList, setBranchesList] = useState(() => {
     try {
       const saved = localStorage.getItem('bama_custom_branches');
@@ -35,7 +35,17 @@ export default function AttendanceManagement() {
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attendanceRecords, setAttendanceRecords] = useState({});
+  const [attendanceRecords, setAttendanceRecords] = useState(() => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const saved = localStorage.getItem(`bama_attendance_${today}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {}
+    return {};
+  });
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'PRESENT' | 'ABSENT' | 'LATE'
@@ -135,36 +145,42 @@ export default function AttendanceManagement() {
 
   const monthlyStats = getMonthlyClassStats();
 
-  // Load students & saved attendance for selected date
+  // 1. Fast Load students on mount (and update cache in background)
   useEffect(() => {
-    fetchStudents().then(async (data) => {
-      setStudents(data || []);
+    fetchStudents().then((data) => {
+      if (data && data.length > 0) {
+        setStudents(data);
+      }
+    });
+  }, []);
 
-      // 1. Try to fetch live attendance from Fly.io PostgreSQL backend first
-      try {
-        const serverAtt = await fetchAttendanceFromBackend(selectedDate);
-        if (serverAtt && Object.keys(serverAtt).length > 0) {
-          setAttendanceRecords(serverAtt);
-          localStorage.setItem(`bama_attendance_${selectedDate}`, JSON.stringify(serverAtt));
-          return;
+  // 2. Load attendance records for selectedDate (instant localStorage cache + background sync)
+  useEffect(() => {
+    let hasLocal = false;
+    try {
+      const saved = localStorage.getItem(`bama_attendance_${selectedDate}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          setAttendanceRecords(parsed);
+          hasLocal = true;
         }
-      } catch (e) {}
+      }
+    } catch (e) {}
 
-      // 2. Fallback to localStorage
-      try {
-        const saved = localStorage.getItem(`bama_attendance_${selectedDate}`);
-        if (saved) {
-          setAttendanceRecords(JSON.parse(saved));
-          return;
-        }
-      } catch (e) {}
-
-      // 3. Default all cadets to PRESENT
-      const initial = {};
-      (data || []).forEach(s => {
-        initial[s.id || s.admissionNo] = 'PRESENT';
-      });
-      setAttendanceRecords(initial);
+    // Background sync with Fly.io PostgreSQL backend
+    fetchAttendanceFromBackend(selectedDate).then(serverAtt => {
+      if (serverAtt && Object.keys(serverAtt).length > 0) {
+        setAttendanceRecords(serverAtt);
+        localStorage.setItem(`bama_attendance_${selectedDate}`, JSON.stringify(serverAtt));
+      } else if (!hasLocal) {
+        // Default all active cadets to PRESENT
+        const initial = {};
+        (students || []).forEach(s => {
+          initial[s.id || s.admissionNo] = 'PRESENT';
+        });
+        setAttendanceRecords(initial);
+      }
     });
   }, [selectedDate]);
 
@@ -238,35 +254,133 @@ export default function AttendanceManagement() {
     }
   };
 
-  // Branch & Shift Scoped Cadets
-  const getCadetBranchKey = (cadet) => {
-    const raw = cadet.branch_name || cadet.branch_detail?.name || (typeof cadet.branch === 'object' ? cadet.branch?.name : cadet.branch) || '';
-    const bStr = String(raw).toLowerCase();
-    if (bStr.includes('chungam')) return 'chungam';
-    if (bStr.includes('mongam')) return 'mongam';
-    return 'pulikkal';
-  };
+  // 100% Robust Branch Cadets Matching (Handles UUID, Name, Code, Keywords across all 8 branches)
+  const isStudentInBranch = (student, branchFilter) => {
+    if (!branchFilter || branchFilter === 'All' || branchFilter === 'ALL') return true;
 
-  const baseBranchShiftStudents = students.filter(s => {
-    const cadetBranchKey = getCadetBranchKey(s);
+    const bFilterStr = String(branchFilter).toLowerCase().trim();
 
-    if (isInstructor) {
-      const instKey = instructorBranch.toLowerCase().includes('chungam') ? 'chungam' : instructorBranch.toLowerCase().includes('mongam') ? 'mongam' : 'pulikkal';
-      if (cadetBranchKey !== instKey) {
-        return false;
-      }
+    const matchedBranchObj = branchesList.find(b => 
+      b.id === branchFilter || 
+      b.name === branchFilter || 
+      b.code === branchFilter || 
+      String(b.name).toLowerCase().trim() === bFilterStr
+    );
+
+    const targetId = matchedBranchObj?.id || (branchFilter.includes('-') ? branchFilter : null);
+    const targetName = (matchedBranchObj?.name || branchFilter).toLowerCase().trim();
+    const targetCode = (matchedBranchObj?.code || '').toLowerCase().trim();
+
+    const cadetBranchName = String(
+      student.branch_name ||
+      student.branch_detail?.name ||
+      student.branchName ||
+      (typeof student.branch === 'object' ? student.branch?.name : student.branch) ||
+      ''
+    ).toLowerCase().trim();
+
+    const cadetBranchId = String(
+      student.branch_id ||
+      student.branch_detail?.id ||
+      (typeof student.branch === 'object' ? student.branch?.id : student.branch) ||
+      ''
+    ).trim();
+
+    // 1. Direct ID match
+    if (targetId && cadetBranchId && targetId === cadetBranchId) {
+      return true;
     }
 
-    if (selectedBranch !== 'All') {
-      const targetKey = selectedBranch.toLowerCase().includes('chungam') ? 'chungam' : selectedBranch.toLowerCase().includes('mongam') ? 'mongam' : 'pulikkal';
-      if (cadetBranchKey !== targetKey) {
-        return false;
+    // 2. Direct name or code match
+    if (cadetBranchName === targetName) return true;
+    if (targetCode && (cadetBranchName === targetCode || cadetBranchName.includes(targetCode))) return true;
+
+    // 3. Keyword matching for official branches
+    const checkBranchKeyword = (str) => {
+      if (!str) return '';
+      if (str.includes('pulikkal') || str.includes('head office') || str.includes('plk')) return 'pulikkal';
+      if (str.includes('chungam') || str.includes('cgm')) return 'chungam';
+      if (str.includes('pengad') || str.includes('btmamups')) return 'pengad';
+      if (str.includes('airport')) return 'airport';
+      if (str.includes('neerad') || str.includes('amlps')) return 'neerad';
+      if (str.includes('ansar')) return 'ansar';
+      if (str.includes('feroke') || str.includes('frk')) return 'feroke';
+      if (str.includes('kick')) return 'kickboxing';
+      return str;
+    };
+
+    const targetKey = checkBranchKeyword(targetName);
+    const cadetKey = checkBranchKeyword(cadetBranchName);
+
+    if (targetKey && cadetKey && targetKey === cadetKey) {
+      return true;
+    }
+
+    return cadetBranchName.includes(targetName) || targetName.includes(cadetBranchName);
+  };
+
+  // Smart Shift / Batch Matcher (Direct match, timing match, keyword match)
+  const matchesShift = (student, targetShift) => {
+    if (!targetShift || targetShift === 'All' || targetShift === 'ALL') return true;
+
+    const sShift = String(student.shift || student.dojoShift || student.batch || '').trim().toLowerCase();
+    const tShift = String(targetShift).trim().toLowerCase();
+
+    if (!sShift) return false;
+    if (sShift === tShift) return true;
+    if (sShift.includes(tShift) || tShift.includes(sShift)) return true;
+
+    // Extract time parts like "4:00 PM - 5:00 PM"
+    const extractTime = (str) => {
+      const match = str.match(/\d{1,2}:\d{2}\s*(?:AM|PM)/gi);
+      return match ? match.join(' - ') : '';
+    };
+
+    const sTime = extractTime(sShift);
+    const tTime = extractTime(tShift);
+    if (sTime && tTime && (sTime.includes(tTime) || tTime.includes(sTime))) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // Dynamic Shift Options for selected branch ONLY
+  const availableShifts = React.useMemo(() => {
+    const shiftsSet = new Set();
+    const activeBranchFilter = isInstructor ? instructorBranch : (selectedBranch !== 'All' ? selectedBranch : null);
+
+    // 1. Shifts from students in this branch
+    const branchStudents = activeBranchFilter 
+      ? students.filter(s => isStudentInBranch(s, activeBranchFilter))
+      : students;
+
+    branchStudents.forEach(s => {
+      const sh = String(s.shift || s.dojoShift || s.batch || '').trim();
+      if (sh && sh !== 'undefined' && sh !== 'null' && sh !== 'All') {
+        shiftsSet.add(sh);
       }
+    });
+
+    // 2. Configured branch timings / custom shifts for this branch
+    const dynamicOptions = getDynamicShiftOptions(activeBranchFilter, null, branchesList);
+    dynamicOptions.forEach(sh => {
+      if (sh && sh !== 'undefined' && sh !== 'null' && sh !== 'All') {
+        shiftsSet.add(sh);
+      }
+    });
+
+    return Array.from(shiftsSet);
+  }, [students, selectedBranch, isInstructor, instructorBranch, branchesList]);
+
+  const baseBranchShiftStudents = students.filter(s => {
+    const activeBranchFilter = isInstructor ? instructorBranch : selectedBranch;
+    if (!isStudentInBranch(s, activeBranchFilter)) {
+      return false;
     }
 
     if (selectedShift !== 'All') {
-      const cadetShift = s.shift || 'Evening Batch (5:00 PM - 7:00 PM)';
-      if (!cadetShift.toLowerCase().includes(selectedShift.toLowerCase())) {
+      if (!matchesShift(s, selectedShift)) {
         return false;
       }
     }
@@ -552,7 +666,10 @@ export default function AttendanceManagement() {
           {!isInstructor && (
             <select
               value={selectedBranch}
-              onChange={(e) => setSelectedBranch(e.target.value)}
+              onChange={(e) => {
+                setSelectedBranch(e.target.value);
+                setSelectedShift('All');
+              }}
               className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate"
             >
               <option value="All">All Branches</option>
@@ -568,7 +685,7 @@ export default function AttendanceManagement() {
             className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate"
           >
             <option value="All">All Batches</option>
-            {getDynamicShiftOptions(selectedBranch !== 'All' ? selectedBranch : null, null, branchesList).map((s, idx) => (
+            {availableShifts.map((s, idx) => (
               <option key={idx} value={s}>{s}</option>
             ))}
           </select>
