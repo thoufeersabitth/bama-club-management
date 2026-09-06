@@ -138,15 +138,7 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
     }
 
     // 3. Return ONLY the branch's actual timing and configured schedules!
-    if (shiftResults.length > 0) {
-      return Array.from(new Set(shiftResults));
-    }
-
-    // 4. Clean fallback ONLY if no timing was ever entered for this branch
-    return [
-      `${resolveBranchName(branchFilter)} - Regular Batch (5:00 PM - 7:00 PM)`,
-      'Custom Shift / Flexible'
-    ];
+    return Array.from(new Set(shiftResults));
   }
 
   // Global All Branches view: collect all shifts from custom schedules AND branch timings
