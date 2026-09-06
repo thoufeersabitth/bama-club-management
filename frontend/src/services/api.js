@@ -1008,8 +1008,16 @@ export const syncAllBranchImagesBackend = async (imagesMap) => {
     Object.entries(existingImages).forEach(([k, v]) => {
       if (k && isValidBranchImage(v)) cleanImages[k] = v;
     });
-    Object.entries(imagesMap).forEach(([k, v]) => {
-      if (k && isValidBranchImage(v)) cleanImages[k] = v;
+    Object.entries(imagesMap).forEach(([newKey, newImg]) => {
+      if (newKey && isValidBranchImage(newImg)) {
+        cleanImages[newKey] = newImg;
+        // Also update any existing key in cleanImages with matching name/code/id (case-insensitive)
+        Object.keys(cleanImages).forEach(k => {
+          if (k.toLowerCase().trim() === newKey.toLowerCase().trim()) {
+            cleanImages[k] = newImg;
+          }
+        });
+      }
     });
     
     await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
@@ -1105,8 +1113,12 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
     } catch (e) {}
 
     // 3. Dual Cloud Persistence:
-    // A) Fast dedicated micro-record in Fly.io PostgreSQL FAQs
-    const targetQuestion = `BRANCH_PHOTO:${codeKey || idKey || nameKey}`;
+    // A) Fast dedicated micro-records in Fly.io PostgreSQL FAQs (Code & ID for instant lookup)
+    const targetQuestions = [];
+    if (codeKey) targetQuestions.push(`BRANCH_PHOTO:${codeKey}`);
+    if (idKey && (!codeKey || idKey !== codeKey.toLowerCase())) targetQuestions.push(`BRANCH_PHOTO:${idKey}`);
+    if (targetQuestions.length === 0 && nameKey) targetQuestions.push(`BRANCH_PHOTO:${nameKey}`);
+
     try {
       const acGet = new AbortController();
       const getTimeout = setTimeout(() => acGet.abort(), 12000);
@@ -1118,39 +1130,44 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
       clearTimeout(getTimeout);
       const getData = getRes.ok ? await getRes.json() : {};
       const results = getData.results || (Array.isArray(getData) ? getData : []);
-      const existing = results.find(f => f.question === targetQuestion);
 
-      const acPost = new AbortController();
-      const postTimeout = setTimeout(() => acPost.abort(), 12000);
-      if (existing && existing.id) {
-        await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' }),
-          signal: acPost.signal
-        });
-      } else {
-        await fetch('https://bama-club-backend.fly.dev/api/faqs/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            question: targetQuestion,
-            answer: imageUrl,
-            category: 'BRANCH_PHOTO',
-            order: 999
-          }),
-          signal: acPost.signal
-        });
+      for (const tQ of targetQuestions) {
+        const existing = results.find(f => f.question && f.question.toLowerCase().trim() === tQ.toLowerCase().trim());
+        const acPost = new AbortController();
+        const postTimeout = setTimeout(() => acPost.abort(), 12000);
+        if (existing && existing.id) {
+          await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' }),
+            signal: acPost.signal
+          }).catch(() => {});
+        } else {
+          await fetch('https://bama-club-backend.fly.dev/api/faqs/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              question: tQ,
+              answer: imageUrl,
+              category: 'BRANCH_PHOTO',
+              order: 999
+            }),
+            signal: acPost.signal
+          }).catch(() => {});
+        }
+        clearTimeout(postTimeout);
       }
-      clearTimeout(postTimeout);
     } catch (dbErr) {
       console.warn('Failed to save branch image to PostgreSQL FAQ storage:', dbErr);
     }
 
     // B) Central cms-config branch_images registry in PostgreSQL
     const imagesToMerge = {};
+    if (branchId) imagesToMerge[String(branchId)] = imageUrl;
     if (idKey) imagesToMerge[idKey] = imageUrl;
+    if (branchCode) imagesToMerge[String(branchCode)] = imageUrl;
     if (codeKey) imagesToMerge[codeKey] = imageUrl;
+    if (branchName) imagesToMerge[String(branchName)] = imageUrl;
     if (nameKey) imagesToMerge[nameKey] = imageUrl;
     await syncAllBranchImagesBackend(imagesToMerge).catch(() => {});
 
@@ -1203,23 +1220,7 @@ export const fetchBranches = async (forceRefresh = false) => {
       }).catch(() => null)
     ]);
 
-    // Extract images from FAQs micro-records
-    if (faqsRes && faqsRes.ok) {
-      try {
-        const faqsData = await faqsRes.json();
-        const list = faqsData.results || (Array.isArray(faqsData) ? faqsData : []);
-        list.forEach(f => {
-          if (f.question && f.question.startsWith('BRANCH_PHOTO:') && isValidBranchImage(f.answer)) {
-            const rawKey = f.question.replace('BRANCH_PHOTO:', '').trim();
-            cloudBranchImages[rawKey] = f.answer;
-            cloudBranchImages[rawKey.toUpperCase()] = f.answer;
-            cloudBranchImages[rawKey.toLowerCase()] = f.answer;
-          }
-        });
-      } catch (e) {}
-    }
-
-    // Extract images from CMS config branch_images dictionary & branches array
+    // A) Extract images from CMS config branch_images dictionary & branches array FIRST (baseline)
     if (cmsRes && cmsRes.ok) {
       try {
         const cmsData = await cmsRes.json();
@@ -1252,6 +1253,22 @@ export const fetchBranches = async (forceRefresh = false) => {
             }
           });
         }
+      } catch (e) {}
+    }
+
+    // B) Extract images from FAQs micro-records SECOND (authoritative individual branch photos take precedence!)
+    if (faqsRes && faqsRes.ok) {
+      try {
+        const faqsData = await faqsRes.json();
+        const list = faqsData.results || (Array.isArray(faqsData) ? faqsData : []);
+        list.forEach(f => {
+          if (f.question && f.question.startsWith('BRANCH_PHOTO:') && isValidBranchImage(f.answer)) {
+            const rawKey = f.question.replace('BRANCH_PHOTO:', '').trim();
+            cloudBranchImages[rawKey] = f.answer;
+            cloudBranchImages[rawKey.toUpperCase()] = f.answer;
+            cloudBranchImages[rawKey.toLowerCase()] = f.answer;
+          }
+        });
       } catch (e) {}
     }
 
@@ -1316,44 +1333,39 @@ export const fetchBranches = async (forceRefresh = false) => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        let hasUnsyncedImages = false;
         parsed.forEach(b => {
           if (!b) return;
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
           const customImg = b.image || b.img || b.photo;
-          if (isValidBranchImage(customImg)) {
-            const idKey = String(b.id || '').toLowerCase().trim();
-            const codeKey = String(b.code || '').toUpperCase().trim();
-            const nameKey = String(b.name || '').toLowerCase().trim();
-            if (idKey && cloudBranchImages[idKey] !== customImg) { cloudBranchImages[idKey] = customImg; hasUnsyncedImages = true; }
-            if (codeKey && cloudBranchImages[codeKey] !== customImg) { cloudBranchImages[codeKey] = customImg; hasUnsyncedImages = true; }
-            if (nameKey && cloudBranchImages[nameKey] !== customImg) { cloudBranchImages[nameKey] = customImg; hasUnsyncedImages = true; }
-          }
-          if (key && branchMap.has(key)) {
-            const existing = branchMap.get(key);
-            if (isValidBranchImage(customImg) && (customImg !== existing.image || !isValidBranchImage(existing.image))) {
+
+          if (fetchedFromServer) {
+            // Live Server is authoritative across all devices!
+            // If the server branch somehow has no valid custom photo, but local storage has one, use it.
+            // NEVER let stale local cache overwrite an existing valid photo from the server!
+            if (key && branchMap.has(key)) {
+              const existing = branchMap.get(key);
+              if (!isValidBranchImage(existing.image) && isValidBranchImage(customImg)) {
+                branchMap.set(key, {
+                  ...existing,
+                  image: customImg,
+                  img: customImg,
+                  photo: customImg
+                });
+              }
+            }
+          } else {
+            // Server was completely offline: populate from local cache
+            if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+              const finalImg = isValidBranchImage(customImg) ? customImg : (b.image && isValidBranchImage(b.image) ? b.image : ((b.isHeadOffice || b.is_head_office) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'));
               branchMap.set(key, {
-                ...existing,
-                image: customImg,
-                img: customImg,
-                photo: customImg
+                ...b,
+                image: finalImg,
+                img: finalImg,
+                photo: finalImg
               });
             }
-          } else if (!fetchedFromServer && key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
-            // ONLY if server was offline: use cached branch
-            const finalImg = isValidBranchImage(customImg) ? customImg : (b.image && isValidBranchImage(b.image) ? b.image : ((b.isHeadOffice || b.is_head_office) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'));
-            branchMap.set(key, {
-              ...b,
-              image: finalImg,
-              img: finalImg,
-              photo: finalImg
-            });
           }
         });
-
-        if (hasUnsyncedImages) {
-          syncAllBranchImagesBackend(cloudBranchImages).catch(() => {});
-        }
       }
     }
   } catch (e) {}

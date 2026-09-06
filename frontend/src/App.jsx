@@ -33,7 +33,7 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_06_plan1_cdn_v12';
+    const APP_VERSION = 'bama_v2026_09_06_live_sync_v14';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       try {
         const storedSchedules = localStorage.getItem('bama_training_schedules');
@@ -45,45 +45,15 @@ export default function App() {
         }
       } catch (e) {}
 
-      // Clean only stale cadet/user cache, sanitize branch images
+      // Clean stale cadet/user cache and branch caches so fresh cloud photos load instantly on all devices
       localStorage.removeItem('bama_cadets_roster');
       localStorage.removeItem('bama_students');
       localStorage.removeItem('bama_cadets');
       localStorage.removeItem('bama_students_list');
       localStorage.removeItem('bama_backup_data');
-
-      // Purge any corrupted dummy pixels from localStorage
-      try {
-        const localImg = JSON.parse(localStorage.getItem('bama_branch_images') || '{}');
-        let changed = false;
-        Object.keys(localImg).forEach(k => {
-          if (!isValidBranchImage(localImg[k])) {
-            delete localImg[k];
-            changed = true;
-          }
-        });
-        if (changed) {
-          localStorage.setItem('bama_branch_images', JSON.stringify(localImg));
-        }
-      } catch (e) {}
-
-      try {
-        const customB = JSON.parse(localStorage.getItem('bama_custom_branches') || '[]');
-        if (Array.isArray(customB) && customB.length > 0) {
-          let bChanged = false;
-          const cleanedB = customB.map(b => {
-            if (b.image && !isValidBranchImage(b.image)) {
-              bChanged = true;
-              return { ...b, image: (b.isHeadOffice || b.is_head_office) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg', img: null, photo: null };
-            }
-            return b;
-          });
-          if (bChanged) {
-            localStorage.setItem('bama_custom_branches', JSON.stringify(cleanedB));
-            localStorage.setItem('bama_branches', JSON.stringify(cleanedB));
-          }
-        }
-      } catch (e) {}
+      localStorage.removeItem('bama_custom_branches');
+      localStorage.removeItem('bama_branches');
+      localStorage.removeItem('bama_branch_images');
 
       localStorage.setItem('bama_app_cache_version', APP_VERSION);
     }
