@@ -33,19 +33,9 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_06_live_sync_v14';
+    const APP_VERSION = 'bama_v2026_09_06_shifts_sync_v15';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
-      try {
-        const storedSchedules = localStorage.getItem('bama_training_schedules');
-        if (storedSchedules) {
-          const parsed = JSON.parse(storedSchedules);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            saveTrainingSchedulesBackend(parsed).catch(() => {});
-          }
-        }
-      } catch (e) {}
-
-      // Clean stale cadet/user cache and branch caches so fresh cloud photos load instantly on all devices
+      // Clean stale cadet/user cache, branch caches and schedule caches so fresh cloud data loads instantly on all devices
       localStorage.removeItem('bama_cadets_roster');
       localStorage.removeItem('bama_students');
       localStorage.removeItem('bama_cadets');
@@ -54,6 +44,7 @@ export default function App() {
       localStorage.removeItem('bama_custom_branches');
       localStorage.removeItem('bama_branches');
       localStorage.removeItem('bama_branch_images');
+      localStorage.removeItem('bama_training_schedules');
 
       localStorage.setItem('bama_app_cache_version', APP_VERSION);
     }

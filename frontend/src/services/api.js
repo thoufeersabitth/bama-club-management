@@ -1675,16 +1675,42 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
   } catch (err) {}
 };
 
+// Strict deduplication helper for training schedules / shifts
+export const deduplicateSchedules = (schedules) => {
+  if (!Array.isArray(schedules)) return [];
+  const map = new Map();
+  schedules.forEach(s => {
+    if (!s) return;
+    const sName = String(s.name || '').toLowerCase().trim();
+    if (sName.startsWith('general training batch') || s.branch === 'zxcvbnm') return;
+    
+    // Normalized composite key: branch + days + time
+    const bKey = String(s.branch || s.branch_name || '').toLowerCase().trim();
+    const dKey = String(s.days || '').toLowerCase().trim();
+    const tKey = String(s.time || '').toLowerCase().trim();
+    const compositeKey = `${bKey}__${dKey}__${tKey}`;
+
+    if (map.has(compositeKey)) {
+      const existing = map.get(compositeKey);
+      map.set(compositeKey, { ...existing, ...s });
+    } else {
+      map.set(compositeKey, s);
+    }
+  });
+  return Array.from(map.values());
+};
+
 export const saveTrainingSchedulesBackend = async (schedules) => {
   if (!Array.isArray(schedules)) return false;
   invalidateSchedulesCache();
+  const cleanSchedules = deduplicateSchedules(schedules);
   try {
     const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
     const existingData = existingRes.ok ? await existingRes.json() : {};
-    const updatedData = { ...existingData, training_schedules: schedules };
+    const updatedData = { ...existingData, training_schedules: cleanSchedules };
     const res = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -1702,9 +1728,32 @@ export const createTrainingScheduleBackend = async (shiftData) => {
   try {
     const stored = localStorage.getItem('bama_training_schedules');
     const existing = stored ? JSON.parse(stored) : [];
-    const updated = [...existing.filter(s => s.id !== shiftData.id), shiftData];
-    localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
-    await saveTrainingSchedulesBackend(updated);
+
+    const bKey = String(shiftData.branch || '').toLowerCase().trim();
+    const dKey = String(shiftData.days || '').toLowerCase().trim();
+    const tKey = String(shiftData.time || '').toLowerCase().trim();
+
+    let updated = [];
+    const matchIndex = existing.findIndex(s => {
+      if (!s) return false;
+      if (s.id && shiftData.id && s.id === shiftData.id) return true;
+      const sb = String(s.branch || '').toLowerCase().trim();
+      const sd = String(s.days || '').toLowerCase().trim();
+      const st = String(s.time || '').toLowerCase().trim();
+      return sb === bKey && sd === dKey && st === tKey;
+    });
+
+    if (matchIndex >= 0) {
+      // Overwrite / update existing matching schedule instead of creating a duplicate!
+      const targetId = existing[matchIndex].id || shiftData.id;
+      updated = existing.map((s, idx) => idx === matchIndex ? { ...s, ...shiftData, id: targetId } : s);
+    } else {
+      updated = [...existing, shiftData];
+    }
+
+    const clean = deduplicateSchedules(updated);
+    localStorage.setItem('bama_training_schedules', JSON.stringify(clean));
+    await saveTrainingSchedulesBackend(clean);
   } catch (err) {
     console.error('Failed to create shift on backend:', err);
   }
@@ -1717,8 +1766,9 @@ export const updateTrainingScheduleBackend = async (id, shiftData) => {
     const stored = localStorage.getItem('bama_training_schedules');
     const existing = stored ? JSON.parse(stored) : [];
     const updated = existing.map(s => s.id === id ? { ...s, ...shiftData } : s);
-    localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
-    await saveTrainingSchedulesBackend(updated);
+    const clean = deduplicateSchedules(updated);
+    localStorage.setItem('bama_training_schedules', JSON.stringify(clean));
+    await saveTrainingSchedulesBackend(clean);
   } catch (err) {
     console.error('Failed to update shift on backend:', err);
   }
@@ -1727,12 +1777,12 @@ export const updateTrainingScheduleBackend = async (id, shiftData) => {
 
 export const filterOutDummyShifts = (list) => {
   if (!Array.isArray(list)) return [];
-  return list.filter(s => {
+  return deduplicateSchedules(list.filter(s => {
     if (!s) return false;
     const sName = String(s.name || '').toLowerCase().trim();
-    if (sName.startsWith('general training batch')) return false;
+    if (sName.startsWith('general training batch') || s.branch === 'zxcvbnm') return false;
     return true;
-  });
+  }));
 };
 
 export const fetchTrainingSchedules = async (forceRefresh = false) => {
@@ -1741,7 +1791,7 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
   }
 
   const scheduleMap = new Map();
-  let serverSchedulesCount = 0;
+  let serverSchedules = [];
 
   // 1. Fetch persistent schedules directly from Fly.io PostgreSQL cms-config
   try {
@@ -1752,11 +1802,14 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.training_schedules) && data.training_schedules.length > 0) {
-        serverSchedulesCount = data.training_schedules.length;
-        data.training_schedules.forEach(s => {
+        serverSchedules = deduplicateSchedules(data.training_schedules);
+        serverSchedules.forEach(s => {
           if (s && s.id) {
-            const key = String(s.name + (s.branch || '')).toLowerCase().trim();
-            scheduleMap.set(key || s.id, s);
+            const bKey = String(s.branch || s.branch_name || '').toLowerCase().trim();
+            const dKey = String(s.days || '').toLowerCase().trim();
+            const tKey = String(s.time || '').toLowerCase().trim();
+            const key = `${bKey}__${dKey}__${tKey}`;
+            scheduleMap.set(key, s);
           }
         });
       }
@@ -1765,35 +1818,36 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
     console.error('Failed to fetch training schedules from Fly.io cms-config:', err);
   }
 
-  // 2. Also merge with any local schedules from localStorage so user creations are NEVER lost!
-  try {
-    const stored = localStorage.getItem('bama_training_schedules');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        parsed.forEach(s => {
-          if (s && s.id) {
-            const key = String(s.name + (s.branch || '')).toLowerCase().trim();
-            if (!scheduleMap.has(key || s.id)) {
-              scheduleMap.set(key || s.id, s);
+  // 2. If server returned schedules, server is authoritative! If server was offline, load from localStorage
+  if (serverSchedules.length === 0) {
+    try {
+      const stored = localStorage.getItem('bama_training_schedules');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          const cleanLocal = deduplicateSchedules(parsed);
+          cleanLocal.forEach(s => {
+            if (s && s.id) {
+              const bKey = String(s.branch || s.branch_name || '').toLowerCase().trim();
+              const dKey = String(s.days || '').toLowerCase().trim();
+              const tKey = String(s.time || '').toLowerCase().trim();
+              const key = `${bKey}__${dKey}__${tKey}`;
+              if (!scheduleMap.has(key)) {
+                scheduleMap.set(key, s);
+              }
             }
-          }
-        });
+          });
+        }
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
 
-  const finalSchedules = Array.from(scheduleMap.values());
+  const finalSchedules = deduplicateSchedules(Array.from(scheduleMap.values()));
   
   if (finalSchedules.length > 0) {
     try {
       localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
     } catch (e) {}
-
-    // Automatically sync merged schedules to Fly.io cloud backend so both phone and laptop share the exact same schedules!
-    if (finalSchedules.length > serverSchedulesCount) {
-      saveTrainingSchedulesBackend(finalSchedules).catch(() => {});
-    }
   }
 
   _schedulesCache = finalSchedules;

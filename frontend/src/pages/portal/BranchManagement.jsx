@@ -48,6 +48,7 @@ export default function BranchManagement() {
   const [bannerMessage, setBannerMessage] = useState(null);
 
   const [showShiftModal, setShowShiftModal] = useState(false);
+  const [savingShift, setSavingShift] = useState(false);
   const [editShift, setEditShift] = useState(null);
   const [viewShiftDetails, setViewShiftDetails] = useState(null);
   const [shiftRosterSearch, setShiftRosterSearch] = useState('');
@@ -331,33 +332,98 @@ export default function BranchManagement() {
 
   const handleCreateOrUpdateShift = async (e) => {
     e.preventDefault();
-    const finalShiftName = shiftData.name?.trim() || `${shiftData.branch || 'Dojo'} (${shiftData.time || shiftData.days || 'Regular Batch'})`;
-    const cleanShiftData = {
-      ...shiftData,
-      name: finalShiftName
-    };
+    if (savingShift) return; // STRICT GUARD: Completely blocks accidental double clicks
+    setSavingShift(true);
 
-    let updated = [];
-    if (editShift) {
-      const updatedItem = { ...editShift, ...cleanShiftData };
-      updated = schedules.map(s => s.id === editShift.id ? updatedItem : s);
-      await updateTrainingScheduleBackend(editShift.id, updatedItem);
-    } else {
-      const newS = {
-        id: `shift-${Date.now()}`,
-        ...cleanShiftData,
-        status: 'Active'
+    try {
+      const finalShiftName = shiftData.name?.trim() || `${shiftData.branch || 'Dojo'} (${shiftData.time || shiftData.days || 'Regular Batch'})`;
+      const cleanShiftData = {
+        ...shiftData,
+        name: finalShiftName
       };
-      await createTrainingScheduleBackend(newS);
-      updated = [...schedules.filter(s => s.id !== newS.id), newS];
+
+      const bKey = String(cleanShiftData.branch || '').toLowerCase().trim();
+      const dKey = String(cleanShiftData.days || '').toLowerCase().trim();
+      const tKey = String(cleanShiftData.time || '').toLowerCase().trim();
+
+      // Check if an existing shift has the exact same branch + days + time
+      const duplicateExisting = schedules.find(s => {
+        if (!s) return false;
+        if (editShift && s.id === editShift.id) return false;
+        const sb = String(s.branch || '').toLowerCase().trim();
+        const sd = String(s.days || '').toLowerCase().trim();
+        const st = String(s.time || '').toLowerCase().trim();
+        return sb === bKey && sd === dKey && st === tKey;
+      });
+
+      let updated = [];
+      if (editShift) {
+        const updatedItem = { ...editShift, ...cleanShiftData };
+        updated = schedules.map(s => s.id === editShift.id ? updatedItem : s);
+        await updateTrainingScheduleBackend(editShift.id, updatedItem);
+      } else if (duplicateExisting) {
+        // If a duplicate already exists, seamlessly update that existing shift instead of adding a clone!
+        const updatedItem = { ...duplicateExisting, ...cleanShiftData };
+        updated = schedules.map(s => s.id === duplicateExisting.id ? updatedItem : s);
+        await updateTrainingScheduleBackend(duplicateExisting.id, updatedItem);
+      } else {
+        const newS = {
+          id: `shift-${Date.now()}`,
+          ...cleanShiftData,
+          status: 'Active'
+        };
+        await createTrainingScheduleBackend(newS);
+        updated = [...schedules.filter(s => s.id !== newS.id), newS];
+      }
+
+      const cleanShifts = filterOutDummyShifts(updated);
+      setSchedules(cleanShifts);
+      localStorage.setItem('bama_training_schedules', JSON.stringify(cleanShifts));
+      await saveTrainingSchedulesBackend(cleanShifts);
+
+      // Auto-synchronize this branch's timings string (b.timings) so Public /branches & Home pages show it immediately!
+      try {
+        const targetBranch = branches.find(b => {
+          if (!b) return false;
+          const bn = String(b.name || '').toLowerCase().trim();
+          const bc = String(b.code || '').toLowerCase().trim();
+          return bn === bKey || bc === bKey || bn.includes(bKey) || bKey.includes(bn);
+        });
+
+        if (targetBranch) {
+          const allBranchShifts = cleanShifts.filter(s => {
+            const sb = String(s.branch || '').toLowerCase().trim();
+            const bn = String(targetBranch.name || '').toLowerCase().trim();
+            const bc = String(targetBranch.code || '').toLowerCase().trim();
+            return sb === bn || sb === bc || sb.includes(bn) || bn.includes(sb);
+          });
+          const newTimings = allBranchShifts.map(s => `${s.days}: ${s.time}`).filter(Boolean).join(' | ');
+          if (newTimings && newTimings !== targetBranch.timings) {
+            const updatedBranch = { ...targetBranch, timings: newTimings };
+            const newBranches = branches.map(b => b.id === targetBranch.id ? updatedBranch : b);
+            setBranches(newBranches);
+            safeLocalStorageSet('bama_custom_branches', newBranches);
+            safeLocalStorageSet('bama_branches', newBranches);
+            updateBranchBackend(targetBranch.id, updatedBranch).catch(() => {});
+            window.dispatchEvent(new Event('bama_branches_updated'));
+          }
+        }
+      } catch (syncErr) {
+        console.warn('Auto-sync of branch timings failed:', syncErr);
+      }
+
+      window.dispatchEvent(new Event('bama_schedules_updated'));
+      window.dispatchEvent(new Event('bama_data_updated'));
+      setShowShiftModal(false);
+      setEditShift(null);
+      setBannerMessage({ type: 'success', text: `✅ Training shift batch saved & synchronized live!` });
+      setTimeout(() => setBannerMessage(null), 3500);
+    } catch (err) {
+      console.error('Failed to save shift:', err);
+      alert('Failed to save shift. Please try again.');
+    } finally {
+      setSavingShift(false);
     }
-    setSchedules(updated);
-    localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
-    await saveTrainingSchedulesBackend(updated);
-    window.dispatchEvent(new Event('bama_schedules_updated'));
-    window.dispatchEvent(new Event('bama_data_updated'));
-    setShowShiftModal(false);
-    setEditShift(null);
   };
 
   const handleCloudSyncSchedules = async () => {
@@ -486,10 +552,43 @@ export default function BranchManagement() {
     const shiftName = targetShift?.name || '';
     if (window.confirm(`Are you sure you want to delete "${shiftName || 'this training shift schedule'}"?`)) {
       const updated = schedules.filter(s => s.id !== id && s.name !== shiftName);
-      setSchedules(updated);
-      localStorage.setItem('bama_training_schedules', JSON.stringify(updated));
+      const cleanShifts = filterOutDummyShifts(updated);
+      setSchedules(cleanShifts);
+      localStorage.setItem('bama_training_schedules', JSON.stringify(cleanShifts));
       await deleteTrainingScheduleBackend(id, shiftName);
-      await saveTrainingSchedulesBackend(updated);
+      await saveTrainingSchedulesBackend(cleanShifts);
+
+      // Recalculate and update the corresponding branch's timings string
+      if (targetShift?.branch) {
+        try {
+          const bKey = String(targetShift.branch).toLowerCase().trim();
+          const targetBranch = branches.find(b => {
+            if (!b) return false;
+            const bn = String(b.name || '').toLowerCase().trim();
+            const bc = String(b.code || '').toLowerCase().trim();
+            return bn === bKey || bc === bKey || bn.includes(bKey) || bKey.includes(bn);
+          });
+          if (targetBranch) {
+            const remainingBranchShifts = cleanShifts.filter(s => {
+              const sb = String(s.branch || '').toLowerCase().trim();
+              const bn = String(targetBranch.name || '').toLowerCase().trim();
+              const bc = String(targetBranch.code || '').toLowerCase().trim();
+              return sb === bn || sb === bc || sb.includes(bn) || bn.includes(sb);
+            });
+            const newTimings = remainingBranchShifts.map(s => `${s.days}: ${s.time}`).filter(Boolean).join(' | ') || 'Flexible Dojo Batches';
+            const updatedBranch = { ...targetBranch, timings: newTimings };
+            const newBranches = branches.map(b => b.id === targetBranch.id ? updatedBranch : b);
+            setBranches(newBranches);
+            safeLocalStorageSet('bama_custom_branches', newBranches);
+            safeLocalStorageSet('bama_branches', newBranches);
+            updateBranchBackend(targetBranch.id, updatedBranch).catch(() => {});
+            window.dispatchEvent(new Event('bama_branches_updated'));
+          }
+        } catch (syncErr) {
+          console.warn('Recalculation of branch timings after shift delete failed:', syncErr);
+        }
+      }
+
       window.dispatchEvent(new Event('bama_schedules_updated'));
       window.dispatchEvent(new Event('bama_data_updated'));
     }
@@ -1764,9 +1863,13 @@ export default function BranchManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2.5 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-black text-xs rounded-xl shadow-md shadow-amber-600/20 flex items-center gap-2 cursor-pointer"
+                  disabled={savingShift}
+                  className={`px-6 py-2.5 bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white font-black text-xs rounded-xl shadow-md shadow-amber-600/20 flex items-center gap-2 transition ${
+                    savingShift ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
                 >
-                  <Clock className="w-4 h-4" /> {editShift ? 'Save Shift Schedule' : 'Create Training Shift'}
+                  <Clock className={`w-4 h-4 ${savingShift ? 'animate-spin' : ''}`} />
+                  <span>{savingShift ? 'Saving Batch...' : (editShift ? 'Save Shift Schedule' : 'Create Training Shift')}</span>
                 </button>
               </div>
             </form>

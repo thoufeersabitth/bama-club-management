@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Phone, Mail, Clock, Shield, Users, ExternalLink, Sparkles, Navigation } from 'lucide-react';
 import { INITIAL_BRANCHES } from '../../services/initialData';
-import { fetchBranches, fetchStudents, sanitizeBranches, getBranchPhotoUrl } from '../../services/api';
+import { fetchBranches, fetchStudents, sanitizeBranches, getBranchPhotoUrl, fetchTrainingSchedules } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
 import useScrollReveal from '../../hooks/useScrollReveal';
 
@@ -24,6 +24,13 @@ export default function Branches() {
   });
 
   const [students, setStudents] = useState([]);
+  const [schedules, setSchedules] = useState(() => {
+    try {
+      const stored = localStorage.getItem('bama_training_schedules');
+      if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return [];
+  });
 
   useScrollReveal([branches]);
 
@@ -60,14 +67,22 @@ export default function Branches() {
         setStudents(stData);
       }
     });
+
+    fetchTrainingSchedules(true).then(schData => {
+      if (Array.isArray(schData) && schData.length > 0) {
+        setSchedules(schData);
+      }
+    });
   };
 
   useEffect(() => {
     loadBranchesList();
     window.addEventListener('bama_branches_updated', loadBranchesList);
+    window.addEventListener('bama_schedules_updated', loadBranchesList);
     window.addEventListener('bama_data_updated', loadBranchesList);
     return () => {
       window.removeEventListener('bama_branches_updated', loadBranchesList);
+      window.removeEventListener('bama_schedules_updated', loadBranchesList);
       window.removeEventListener('bama_data_updated', loadBranchesList);
     };
   }, []);
@@ -203,13 +218,70 @@ export default function Branches() {
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-3 bg-black/40 p-3.5 rounded-2xl border border-gray-800/80">
-                      <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <strong className="text-white block uppercase text-[10px] tracking-wider mb-0.5">Class Batches:</strong>
-                        <span>{b.timings}</span>
-                      </div>
-                    </div>
+                    {/* Dynamic Training Schedules & Batches Display */}
+                    {(() => {
+                      const branchShifts = schedules.filter(s => {
+                        if (!s) return false;
+                        const sb = String(s.branch || s.branch_name || '').toLowerCase().trim();
+                        const bn = String(b.name || '').toLowerCase().trim();
+                        const bc = String(b.code || '').toLowerCase().trim();
+                        return sb === bn || sb === bc || sb.includes(bn) || bn.includes(sb);
+                      });
+
+                      if (branchShifts.length > 0) {
+                        return (
+                          <div className="bg-black/40 p-3.5 rounded-2xl border border-gray-800/80 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                <strong className="text-white uppercase text-[10px] tracking-wider">
+                                  Training Shift Batches ({branchShifts.length}):
+                                </strong>
+                              </div>
+                              <span className="text-[9px] font-mono text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-800/50 px-2 py-0.5 rounded-full">
+                                LIVE SCHEDULE
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                              {branchShifts.map((sch, sIdx) => (
+                                <div key={sch.id || `shift-${sIdx}`} className="bg-gray-900/90 border border-gray-800/90 p-2.5 rounded-xl space-y-1 hover:border-amber-400/50 transition">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[11px] font-black text-amber-300 line-clamp-1">
+                                      {sch.name || sch.program || 'Training Batch'}
+                                    </span>
+                                    <span className="text-[9px] font-black px-1.5 py-0.2 bg-red-950 text-red-300 rounded border border-red-800/60 uppercase whitespace-nowrap font-mono">
+                                      {sch.program ? sch.program.split(' ')[0] : 'Karate'}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-white font-bold flex items-center gap-1">
+                                    <span className="text-amber-400 text-xs">🕒</span>
+                                    <span>{sch.days}: {sch.time}</span>
+                                  </div>
+                                  {(sch.instructor || sch.targetGroup) && (
+                                    <div className="text-[10px] text-gray-400 flex items-center justify-between pt-1 border-t border-gray-800/60 font-medium">
+                                      <span className="truncate pr-1">🥋 {sch.instructor?.split('(')[0]?.trim() || 'Sensei'}</span>
+                                      <span className="text-gray-300 text-[9px] bg-gray-800 px-1.5 py-0.2 rounded whitespace-nowrap">{sch.targetGroup || 'All Belts'}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Clean fallback if no custom shift records are found
+                      return (
+                        <div className="flex items-start gap-3 bg-black/40 p-3.5 rounded-2xl border border-gray-800/80">
+                          <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <strong className="text-white block uppercase text-[10px] tracking-wider mb-0.5">Class Batches:</strong>
+                            <span>{b.timings || 'Contact Dojo for Batch Timings'}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex items-start gap-3 bg-black/40 p-3.5 rounded-2xl border border-gray-800/80">
                       <Phone className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
