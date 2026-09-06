@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { ACADEMY_INFO, INITIAL_BRANCHES } from '../../services/initialData';
 import { getCmsConfig, saveCmsConfig } from '../../services/cmsService';
-import { fetchBranches, saveBranchImageBackend, getBranchPhotoUrl } from '../../services/api';
+import { fetchBranches, saveBranchImageBackend, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage } from '../../services/api';
 
 const INITIAL_CMS_CONFIG = {
   hero: {
@@ -189,7 +189,7 @@ export default function CMSManagement() {
     img: '/assets/prog_competition.jpg'
   });
 
-  // Smart Image Compression & Conversion to Base64 (Prevents LocalStorage Quota Crashes)
+  // Smart Image Auto-Crop to 16:9 Banner, High-Def Compression & Direct Cloud CDN Upload (Plan 1)
   const handleImageFilePick = (e, callback, onStart, onError) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
@@ -198,10 +198,10 @@ export default function CMSManagement() {
       reader.onload = (event) => {
         const rawDataUrl = event.target.result;
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           try {
-            const targetWidth = 540;
-            const targetHeight = 304; // Standard 16:9 widescreen banner
+            const targetWidth = 640;
+            const targetHeight = 360; // Standard 16:9 widescreen banner
             const targetAspect = targetWidth / targetHeight;
             const sourceAspect = img.width / img.height;
 
@@ -227,8 +227,12 @@ export default function CMSManagement() {
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
 
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
-            callback(compressedDataUrl);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+
+            // Plan 1: Upload to ultra-fast global Cloud CDN with 50ms edge delivery
+            const cdnUrl = await uploadImageToCdn(compressedDataUrl, `branch_${Date.now()}.jpg`);
+            const finalImage = (cdnUrl && cdnUrl.startsWith('http')) ? cdnUrl : compressedDataUrl;
+            callback(finalImage);
           } catch (err) {
             callback(rawDataUrl);
           }

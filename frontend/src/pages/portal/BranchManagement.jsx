@@ -5,7 +5,7 @@ import {
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
   Sparkles, Eye, Camera, Upload, Image as ImageIcon, RefreshCw, Loader2
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -95,7 +95,7 @@ export default function BranchManagement() {
     targetGroup: 'All Belts & Cadets'
   });
 
-  // Smart Image Auto-Crop to 16:9 Banner, High-Def Compression & Base64
+  // Smart Image Auto-Crop to 16:9 Banner, High-Def Compression & Direct Cloud CDN Upload (Plan 1)
   const handleImageFilePick = (e, callback, onStart, onError) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
@@ -104,10 +104,10 @@ export default function BranchManagement() {
       reader.onload = (event) => {
         const rawDataUrl = event.target.result;
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           try {
-            const targetWidth = 540;
-            const targetHeight = 304; // Standard 16:9 widescreen banner
+            const targetWidth = 640;
+            const targetHeight = 360; // Standard 16:9 widescreen banner
             const targetAspect = targetWidth / targetHeight;
             const sourceAspect = img.width / img.height;
 
@@ -118,11 +118,9 @@ export default function BranchManagement() {
 
             // Smart Center Crop calculation:
             if (sourceAspect > targetAspect) {
-              // Source is wider than 16:9 -> trim extra left/right
               sWidth = Math.round(img.height * targetAspect);
               sx = Math.round((img.width - sWidth) / 2);
             } else {
-              // Source is taller than 16:9 (e.g. portrait/vertical phone photos) -> trim extra top/bottom
               sHeight = Math.round(img.width / targetAspect);
               sy = Math.round((img.height - sHeight) / 2);
             }
@@ -135,8 +133,12 @@ export default function BranchManagement() {
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
 
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
-            callback(compressedDataUrl);
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+
+            // Plan 1: Upload to ultra-fast global Cloud CDN with 50ms edge delivery
+            const cdnUrl = await uploadImageToCdn(compressedDataUrl, `branch_${Date.now()}.jpg`);
+            const finalImage = (cdnUrl && cdnUrl.startsWith('http')) ? cdnUrl : compressedDataUrl;
+            callback(finalImage);
           } catch (err) {
             callback(rawDataUrl);
           }

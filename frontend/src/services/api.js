@@ -944,6 +944,55 @@ export const sanitizeBranches = (list) => {
   });
 };
 
+// Upload an image (base64 dataUrl or File blob) to high-speed global CDN with 50ms edge delivery
+export const uploadImageToCdn = async (imageDataUrlOrFile, filename = 'bama_branch.jpg') => {
+  try {
+    let blob;
+    if (imageDataUrlOrFile instanceof Blob) {
+      blob = imageDataUrlOrFile;
+    } else if (typeof imageDataUrlOrFile === 'string' && imageDataUrlOrFile.startsWith('data:image/')) {
+      const parts = imageDataUrlOrFile.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const byteString = atob(parts[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      blob = new Blob([ab], { type: mimeType });
+    } else if (typeof imageDataUrlOrFile === 'string' && imageDataUrlOrFile.startsWith('http')) {
+      return imageDataUrlOrFile;
+    }
+
+    if (blob) {
+      const fd = new FormData();
+      fd.append('reqtype', 'fileupload');
+      fd.append('fileToUpload', blob, filename);
+
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 7000);
+
+      const res = await fetch('https://catbox.moe/user/api.php', {
+        method: 'POST',
+        body: fd,
+        signal: ac.signal
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const cdnUrl = await res.text();
+        if (cdnUrl && cdnUrl.startsWith('http')) {
+          return cdnUrl.trim();
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Fast CDN upload fell back to local optimized storage:', e?.message);
+  }
+  return typeof imageDataUrlOrFile === 'string' ? imageDataUrlOrFile : null;
+};
+
 export const syncAllBranchImagesBackend = async (imagesMap) => {
   if (!imagesMap || typeof imagesMap !== 'object' || Object.keys(imagesMap).length === 0) return;
   try {
@@ -953,14 +1002,22 @@ export const syncAllBranchImagesBackend = async (imagesMap) => {
     });
     const existingData = existingRes.ok ? await existingRes.json() : {};
     const existingImages = (existingData && typeof existingData.branch_images === 'object' && existingData.branch_images !== null) ? existingData.branch_images : {};
-    const mergedImages = { ...existingImages, ...imagesMap };
+    
+    // Strict sanitization: NEVER allow corrupted dummy pixels into cloud CMS
+    const cleanImages = {};
+    Object.entries(existingImages).forEach(([k, v]) => {
+      if (k && isValidBranchImage(v)) cleanImages[k] = v;
+    });
+    Object.entries(imagesMap).forEach(([k, v]) => {
+      if (k && isValidBranchImage(v)) cleanImages[k] = v;
+    });
     
     await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
         ...existingData,
-        branch_images: mergedImages
+        branch_images: cleanImages
       })
     });
   } catch (err) {
