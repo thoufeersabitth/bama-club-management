@@ -808,21 +808,7 @@ export default function BranchManagement() {
   };
 
   const getBranchCadetCount = (b) => {
-    const cadets = getBranchCadets(b);
-    if (cadets.length > 0) return cadets.length;
-    if (typeof b === 'object' && typeof b.student_count === 'number' && b.student_count > 0) {
-      return b.student_count;
-    }
-    const bStr = String(b.name || '').toLowerCase();
-    if (bStr.includes('pulikkal')) return 25;
-    if (bStr.includes('pengad')) return 20;
-    if (bStr.includes('chungam')) return 18;
-    if (bStr.includes('neerad')) return 16;
-    if (bStr.includes('airport')) return 15;
-    if (bStr.includes('ansar')) return 14;
-    if (bStr.includes('feroke')) return 18;
-    if (bStr.includes('kick')) return 15;
-    return 15;
+    return getBranchCadets(b).length;
   };
 
   const openBranchCadetsRoster = (b) => {

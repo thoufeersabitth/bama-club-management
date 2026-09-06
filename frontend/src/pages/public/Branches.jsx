@@ -130,17 +130,7 @@ export default function Branches() {
       }).length;
     }
 
-    if (count > 0) return count;
-
-    if (bStr.includes('pulikkal')) return 25;
-    if (bStr.includes('pengad')) return 20;
-    if (bStr.includes('chungam')) return 18;
-    if (bStr.includes('neerad')) return 16;
-    if (bStr.includes('airport')) return 15;
-    if (bStr.includes('ansar')) return 14;
-    if (bStr.includes('feroke')) return 18;
-    if (bStr.includes('kick')) return 15;
-    return b.studentCount || b.student_count || 15;
+    return count;
   };
 
   const branchList = branches;
