@@ -2046,10 +2046,12 @@ export const fetchCompetitionsBackend = async () => {
     });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data.competitions) && data.competitions.length > 0) return data.competitions;
+      if (Array.isArray(data.competitions)) {
+        return data.competitions.filter(c => c.id !== 'comp-101' && c.id !== 'comp-102');
+      }
     }
   } catch (err) {}
-  return null;
+  return [];
 };
 
 export const saveCompetitionsBackend = async (competitions) => {

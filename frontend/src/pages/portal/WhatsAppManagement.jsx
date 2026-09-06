@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award, Settings, Smartphone, Trash2 } from 'lucide-react';
-import { WHATSAPP_TEMPLATES, SAMPLE_STUDENTS } from '../../services/initialData';
+import { WHATSAPP_TEMPLATES } from '../../services/initialData';
 import { fetchStudents, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 export default function WhatsAppManagement() {
   const { user } = useAuth();
-  const [students, setStudents] = useState(SAMPLE_STUDENTS);
+  const [students, setStudents] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(WHATSAPP_TEMPLATES[0]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [cadetSearch, setCadetSearch] = useState('');
@@ -21,12 +21,14 @@ export default function WhatsAppManagement() {
   const [sentLogs, setSentLogs] = useState(() => {
     try {
       const saved = localStorage.getItem('bama_whatsapp_sent_logs');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(l => l.id !== 'log-1' && l.id !== 'log-2' && l.id !== 'log-3');
+        }
+      }
     } catch (e) {}
-    return [
-      { id: 'log-1', student: 'Fathima Riya', phone: '+91 94471 33445', template: 'Monthly Fee Due Reminder', time: '10:15 AM Today', status: 'Delivered' },
-      { id: 'log-2', student: 'Adithya Suresh', phone: '+91 98460 11223', template: 'Fee Payment Receipt', time: 'Yesterday', status: 'Delivered' }
-    ];
+    return [];
   });
 
   const saveLogs = (logs) => {
@@ -66,7 +68,8 @@ export default function WhatsAppManagement() {
         setStudents(data);
         setSelectedStudentIds(data.map(s => s.id));
       } else {
-        setSelectedStudentIds(SAMPLE_STUDENTS.map(s => s.id));
+        setStudents([]);
+        setSelectedStudentIds([]);
       }
     });
   }, []);

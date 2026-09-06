@@ -2085,7 +2085,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                     {c.student_name}
                   </h2>
                   <p className="text-xs text-gray-500 font-medium mt-1">
-                    Branch Dojo: <strong className="text-gray-800 font-bold">{c.branch_name || 'Pulikkal Main Dojo'}</strong> | Subordinated Category: <strong className="text-gray-800 font-bold">{formatSubtitle}</strong>
+                    Branch Dojo: <strong className="text-gray-800 font-bold">{c.branch_name || 'B.A.M.A. Dojo'}</strong> | Subordinated Category: <strong className="text-gray-800 font-bold">{formatSubtitle}</strong>
                   </p>
                 </div>
               </div>
@@ -2099,12 +2099,12 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                     <span>Candidate Personal Information</span>
                   </h4>
                   <p className="flex justify-between"><strong className="text-gray-600">Full Name:</strong> <span className="font-bold text-gray-900">{c.student_name}</span></p>
-                  <p className="flex justify-between"><strong className="text-gray-600">Reg / Member No:</strong> <span className="font-mono font-bold text-red-700">#{c.registration_no || c.admission_no || 'BAMA-00'}</span></p>
-                  <p className="flex justify-between"><strong className="text-gray-600">Age & Gender:</strong> <span className="font-bold text-gray-900">{c.age || 10} Yrs / {c.gender || 'Male'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-600">Reg / Member No:</strong> <span className="font-mono font-bold text-red-700">#{c.registration_no || c.admission_no || 'N/A'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-600">Age & Gender:</strong> <span className="font-bold text-gray-900">{c.age ? `${c.age} Yrs` : 'N/A'} / {c.gender || 'N/A'}</span></p>
                   <p className="flex justify-between"><strong className="text-gray-600">Date of Birth:</strong> <span className="font-bold text-gray-900">{c.dob || 'N/A'}</span></p>
-                  <p className="flex justify-between"><strong className="text-gray-600">Height & Weight:</strong> <span className="font-bold text-gray-900">{c.height_cm || 150} cm / {c.weight_kg || 40} kg</span></p>
-                  <p className="flex justify-between"><strong className="text-gray-600">Parent Tel / WA:</strong> <span className="font-mono font-bold text-emerald-700">{c.phone || '+91 9544085442'}</span></p>
-                  <p className="flex justify-between"><strong className="text-gray-600">Residence Address:</strong> <span className="font-bold text-gray-900 truncate max-w-[180px]">{c.address || 'Pulikkal'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-600">Height & Weight:</strong> <span className="font-bold text-gray-900">{c.height_cm ? `${c.height_cm} cm` : 'N/A'} / {c.weight_kg ? `${c.weight_kg} kg` : 'N/A'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-600">Parent Tel / WA:</strong> <span className="font-mono font-bold text-emerald-700">{c.phone || 'N/A'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-600">Residence Address:</strong> <span className="font-bold text-gray-900 truncate max-w-[180px]">{c.address || 'N/A'}</span></p>
                 </div>
 
                 {/* Form Specific Particulars & Exam Details Box */}
@@ -2113,9 +2113,9 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                     <Award className="w-4 h-4 text-amber-600" />
                     <span>Grading Rank & Form Particulars</span>
                   </h4>
-                  <p className="flex justify-between"><strong className="text-gray-700">Current Belt Rank:</strong> <span className="font-bold text-gray-900">🥋 {c.current_belt}</span></p>
-                  <p className="flex justify-between"><strong className="text-gray-700">Target Promotion Belt:</strong> <span className="font-black text-red-600 text-sm">🥋 {c.target_belt}</span></p>
-                  <p className="flex justify-between"><strong className="text-gray-700">Term of Training:</strong> <span className="font-bold text-gray-900">{c.training_period_years || c.years_months_training || '1 Year 0 Months'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-700">Current Belt Rank:</strong> <span className="font-bold text-gray-900">🥋 {c.current_belt || 'White Belt'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-700">Target Promotion Belt:</strong> <span className="font-black text-red-600 text-sm">🥋 {c.target_belt || 'N/A'}</span></p>
+                  <p className="flex justify-between"><strong className="text-gray-700">Term of Training:</strong> <span className="font-bold text-gray-900">{c.training_period_years || c.years_months_training || 'N/A'}</span></p>
                   
                   {/* Instructor Reference if Brown or Black Belt */}
                   {(fType === 'JKK_BROWN' || fType === 'JAPAN_DIRECT_BLACK_BELT' || fType === 'JKA_JAPAN') && (

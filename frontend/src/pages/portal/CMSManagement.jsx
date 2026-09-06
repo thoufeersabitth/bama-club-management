@@ -103,21 +103,14 @@ const INITIAL_CMS_CONFIG = {
       name: 'Sensei Abdul Rahman',
       rank: '5th Dan Black Belt',
       role: 'Chief Instructor & Founder',
-      branch: 'Pulikkal Head Office'
+      branch: 'Pulikkal Branch (Head Office)'
     },
     {
       id: 'inst-2',
-      name: 'Sensei Rahul Kumar',
-      rank: '3rd Dan Black Belt',
-      role: 'Senior Instructor',
-      branch: 'Chungam Branch'
-    },
-    {
-      id: 'inst-3',
-      name: 'Sensei Muhammed Haneen',
-      rank: '2nd Dan Black Belt',
-      role: 'Instructor',
-      branch: 'Mongam Branch'
+      name: 'Sensei Abdul Nafih',
+      rank: 'Chief Administrator',
+      role: 'Head Instructor',
+      branch: 'Pulikkal Branch (Head Office)'
     }
   ]
 };

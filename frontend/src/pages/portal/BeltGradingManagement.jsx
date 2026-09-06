@@ -8,37 +8,23 @@ import { fetchBeltGradings, fetchStudents, saveBeltGradingBackend, openWhatsApp,
 import OfficeGrading from '../office/OfficeGrading';
 import { BELT_LEVELS, ACADEMY_INFO, UPCOMING_EVENTS } from '../../services/initialData';
 
-const INITIAL_COMPETITIONS = [
-  {
-    id: 'comp-101',
-    title: 'Annual B.A.M.A. State Karate Championship 2026',
-    category: 'Tournament',
-    date: '2026-07-20',
-    venue: 'Calicut Indoor Stadium',
-    firstPlace: 'Adithya Suresh (Kumite Category A)',
-    secondPlace: 'Kanjali (Kata Category B)',
-    thirdPlace: 'Muhammed Haneen (Kumite Category B)',
-    notes: 'State Level Championship with 150+ participants.',
-    whatsappAlertSent: true
-  },
-  {
-    id: 'comp-102',
-    title: 'Academy Speed Kick & Fun Obstacle Challenge',
-    category: 'Fun Program',
-    date: '2026-08-05',
-    venue: 'Pulikkal Main Dojo',
-    firstPlace: 'Kanjali',
-    secondPlace: 'Adithya Suresh',
-    thirdPlace: 'Rohan Sharma',
-    notes: 'Inter-dojo fun agility and obstacle sprint competition.',
-    whatsappAlertSent: true
-  }
-];
+const INITIAL_COMPETITIONS = [];
 
 export default function BeltGradingManagement() {
   const [gradings, setGradings] = useState([]);
-  const [competitions, setCompetitions] = useState(INITIAL_COMPETITIONS);
-  const [events, setEvents] = useState(UPCOMING_EVENTS);
+  const [competitions, setCompetitions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_competitions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(c => c.id !== 'comp-101' && c.id !== 'comp-102');
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
+  const [events, setEvents] = useState([]);
   const [studentsList, setStudentsList] = useState([]);
 
   const [activeTab, setActiveTab] = useState('EXAM_APPLICATIONS'); // 'EXAM_APPLICATIONS' | 'CERTIFICATES' | 'COMPETITIONS' | 'EXAM_CAMPS'
@@ -100,14 +86,15 @@ export default function BeltGradingManagement() {
           status: ex.status || 'Active',
           whatsappAlertSent: false
         }));
-        setEvents(prev => {
-          const ids = new Set(mapped.map(m => m.id));
-          return [...mapped, ...prev.filter(p => !ids.has(p.id))];
-        });
+        setEvents(mapped);
+      } else {
+        setEvents([]);
       }
     });
     fetchCompetitionsBackend().then(comps => {
-      if (comps && comps.length > 0) setCompetitions(comps);
+      if (comps && Array.isArray(comps)) {
+        setCompetitions(comps.filter(c => c.id !== 'comp-101' && c.id !== 'comp-102'));
+      }
     });
   }, []);
 

@@ -33,9 +33,9 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_06_chungam_sync_v19';
+    const APP_VERSION = 'bama_v2026_09_06_zero_dummy_v20';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
-      // Clean stale cadet/user cache, branch caches and schedule caches so fresh cloud data loads instantly on all devices
+      // Clean stale cadet/user cache, branch caches, schedule caches and dummy logs
       localStorage.removeItem('bama_cadets_roster');
       localStorage.removeItem('bama_students');
       localStorage.removeItem('bama_cadets');
@@ -47,6 +47,9 @@ export default function App() {
       localStorage.removeItem('bama_training_schedules');
       localStorage.removeItem('bama_deleted_branch_ids');
       localStorage.removeItem('bama_deleted_shift_ids');
+      localStorage.removeItem('bama_whatsapp_sent_logs');
+      localStorage.removeItem('bama_admission_inquiries');
+      localStorage.removeItem('bama_competitions');
 
       localStorage.setItem('bama_app_cache_version', APP_VERSION);
     }

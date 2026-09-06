@@ -87,17 +87,19 @@ export const buildRealDatabaseActivities = (students = [], fees = []) => {
   // 4. Real Class Session Conducted Logs
   try {
     const logs = JSON.parse(localStorage.getItem('bama_class_logs') || '[]');
-    logs.forEach((log, idx) => {
-      combined.push({
-        id: `log-${log.id || idx}`,
-        type: 'CLASS',
-        title: 'Class Session Conducted',
-        description: `${log.staffName || 'Sensei'} conducted ${log.shift} (${log.cadetsCount} Cadets)`,
-        user: log.staffName || 'Instructor',
-        timestamp: log.date ? new Date(log.date).getTime() : (Date.now() - (idx + 3) * 14400000),
-        time: log.date || 'Class Log'
+    if (Array.isArray(logs)) {
+      logs.filter(l => l.id !== 'log-1' && l.id !== 'log-2' && l.id !== 'log-3').forEach((log, idx) => {
+        combined.push({
+          id: `log-${log.id || idx}`,
+          type: 'CLASS',
+          title: 'Class Session Conducted',
+          description: `${log.staffName || 'Sensei'} conducted ${log.shift} (${log.cadetsCount} Cadets)`,
+          user: log.staffName || 'Instructor',
+          timestamp: log.date ? new Date(log.date).getTime() : (Date.now() - (idx + 3) * 14400000),
+          time: log.date || 'Class Log'
+        });
       });
-    });
+    }
   } catch (e) {}
 
   // Sort descending by timestamp (most recent first)

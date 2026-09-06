@@ -170,12 +170,14 @@ export default function StudentManagement() {
   const [inquiriesList, setInquiriesList] = useState(() => {
     try {
       const saved = localStorage.getItem('bama_admission_inquiries');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(inq => inq.id !== 'INQ-101' && inq.id !== 'INQ-102');
+        }
+      }
     } catch (e) {}
-    return [
-      { id: 'INQ-101', name: 'Rahul V.K.', phone: '+91 98470 12345', email: 'rahul@gmail.com', branch: 'Chungam Dojo Branch', program: 'Adult Fitness & Sparring', message: 'Want to join evening karate batch for fitness.', date: '2026-08-23', time: '10:15 PM', status: 'PENDING' },
-      { id: 'INQ-102', name: 'Fathima Riya (Parent)', phone: '+91 95440 85442', email: 'riya@gmail.com', branch: 'Pulikkal Dojo (Head Office)', program: 'Kids Karate (Ages 5-12)', message: 'Enquiring about kids karate fee and timings.', date: '2026-08-23', time: '11:20 PM', status: 'PENDING' }
-    ];
+    return [];
   });
 
   useEffect(() => {

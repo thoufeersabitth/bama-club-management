@@ -243,22 +243,28 @@ export default function DashboardPortal() {
   const pendingPct = Math.max(0, 100 - collectedPct);
   // 100% REAL DYNAMIC SYSTEM STATS
   const systemStats = React.useMemo(() => {
-    let instructorsCount = 3;
+    let instructorsCount = 1;
     try {
-      const staff = JSON.parse(localStorage.getItem('bama_staff') || '[]');
-      if (staff.length > 0) instructorsCount = staff.filter(s => s.status !== 'Inactive').length;
+      const staff = JSON.parse(localStorage.getItem('bama_staff') || localStorage.getItem('bama_staff_list') || '[]');
+      if (Array.isArray(staff) && staff.length > 0) {
+        instructorsCount = staff.filter(s => s.status !== 'Inactive').length;
+      }
     } catch (e) {}
 
-    let classesCount = 4;
+    let classesCount = 0;
     try {
       const logs = JSON.parse(localStorage.getItem('bama_class_logs') || '[]');
-      if (logs.length > 0) classesCount = logs.length;
+      if (Array.isArray(logs)) {
+        classesCount = logs.filter(l => l.id !== 'log-1' && l.id !== 'log-2' && l.id !== 'log-3').length;
+      }
     } catch (e) {}
 
-    let branchesCount = 3;
+    let branchesCount = INITIAL_BRANCHES.length;
     try {
-      const bList = JSON.parse(localStorage.getItem('bama_branches') || '[]');
-      if (bList.length > 0) branchesCount = bList.length;
+      const bList = JSON.parse(localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches') || '[]');
+      if (Array.isArray(bList) && bList.length > 0) {
+        branchesCount = bList.length;
+      }
     } catch (e) {}
 
     const uniqueBatches = new Set();
@@ -266,9 +272,9 @@ export default function DashboardPortal() {
       if (s.dojoShift) uniqueBatches.add(s.dojoShift);
       if (s.batch) uniqueBatches.add(s.batch);
     });
-    const batchesCount = uniqueBatches.size > 0 ? uniqueBatches.size : 4;
+    const batchesCount = uniqueBatches.size;
 
-    const registeredParentsCount = filteredStudents.filter(s => s.guardianName || s.parentName || s.fatherName || s.contactPerson).length || filteredStudents.length;
+    const registeredParentsCount = filteredStudents.filter(s => s.guardianName || s.parentName || s.fatherName || s.contactPerson).length;
 
     return {
       instructors: instructorsCount,
@@ -375,10 +381,12 @@ export default function DashboardPortal() {
     const lastPoint = points[points.length - 1];
 
     // Read total classes conducted
-    let totalClassesCount = 24;
+    let totalClassesCount = 0;
     try {
       const logs = JSON.parse(localStorage.getItem('bama_class_logs') || '[]');
-      if (logs.length > 0) totalClassesCount = logs.length;
+      if (Array.isArray(logs)) {
+        totalClassesCount = logs.filter(l => l.id !== 'log-1' && l.id !== 'log-2' && l.id !== 'log-3').length;
+      }
     } catch (e) {}
 
     return {

@@ -196,11 +196,7 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
     return Array.from(new Set(allShifts));
   }
 
-  return [
-    'Evening Batch (5:00 PM - 7:00 PM)',
-    'Morning Batch (6:00 AM - 7:30 AM)',
-    'Custom Shift / Flexible'
-  ];
+  return [];
 };
 
 export const BELT_LEVELS = [
