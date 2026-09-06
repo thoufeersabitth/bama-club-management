@@ -353,22 +353,6 @@ export const INITIAL_BRANCHES = [
     status: "Active",
     isHeadOffice: false,
     mapUrl: "https://maps.google.com/?q=Pulikkal+Malappuram"
-  },
-  {
-    id: "8a7261d5-273f-4a07-a360-806185252ff6",
-    name: "cfgvhbjk",
-    code: "BAMA-DOJO-11",
-    address: "cvubnl, Malappuram",
-    phone: "+91 95440 85442",
-    whatsapp: "+91 95440 85442",
-    email: "branch11@bama.org",
-    branch_head: "Sensei Abdul Rahman (5th Dan)",
-    head: "Sensei Abdul Rahman (5th Dan)",
-    timings: "Mon, Wed, Fri: 5:00 PM - 7:00 PM",
-    facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags"],
-    status: "Active",
-    isHeadOffice: false,
-    mapUrl: "https://maps.google.com/?q=Pulikkal+Malappuram"
   }
 ];
 

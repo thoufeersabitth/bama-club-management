@@ -1202,6 +1202,18 @@ export const fetchBranches = async (forceRefresh = false) => {
     }
   } catch (e) {}
 
+  const isBranchExcluded = (b) => {
+    if (!b) return true;
+    const bId = String(b.id || '').toLowerCase().trim();
+    const bName = String(b.name || '').toLowerCase().trim();
+    const bCode = String(b.code || '').toLowerCase().trim();
+    if (bName === 'cfgvhbjk' || bName === 'zxcvbnm' || (bCode === 'bama-dojo-11' && bName.includes('cfgvhbjk'))) return true;
+    return deletedBranchIds.some(d => {
+      const dLow = String(d || '').toLowerCase().trim();
+      return dLow && (dLow === bId || dLow === bName || dLow === bCode);
+    });
+  };
+
   // 1. Fetch directly from Fly.io live PostgreSQL server: branches, faqs, and cms-config concurrently
   let fetchedFromServer = false;
   try {
@@ -1220,10 +1232,22 @@ export const fetchBranches = async (forceRefresh = false) => {
       }).catch(() => null)
     ]);
 
-    // A) Extract images from CMS config branch_images dictionary & branches array FIRST (baseline)
+    // A) Extract images and deleted branch IDs from CMS config
     if (cmsRes && cmsRes.ok) {
       try {
         const cmsData = await cmsRes.json();
+        if (Array.isArray(cmsData?.deleted_branch_ids)) {
+          cmsData.deleted_branch_ids.forEach(did => {
+            if (did) {
+              const dStr = String(did).toLowerCase().trim();
+              if (!deletedBranchIds.includes(String(did))) deletedBranchIds.push(String(did));
+              if (!deletedBranchIds.includes(dStr)) deletedBranchIds.push(dStr);
+            }
+          });
+          try {
+            localStorage.setItem('bama_deleted_branch_ids', JSON.stringify(Array.from(new Set(deletedBranchIds))));
+          } catch (e) {}
+        }
         if (cmsData?.branch_images && typeof cmsData.branch_images === 'object') {
           Object.entries(cmsData.branch_images).forEach(([k, v]) => {
             if (k && isValidBranchImage(v)) {
@@ -1283,7 +1307,7 @@ export const fetchBranches = async (forceRefresh = false) => {
         fetchedFromServer = true;
         serverBranches.forEach(b => {
           const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-          if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+          if (key && !isBranchExcluded(b)) {
             const idKey = String(b.id || '').toLowerCase().trim();
             const codeKey = String(b.code || '').toUpperCase().trim();
             const nameKey = String(b.name || '').toLowerCase().trim();
@@ -1340,8 +1364,6 @@ export const fetchBranches = async (forceRefresh = false) => {
 
           if (fetchedFromServer) {
             // Live Server is authoritative across all devices!
-            // If the server branch somehow has no valid custom photo, but local storage has one, use it.
-            // NEVER let stale local cache overwrite an existing valid photo from the server!
             if (key && branchMap.has(key)) {
               const existing = branchMap.get(key);
               if (!isValidBranchImage(existing.image) && isValidBranchImage(customImg)) {
@@ -1355,7 +1377,7 @@ export const fetchBranches = async (forceRefresh = false) => {
             }
           } else {
             // Server was completely offline: populate from local cache
-            if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+            if (key && !isBranchExcluded(b)) {
               const finalImg = isValidBranchImage(customImg) ? customImg : (b.image && isValidBranchImage(b.image) ? b.image : ((b.isHeadOffice || b.is_head_office) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg'));
               branchMap.set(key, {
                 ...b,
@@ -1374,15 +1396,13 @@ export const fetchBranches = async (forceRefresh = false) => {
   if (branchMap.size === 0) {
     INITIAL_BRANCHES.forEach(b => {
       const key = String(b.name || b.code || b.id || '').toLowerCase().trim();
-      if (key && !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())) {
+      if (key && !isBranchExcluded(b)) {
         branchMap.set(key, b);
       }
     });
   }
 
-  const cleaned = sanitizeBranches(Array.from(branchMap.values()).filter(b => 
-    !deletedBranchIds.includes(String(b.id)) && !deletedBranchIds.includes(String(b.name).toLowerCase().trim())
-  ));
+  const cleaned = sanitizeBranches(Array.from(branchMap.values()).filter(b => !isBranchExcluded(b)));
   const result = cleaned.length > 0 ? cleaned : INITIAL_BRANCHES;
   _branchesCache = result;
   _branchesCacheTime = Date.now();
@@ -1567,6 +1587,22 @@ export const deleteBranchBackend = async (id, branchName = '') => {
     }
   } catch (e) {}
 
+  // Synchronize deleted IDs to global cms-config so all devices immediately purge it
+  try {
+    const cmsRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`);
+    if (cmsRes.ok) {
+      const cms = await cmsRes.json();
+      const curDeleted = Array.isArray(cms.deleted_branch_ids) ? cms.deleted_branch_ids : [];
+      const toAdd = [String(id || ''), String(branchName || '').toLowerCase().trim()].filter(Boolean);
+      const updatedDeleted = Array.from(new Set([...curDeleted, ...toAdd]));
+      await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...cms, deleted_branch_ids: updatedDeleted })
+      });
+    }
+  } catch (e) {}
+
   try {
     if (typeof id === 'string' && id.length > 20) {
       const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
@@ -1682,19 +1718,29 @@ export const deduplicateSchedules = (schedules) => {
   schedules.forEach(s => {
     if (!s) return;
     const sName = String(s.name || '').toLowerCase().trim();
-    if (sName.startsWith('general training batch') || s.branch === 'zxcvbnm') return;
+    let normBranch = String(s.branch || s.branch_name || '').trim();
+    if (normBranch.includes('2026')) {
+      normBranch = normBranch.replace(/\s*2026\s*/g, ' ').trim();
+    }
+    const bLow = normBranch.toLowerCase();
+    if (sName.startsWith('general training batch') || bLow === 'zxcvbnm' || bLow === 'cfgvhbjk' || sName.includes('cfgvhbjk')) return;
     
     // Normalized composite key: branch + days + time
-    const bKey = String(s.branch || s.branch_name || '').toLowerCase().trim();
+    const bKey = bLow.replace(/[^a-z0-9]/g, '');
     const dKey = String(s.days || '').toLowerCase().trim();
     const tKey = String(s.time || '').toLowerCase().trim();
     const compositeKey = `${bKey}__${dKey}__${tKey}`;
 
+    const normalizedSchedule = {
+      ...s,
+      branch: normBranch
+    };
+
     if (map.has(compositeKey)) {
       const existing = map.get(compositeKey);
-      map.set(compositeKey, { ...existing, ...s });
+      map.set(compositeKey, { ...existing, ...normalizedSchedule });
     } else {
-      map.set(compositeKey, s);
+      map.set(compositeKey, normalizedSchedule);
     }
   });
   return Array.from(map.values());
@@ -1780,7 +1826,8 @@ export const filterOutDummyShifts = (list) => {
   return deduplicateSchedules(list.filter(s => {
     if (!s) return false;
     const sName = String(s.name || '').toLowerCase().trim();
-    if (sName.startsWith('general training batch') || s.branch === 'zxcvbnm') return false;
+    const sBranch = String(s.branch || s.branch_name || '').toLowerCase().trim();
+    if (sName.startsWith('general training batch') || sBranch === 'zxcvbnm' || sBranch === 'cfgvhbjk' || sName.includes('cfgvhbjk')) return false;
     return true;
   }));
 };

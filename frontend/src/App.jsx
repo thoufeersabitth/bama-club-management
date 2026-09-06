@@ -33,7 +33,7 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_06_all_branch_shifts_v16';
+    const APP_VERSION = 'bama_v2026_09_06_sync_v18_final';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       // Clean stale cadet/user cache, branch caches and schedule caches so fresh cloud data loads instantly on all devices
       localStorage.removeItem('bama_cadets_roster');

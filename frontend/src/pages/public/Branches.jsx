@@ -222,10 +222,10 @@ export default function Branches() {
                     {(() => {
                       const branchShifts = schedules.filter(s => {
                         if (!s) return false;
-                        const sb = String(s.branch || s.branch_name || '').toLowerCase().trim();
-                        const bn = String(b.name || '').toLowerCase().trim();
-                        const bc = String(b.code || '').toLowerCase().trim();
-                        return sb === bn || sb === bc || sb.includes(bn) || bn.includes(sb);
+                        const sb = String(s.branch || s.branch_name || '').toLowerCase().replace(/202\d/g, '').replace(/[^a-z0-9]/g, '');
+                        const bn = String(b.name || '').toLowerCase().replace(/202\d/g, '').replace(/[^a-z0-9]/g, '');
+                        const bc = String(b.code || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return sb === bn || sb === bc || (sb && bn && (sb.includes(bn) || bn.includes(sb)));
                       });
 
                       if (branchShifts.length > 0) {
