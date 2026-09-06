@@ -1202,30 +1202,21 @@ export const fetchBranches = async (forceRefresh = false) => {
     }
   } catch (e) {}
 
-  const OFFICIAL_BRANCH_CODES = ['PLK-01', 'BAMA-DOJO-05', 'BAMA-DOJO-010', 'BAMA-DOJO-09', 'BAMA-DOJO-07', 'CGM-02', 'FRK-04', 'BAMA-DOJO-10'];
-  const OFFICIAL_BRANCH_NAMES = [
-    'pulikkal branch (head office)',
-    'a m l p s neerad school',
-    'airport',
-    'ansar school',
-    'btmamups pengad school',
-    'chungam branch dojo',
-    'feroke branch',
-    'kick boxing pulikkal'
-  ];
-
   const isBranchExcluded = (b) => {
     if (!b) return true;
     const bId = String(b.id || '').toLowerCase().trim();
     const bName = String(b.name || '').toLowerCase().trim();
     const bCode = String(b.code || '').toUpperCase().trim();
 
-    // The 8 official real branches must ALWAYS be visible across all devices:
-    if (OFFICIAL_BRANCH_CODES.includes(bCode) || OFFICIAL_BRANCH_NAMES.includes(bName) || bName.includes('chungam')) {
+    // Permanent dummy test branches to always exclude:
+    if (bName === 'cfgvhbjk' || bName === 'zxcvbnm' || (bCode === 'BAMA-DOJO-11' && bName.includes('cfgvhbjk'))) return true;
+
+    // Head office dojo cannot be deleted
+    if ((b.is_head_office ?? b.isHeadOffice) || bCode === 'PLK-01' || bName === 'pulikkal branch (head office)') {
       return false;
     }
 
-    if (bName === 'cfgvhbjk' || bName === 'zxcvbnm' || (bCode === 'BAMA-DOJO-11' && bName.includes('cfgvhbjk'))) return true;
+    // If group admin explicitly deleted this branch from phone or laptop, exclude it everywhere:
     return deletedBranchIds.some(d => {
       const dLow = String(d || '').toLowerCase().trim();
       return dLow && (dLow === bId || dLow === bName || dLow === bCode.toLowerCase());
@@ -1605,7 +1596,7 @@ export const deleteBranchBackend = async (id, branchName = '') => {
     }
   } catch (e) {}
 
-  // Synchronize deleted IDs to global cms-config so all devices immediately purge it
+  // Synchronize deleted IDs and clean up schedules in global cms-config so all devices immediately purge it
   try {
     const cmsRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`);
     if (cmsRes.ok) {
@@ -1613,10 +1604,25 @@ export const deleteBranchBackend = async (id, branchName = '') => {
       const curDeleted = Array.isArray(cms.deleted_branch_ids) ? cms.deleted_branch_ids : [];
       const toAdd = [String(id || ''), String(branchName || '').toLowerCase().trim()].filter(Boolean);
       const updatedDeleted = Array.from(new Set([...curDeleted, ...toAdd]));
+
+      // Also clean up schedules for this deleted branch
+      let updatedSchedules = cms.training_schedules;
+      if (Array.isArray(updatedSchedules) && branchName) {
+        const normTarget = String(branchName).toLowerCase().trim();
+        updatedSchedules = updatedSchedules.filter(s => {
+          const sB = String(s.branch || s.branch_name || '').toLowerCase().trim();
+          return sB !== normTarget && !sB.includes(normTarget);
+        });
+      }
+
       await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...cms, deleted_branch_ids: updatedDeleted })
+        body: JSON.stringify({
+          ...cms,
+          deleted_branch_ids: updatedDeleted,
+          training_schedules: updatedSchedules
+        })
       });
     }
   } catch (e) {}
