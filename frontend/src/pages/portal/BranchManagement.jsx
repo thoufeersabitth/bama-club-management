@@ -257,6 +257,47 @@ export default function BranchManagement() {
         window.dispatchEvent(new Event('bama_data_updated'));
         window.dispatchEvent(new Event('cms_updated'));
 
+        // 2. Auto-sync training batch schedules for this branch
+        try {
+          const slots = getBranchTimingSlots(formData.timings);
+          if (slots.length > 0) {
+            const branchName = updatedItem.name;
+            const prog = branchName.toLowerCase().includes('kick') ? 'Kickboxing' : 'Karate (Shotokan)';
+            let mergedShifts = [...schedules];
+            slots.forEach((slot, sIdx) => {
+              let days = 'Mon, Wed, Fri';
+              let time = slot;
+              if (slot.includes(':')) {
+                const colonIndex = slot.indexOf(':');
+                days = slot.substring(0, colonIndex).trim();
+                time = slot.substring(colonIndex + 1).trim();
+              }
+              const exists = mergedShifts.some(s => 
+                String(s.branch || '').toLowerCase().trim() === String(branchName).toLowerCase().trim() &&
+                String(s.time || '').toLowerCase().trim() === String(time).toLowerCase().trim()
+              );
+              if (!exists) {
+                mergedShifts.push({
+                  id: `shift-${editBranch.id}-${sIdx}`,
+                  name: `${branchName} (${time})`,
+                  branch: branchName,
+                  program: prog,
+                  days,
+                  time,
+                  instructor: updatedItem.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+                  targetGroup: 'All Belts & Cadets',
+                  status: 'Active'
+                });
+              }
+            });
+            const cleanMerged = filterOutDummyShifts(mergedShifts);
+            setSchedules(cleanMerged);
+            localStorage.setItem('bama_training_schedules', JSON.stringify(cleanMerged));
+            saveTrainingSchedulesBackend(cleanMerged).catch(() => {});
+            window.dispatchEvent(new Event('bama_schedules_updated'));
+          }
+        } catch (schErr) {}
+
         // 3. Dismiss modal cleanly with verified success
         setShowAddModal(false);
         setEditBranch(null);
@@ -308,6 +349,41 @@ export default function BranchManagement() {
           safeLocalStorageSet('bama_custom_branches', updatedList);
           safeLocalStorageSet('bama_branches', updatedList);
         } catch (storageErr) {}
+
+        // Automatically create training schedule batches for this new branch!
+        try {
+          const slots = getBranchTimingSlots(formData.timings);
+          if (slots.length > 0) {
+            const branchName = formData.name;
+            const prog = branchName.toLowerCase().includes('kick') ? 'Kickboxing' : 'Karate (Shotokan)';
+            let mergedShifts = [...schedules];
+            slots.forEach((slot, sIdx) => {
+              let days = 'Mon, Wed, Fri';
+              let time = slot;
+              if (slot.includes(':')) {
+                const colonIndex = slot.indexOf(':');
+                days = slot.substring(0, colonIndex).trim();
+                time = slot.substring(colonIndex + 1).trim();
+              }
+              mergedShifts.push({
+                id: `shift-${finalId}-${sIdx}`,
+                name: `${branchName} (${time})`,
+                branch: branchName,
+                program: prog,
+                days,
+                time,
+                instructor: formData.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+                targetGroup: 'All Belts & Cadets',
+                status: 'Active'
+              });
+            });
+            const cleanMerged = filterOutDummyShifts(mergedShifts);
+            setSchedules(cleanMerged);
+            localStorage.setItem('bama_training_schedules', JSON.stringify(cleanMerged));
+            saveTrainingSchedulesBackend(cleanMerged).catch(() => {});
+            window.dispatchEvent(new Event('bama_schedules_updated'));
+          }
+        } catch (schErr) {}
 
         window.dispatchEvent(new Event('bama_branches_updated'));
         window.dispatchEvent(new Event('bama_data_updated'));
@@ -1798,10 +1874,15 @@ export default function BranchManagement() {
                 <select
                   value={shiftData.branch}
                   onChange={(e) => setShiftData({ ...shiftData, branch: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
+                  className="w-full bg-amber-50/40 border border-amber-300 rounded-xl px-3.5 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
                 >
+                  {branches.length === 0 && (
+                    <option value="">No Branches Found</option>
+                  )}
                   {branches.map(b => (
-                    <option key={b.id} value={b.name}>{b.name}</option>
+                    <option key={b.id || b.code || b.name} value={b.name}>
+                      {b.name} ({b.code || 'DOJO'})
+                    </option>
                   ))}
                 </select>
               </div>
