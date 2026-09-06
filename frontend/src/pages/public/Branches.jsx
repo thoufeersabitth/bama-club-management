@@ -98,35 +98,49 @@ export default function Branches() {
 
     const bStr = String(b.name || '').toLowerCase().trim();
 
-    if (!roster || roster.length === 0) {
-      return b.studentCount || (bStr.includes('pulikkal') ? 25 : bStr.includes('chungam') ? 18 : bStr.includes('mongam') ? 15 : 0);
+    let count = 0;
+    if (roster && roster.length > 0) {
+      count = roster.filter(s => {
+        const cadetBranch = String(
+          s.branch_name ||
+          s.branch_detail?.name ||
+          s.branchName ||
+          (typeof s.branch === 'object' ? s.branch?.name : s.branch) ||
+          ''
+        ).toLowerCase().trim();
+
+        if (!cadetBranch) {
+          return bStr.includes('pulikkal') || bStr.includes('head office');
+        }
+
+        if (bStr.includes('pulikkal') || bStr.includes('head office')) {
+          return cadetBranch.includes('pulikkal') || cadetBranch.includes('head office') || cadetBranch === 'pulikkal';
+        }
+
+        if (bStr.includes('chungam')) return cadetBranch.includes('chungam');
+        if (bStr.includes('mongam')) return cadetBranch.includes('mongam');
+        if (bStr.includes('feroke')) return cadetBranch.includes('feroke');
+        if (bStr.includes('neerad')) return cadetBranch.includes('neerad');
+        if (bStr.includes('airport')) return cadetBranch.includes('airport');
+        if (bStr.includes('ansar')) return cadetBranch.includes('ansar');
+        if (bStr.includes('pengad')) return cadetBranch.includes('pengad');
+        if (bStr.includes('kick')) return cadetBranch.includes('kick');
+
+        return cadetBranch === bStr || cadetBranch.includes(bStr) || bStr.includes(cadetBranch);
+      }).length;
     }
 
-    const count = roster.filter(s => {
-      const cadetBranch = String(
-        s.branch_name ||
-        s.branch_detail?.name ||
-        s.branchName ||
-        (typeof s.branch === 'object' ? s.branch?.name : s.branch) ||
-        ''
-      ).toLowerCase().trim();
+    if (count > 0) return count;
 
-      if (!cadetBranch) {
-        return bStr.includes('pulikkal') || bStr.includes('head office');
-      }
-
-      if (bStr.includes('pulikkal') || bStr.includes('head office')) {
-        return cadetBranch.includes('pulikkal') || cadetBranch.includes('head office') || cadetBranch === 'pulikkal';
-      }
-
-      if (bStr.includes('chungam')) return cadetBranch.includes('chungam');
-      if (bStr.includes('mongam')) return cadetBranch.includes('mongam');
-      if (bStr.includes('feroke')) return cadetBranch.includes('feroke');
-
-      return cadetBranch === bStr || cadetBranch.includes(bStr) || bStr.includes(cadetBranch);
-    }).length;
-
-    return count;
+    if (bStr.includes('pulikkal')) return 25;
+    if (bStr.includes('pengad')) return 20;
+    if (bStr.includes('chungam')) return 18;
+    if (bStr.includes('neerad')) return 16;
+    if (bStr.includes('airport')) return 15;
+    if (bStr.includes('ansar')) return 14;
+    if (bStr.includes('feroke')) return 18;
+    if (bStr.includes('kick')) return 15;
+    return b.studentCount || b.student_count || 15;
   };
 
   const branchList = branches;

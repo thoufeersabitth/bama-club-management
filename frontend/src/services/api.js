@@ -1202,15 +1202,33 @@ export const fetchBranches = async (forceRefresh = false) => {
     }
   } catch (e) {}
 
+  const OFFICIAL_BRANCH_CODES = ['PLK-01', 'BAMA-DOJO-05', 'BAMA-DOJO-010', 'BAMA-DOJO-09', 'BAMA-DOJO-07', 'CGM-02', 'FRK-04', 'BAMA-DOJO-10'];
+  const OFFICIAL_BRANCH_NAMES = [
+    'pulikkal branch (head office)',
+    'a m l p s neerad school',
+    'airport',
+    'ansar school',
+    'btmamups pengad school',
+    'chungam branch dojo',
+    'feroke branch',
+    'kick boxing pulikkal'
+  ];
+
   const isBranchExcluded = (b) => {
     if (!b) return true;
     const bId = String(b.id || '').toLowerCase().trim();
     const bName = String(b.name || '').toLowerCase().trim();
-    const bCode = String(b.code || '').toLowerCase().trim();
-    if (bName === 'cfgvhbjk' || bName === 'zxcvbnm' || (bCode === 'bama-dojo-11' && bName.includes('cfgvhbjk'))) return true;
+    const bCode = String(b.code || '').toUpperCase().trim();
+
+    // The 8 official real branches must ALWAYS be visible across all devices:
+    if (OFFICIAL_BRANCH_CODES.includes(bCode) || OFFICIAL_BRANCH_NAMES.includes(bName) || bName.includes('chungam')) {
+      return false;
+    }
+
+    if (bName === 'cfgvhbjk' || bName === 'zxcvbnm' || (bCode === 'BAMA-DOJO-11' && bName.includes('cfgvhbjk'))) return true;
     return deletedBranchIds.some(d => {
       const dLow = String(d || '').toLowerCase().trim();
-      return dLow && (dLow === bId || dLow === bName || dLow === bCode);
+      return dLow && (dLow === bId || dLow === bName || dLow === bCode.toLowerCase());
     });
   };
 

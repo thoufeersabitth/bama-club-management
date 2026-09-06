@@ -33,7 +33,7 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_06_sync_v18_final';
+    const APP_VERSION = 'bama_v2026_09_06_chungam_sync_v19';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       // Clean stale cadet/user cache, branch caches and schedule caches so fresh cloud data loads instantly on all devices
       localStorage.removeItem('bama_cadets_roster');
@@ -45,9 +45,22 @@ export default function App() {
       localStorage.removeItem('bama_branches');
       localStorage.removeItem('bama_branch_images');
       localStorage.removeItem('bama_training_schedules');
+      localStorage.removeItem('bama_deleted_branch_ids');
+      localStorage.removeItem('bama_deleted_shift_ids');
 
       localStorage.setItem('bama_app_cache_version', APP_VERSION);
     }
+
+    // Safety: ensure official branches like Chungam are NEVER stuck in deleted_branch_ids
+    try {
+      const del = JSON.parse(localStorage.getItem('bama_deleted_branch_ids') || '[]');
+      const protectedWords = ['pulikkal', 'neerad', 'airport', 'ansar', 'pengad', 'chungam', 'feroke', 'kick boxing', 'cgm-02', 'plk-01'];
+      const cleanedDel = del.filter(item => {
+        const itemLow = String(item || '').toLowerCase().trim();
+        return !protectedWords.some(p => itemLow.includes(p));
+      });
+      localStorage.setItem('bama_deleted_branch_ids', JSON.stringify(cleanedDel));
+    } catch (e) {}
 
     // Auto-update checker: when mobile phone resumes/wakes up or tab becomes visible
     const checkFreshness = async () => {
