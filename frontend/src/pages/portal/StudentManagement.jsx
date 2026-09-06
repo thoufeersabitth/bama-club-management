@@ -996,7 +996,7 @@ export default function StudentManagement() {
       const rawBranch = cadet.branch_name || cadet.branchName || cadet.dojo_branch || cadet.dojoBranch || cadet.branch_dojo || bObjName || cadet.branch || '';
       const bStr = (String(rawBranch) + ' ' + String(bId) + ' ' + String(cadet.branch || '')).toLowerCase().trim();
 
-      if (bStr.includes('kick boxing') || bStr.includes('boxing pulikkal')) return 'kickboxing_pulikkal';
+      if (bStr.includes('kick')) return 'kickboxing_pulikkal';
       if (bStr.includes('pengad') || bStr.includes('btmamups')) return 'pengad';
       if (bStr.includes('neerad') || bStr.includes('amlps')) return 'neerad';
       if (bStr.includes('ansar')) return 'ansar';
@@ -1047,7 +1047,7 @@ export default function StudentManagement() {
           const sName = String(s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_detail?.name || '').toLowerCase().trim();
           matchesBranch = (targetId && sId && targetId === sId) || (targetCode && sCode && targetCode === sCode) || (targetName && sName && targetName === sName);
         }
-      } else if (scopeLower.includes('kick boxing') || scopeLower.includes('boxing pulikkal')) {
+      } else if (scopeLower.includes('kick')) {
         matchesBranch = (cadetBranchKey === 'kickboxing_pulikkal');
       } else if (scopeLower.includes('pengad') || scopeLower.includes('btmamups')) {
         matchesBranch = (cadetBranchKey === 'pengad');

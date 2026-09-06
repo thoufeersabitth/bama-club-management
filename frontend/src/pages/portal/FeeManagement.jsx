@@ -528,6 +528,7 @@ export default function FeeManagement() {
     const getCadetBranchKey = (cadet) => {
       const rawBranch = cadet.branch_name || cadet.branch_detail?.name || cadet.branchName || (typeof cadet.branch === 'object' ? cadet.branch?.name : cadet.branch) || '';
       const bStr = (String(rawBranch) + ' ' + String(cadet.branch_id || '')).toLowerCase();
+      if (bStr.includes('kick')) return 'kickboxing';
       if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02') || bStr.includes('20c924cd')) return 'chungam';
       if (bStr.includes('mongam') || bStr.includes('dojo-03') || bStr.includes('d4639193')) return 'mongam';
       if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
@@ -539,7 +540,8 @@ export default function FeeManagement() {
     let matchesBranch = selectedBranch === 'All';
     if (!matchesBranch) {
       const selStr = String(selectedBranch).toLowerCase().trim();
-      if (selStr.includes('pulikkal') || selStr.includes('plk') || selStr.includes('dojo-01') || selStr.includes('283e0cc2')) matchesBranch = (cadetBranchKey === 'pulikkal');
+      if (selStr.includes('kick')) matchesBranch = (cadetBranchKey === 'kickboxing');
+      else if (selStr.includes('pulikkal') || selStr.includes('plk') || selStr.includes('dojo-01') || selStr.includes('283e0cc2')) matchesBranch = (cadetBranchKey === 'pulikkal');
       else if (selStr.includes('chungam') || selStr.includes('cgm') || selStr.includes('dojo-02') || selStr.includes('20c924cd')) matchesBranch = (cadetBranchKey === 'chungam');
       else if (selStr.includes('mongam') || selStr.includes('dojo-03') || selStr.includes('d4639193')) matchesBranch = (cadetBranchKey === 'mongam');
       else if (selStr.includes('feroke') || selStr.includes('dojo-04') || selStr.includes('5f429f1f')) matchesBranch = (cadetBranchKey === 'feroke');

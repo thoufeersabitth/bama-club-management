@@ -32,6 +32,11 @@ export default function DashboardPortal() {
     const rawBranch = item.branch_name || item.branch || item.branchName || item.dojo_branch || item.dojoBranch || item.branch_detail?.name || (typeof item.branch === 'object' ? item.branch?.name : '') || '';
     const bId = item.branch_id || (typeof item.branch === 'object' ? item.branch?.id : null) || '';
     const bStr = (String(rawBranch) + ' ' + String(bId) + ' ' + String(item.branch || '')).toLowerCase().trim();
+    if (bStr.includes('kick')) return 'kickboxing';
+    if (bStr.includes('pengad') || bStr.includes('btmamups')) return 'pengad';
+    if (bStr.includes('airport')) return 'airport';
+    if (bStr.includes('neerad') || bStr.includes('amlps')) return 'neerad';
+    if (bStr.includes('ansar')) return 'ansar';
     if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02') || bStr.includes('20c924cd')) return 'chungam';
     if (bStr.includes('mongam') || bStr.includes('dojo-03') || bStr.includes('d4639193')) return 'mongam';
     if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
@@ -45,6 +50,11 @@ export default function DashboardPortal() {
     if (!scopeLower || scopeLower.includes('all')) return true;
 
     const itemKey = getBranchKey(item);
+    if (scopeLower.includes('kick')) return itemKey === 'kickboxing';
+    if (scopeLower.includes('pengad') || scopeLower.includes('btmamups')) return itemKey === 'pengad';
+    if (scopeLower.includes('airport')) return itemKey === 'airport';
+    if (scopeLower.includes('neerad') || scopeLower.includes('amlps')) return itemKey === 'neerad';
+    if (scopeLower.includes('ansar')) return itemKey === 'ansar';
     if (scopeLower.includes('chungam') || scopeLower.includes('cgm') || scopeLower.includes('dojo-02') || scopeLower.includes('20c924cd')) return itemKey === 'chungam';
     if (scopeLower.includes('mongam') || scopeLower.includes('dojo-03') || scopeLower.includes('d4639193')) return itemKey === 'mongam';
     if (scopeLower.includes('feroke') || scopeLower.includes('dojo-04') || scopeLower.includes('5f429f1f')) return itemKey === 'feroke';

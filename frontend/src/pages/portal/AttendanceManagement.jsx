@@ -254,69 +254,61 @@ export default function AttendanceManagement() {
     }
   };
 
+  // Helper to resolve standard canonical branch key for 100% accurate branch separation
+  const getBranchKey = (val) => {
+    if (!val) return '';
+    if (typeof val === 'object') {
+      val = val.name || val.id || '';
+    }
+    const s = String(val).toLowerCase().trim();
+    if (s === 'all') return 'all';
+
+    // 1. Direct UUID & Code matching
+    if (s === 'bd5c0955-002e-4c21-a661-940d6e334ad4' || s === 'bama-dojo-10') return 'kickboxing';
+    if (s === '4d04730d-8de9-4a3f-9dc4-705b31ef2630' || s === 'plk-01') return 'pulikkal';
+    if (s === 'b226a5e3-877d-40bc-b846-4ecf7e27d96f' || s === 'bama-dojo-07') return 'pengad';
+    if (s === '4348ee03-32c3-4464-b6fb-4c8050b530ce' || s === 'bama-dojo-010') return 'airport';
+    if (s === 'b65c2bbc-7423-4c11-9cda-89a104528085' || s === 'bama-dojo-05') return 'neerad';
+    if (s === '3cbb7511-5c87-4703-aad0-e28d75869d9c' || s === 'bama-dojo-09') return 'ansar';
+    if (s === '17e47ded-5595-4dc1-b0e6-01d46f8ba7fc' || s === 'cgm-02') return 'chungam';
+    if (s === '0d4a652e-a978-4aaf-b5a3-ba6bb2be8cb2' || s === 'frk-04') return 'feroke';
+
+    // 2. Keyword matching - MUST CHECK 'kick' FIRST so 'KICK BOXING PULIKKAL' is NEVER matched as 'pulikkal'!
+    if (s.includes('kick')) return 'kickboxing';
+    if (s.includes('pulikkal') || s.includes('head office') || s.includes('plk')) return 'pulikkal';
+    if (s.includes('pengad') || s.includes('btmamups')) return 'pengad';
+    if (s.includes('airport')) return 'airport';
+    if (s.includes('neerad') || s.includes('amlps')) return 'neerad';
+    if (s.includes('ansar')) return 'ansar';
+    if (s.includes('feroke') || s.includes('frk')) return 'feroke';
+    if (s.includes('chungam') || s.includes('cgm')) return 'chungam';
+
+    return s;
+  };
+
   // 100% Robust Branch Cadets Matching (Handles UUID, Name, Code, Keywords across all 8 branches)
   const isStudentInBranch = (student, branchFilter) => {
     if (!branchFilter || branchFilter === 'All' || branchFilter === 'ALL') return true;
 
-    const bFilterStr = String(branchFilter).toLowerCase().trim();
+    const targetKey = getBranchKey(branchFilter);
+    if (targetKey === 'all') return true;
 
-    const matchedBranchObj = branchesList.find(b => 
-      b.id === branchFilter || 
-      b.name === branchFilter || 
-      b.code === branchFilter || 
-      String(b.name).toLowerCase().trim() === bFilterStr
-    );
-
-    const targetId = matchedBranchObj?.id || (branchFilter.includes('-') ? branchFilter : null);
-    const targetName = (matchedBranchObj?.name || branchFilter).toLowerCase().trim();
-    const targetCode = (matchedBranchObj?.code || '').toLowerCase().trim();
-
-    const cadetBranchName = String(
+    const cadetNameKey = getBranchKey(
       student.branch_name ||
       student.branch_detail?.name ||
       student.branchName ||
       (typeof student.branch === 'object' ? student.branch?.name : student.branch) ||
       ''
-    ).toLowerCase().trim();
+    );
 
-    const cadetBranchId = String(
+    const cadetIdKey = getBranchKey(
       student.branch_id ||
       student.branch_detail?.id ||
       (typeof student.branch === 'object' ? student.branch?.id : student.branch) ||
       ''
-    ).trim();
+    );
 
-    // 1. Direct ID match
-    if (targetId && cadetBranchId && targetId === cadetBranchId) {
-      return true;
-    }
-
-    // 2. Direct name or code match
-    if (cadetBranchName === targetName) return true;
-    if (targetCode && (cadetBranchName === targetCode || cadetBranchName.includes(targetCode))) return true;
-
-    // 3. Keyword matching for official branches
-    const checkBranchKeyword = (str) => {
-      if (!str) return '';
-      if (str.includes('pulikkal') || str.includes('head office') || str.includes('plk')) return 'pulikkal';
-      if (str.includes('chungam') || str.includes('cgm')) return 'chungam';
-      if (str.includes('pengad') || str.includes('btmamups')) return 'pengad';
-      if (str.includes('airport')) return 'airport';
-      if (str.includes('neerad') || str.includes('amlps')) return 'neerad';
-      if (str.includes('ansar')) return 'ansar';
-      if (str.includes('feroke') || str.includes('frk')) return 'feroke';
-      if (str.includes('kick')) return 'kickboxing';
-      return str;
-    };
-
-    const targetKey = checkBranchKeyword(targetName);
-    const cadetKey = checkBranchKeyword(cadetBranchName);
-
-    if (targetKey && cadetKey && targetKey === cadetKey) {
-      return true;
-    }
-
-    return cadetBranchName.includes(targetName) || targetName.includes(cadetBranchName);
+    return targetKey === cadetNameKey || targetKey === cadetIdKey;
   };
 
   // Smart Shift / Batch Matcher (Direct match, timing match, keyword match)
