@@ -257,6 +257,9 @@ export const resolveDiscipline = (st) => {
     if (matched && matched[1]) return matched[1].trim();
   }
 
+  const branchStr = String(st.branch_name || st.branchName || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || '').toLowerCase();
+  if (branchStr.includes('kick')) return 'Kick Boxing';
+
   return 'Karate (Shotokan)';
 };
 
@@ -563,6 +566,30 @@ export const fetchStudents = async (params = {}) => {
     if (studentsRes && studentsRes.ok) {
       const data = await studentsRes.json();
       allServerData = data.results || (Array.isArray(data) ? data : []);
+
+      let nextUrl = data.next;
+      while (nextUrl) {
+        try {
+          if (nextUrl.startsWith('http:')) {
+            nextUrl = nextUrl.replace('http:', 'https:');
+          }
+          const nextRes = await fetch(nextUrl, {
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+          });
+          if (nextRes && nextRes.ok) {
+            const nextData = await nextRes.json();
+            const nextResults = nextData.results || (Array.isArray(nextData) ? nextData : []);
+            allServerData = allServerData.concat(nextResults);
+            nextUrl = nextData.next;
+          } else {
+            break;
+          }
+        } catch (pageErr) {
+          console.warn('[Students] Error fetching next page:', pageErr);
+          break;
+        }
+      }
     }
 
     if (allServerData && allServerData.length > 0) {
@@ -1931,6 +1958,19 @@ export const fetchFees = async () => {
   try {
     const res = await api.get('/fees/');
     serverFees = res.data.results || res.data || [];
+    let nextUrl = res.data.next;
+    while (nextUrl) {
+      try {
+        const nextPath = nextUrl.replace(/^https?:\/\/[^/]+\/api/, '');
+        const nextRes = await api.get(nextPath);
+        const nextResults = nextRes.data.results || (Array.isArray(nextRes.data) ? nextRes.data : []);
+        serverFees = serverFees.concat(nextResults);
+        nextUrl = nextRes.data.next;
+      } catch (pageErr) {
+        console.warn('[Fees] Error fetching next page:', pageErr);
+        break;
+      }
+    }
     if (!Array.isArray(serverFees)) serverFees = [];
   } catch (err) {
     serverFees = [];
@@ -2132,7 +2172,19 @@ export const publicSubmitExamRegistrationBackend = async (data) => {
 export const fetchAttendanceFromBackend = async (dateStr) => {
   try {
     const res = await api.get('/attendance/');
-    const all = res.data.results || (Array.isArray(res.data) ? res.data : []);
+    let all = res.data.results || (Array.isArray(res.data) ? res.data : []);
+    let nextUrl = res.data.next;
+    while (nextUrl) {
+      try {
+        const nextPath = nextUrl.replace(/^https?:\/\/[^/]+\/api/, '');
+        const nextRes = await api.get(nextPath);
+        const nextResults = nextRes.data.results || (Array.isArray(nextRes.data) ? nextRes.data : []);
+        all = all.concat(nextResults);
+        nextUrl = nextRes.data.next;
+      } catch (e) {
+        break;
+      }
+    }
     const forDate = all.filter(a => a.date === dateStr);
     if (forDate.length === 0) return null;
     const map = {};
