@@ -321,6 +321,9 @@ export const getStoredStudents = () => {
               branch_name: normBranch,
               branchName: normBranch,
               dojo_branch: normBranch,
+              bloodGroup: st.blood_group || st.bloodGroup || 'O+',
+              blood_group: st.blood_group || st.bloodGroup || 'O+',
+              gender: st.gender || 'Male',
               program: resolvedCourse,
               course: resolvedCourse,
               discipline: resolvedCourse
@@ -645,6 +648,9 @@ export const fetchStudents = async (params = {}) => {
           branch_name: sBranchName,
           branchName: sBranchName,
           dojo_branch: sBranchName,
+          bloodGroup: s.blood_group || s.bloodGroup || 'O+',
+          blood_group: s.blood_group || s.bloodGroup || 'O+',
+          gender: s.gender || 'Male',
           program: resolveDiscipline(s),
           course: resolveDiscipline(s),
           discipline: resolveDiscipline(s)
@@ -818,7 +824,10 @@ export const updateStudent = async (id, data) => {
     fee_amount: updatedFeeAmount,
     feeAmount: updatedFeeAmount,
     admission_fee: updatedAdmissionFee,
-    admissionFee: updatedAdmissionFee
+    admissionFee: updatedAdmissionFee,
+    blood_group: data.bloodGroup || data.blood_group || 'O+',
+    bloodGroup: data.bloodGroup || data.blood_group || 'O+',
+    gender: data.gender || 'Male'
   };
 
   const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);

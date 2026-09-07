@@ -5,13 +5,14 @@ import {
   X, Check, Shield, Award, MapPin, Phone, Mail, FileText,
   Calendar, CreditCard, MessageSquare, UserCheck, Upload, Camera, Image as ImageIcon,
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
-  DollarSign, AlertCircle, Clock, Printer, Briefcase
+  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User
 } from 'lucide-react';
 import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 const FIXED_AVATAR_DIM = 300;
+const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 
 // Helper to calculate exact Age automatically from Date of Birth
 const calculateAgeFromDOB = (dobString) => {
@@ -1612,10 +1613,12 @@ export default function StudentManagement() {
                   <span className="text-gray-800 font-mono">{std.dob || 'N/A'}</span>
                 </div>
 
-                <div className="flex justify-between border-b border-gray-50 pb-2">
-                  <span className="text-gray-500">Blood Group:</span>
-                  <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded font-black text-[11px] inline-block">
-                    {std.bloodGroup || std.blood_group || 'O+'}
+                <div className="flex justify-between border-b border-gray-50 pb-2 items-center">
+                  <span className="text-gray-500 flex items-center gap-1">
+                    <Heart className="w-3.5 h-3.5 text-rose-600" /> Blood Group:
+                  </span>
+                  <span className="px-2.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg font-black text-xs inline-flex items-center gap-1 shadow-2xs">
+                    🩸 {std.bloodGroup || std.blood_group || 'Not Specified'}
                   </span>
                 </div>
 
@@ -2661,9 +2664,14 @@ export default function StudentManagement() {
                         </div>
                       )}
                       <div className="space-y-0.5">
-                        <strong className="text-gray-900 font-black text-sm block leading-tight group-hover:text-red-600 transition-colors flex items-center gap-1.5">
+                        <strong className="text-gray-900 font-black text-sm block leading-tight group-hover:text-red-600 transition-colors flex items-center gap-1.5 flex-wrap">
                           <span>{std.name}</span>
                           <span className="text-[9px] px-1.5 py-0.2 bg-gray-100 text-gray-500 rounded font-normal group-hover:bg-red-100 group-hover:text-red-700">360° Profile</span>
+                          {(std.bloodGroup || std.blood_group) && (
+                            <span className="text-[9px] px-1.5 py-0.2 bg-rose-50 text-rose-700 border border-rose-200 rounded font-black flex items-center gap-0.5 shadow-2xs">
+                              🩸 {std.bloodGroup || std.blood_group}
+                            </span>
+                          )}
                         </strong>
                         <span className="text-[11px] text-gray-500 font-medium block">
                           Parent: {std.guardianName || std.guardian_name} ({std.phone})
@@ -3155,8 +3163,8 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Row 3: Enrolled Course, Belt Level, DOB & Age */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Row 3: Enrolled Course & Belt Level */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
                     <Award className="w-3.5 h-3.5 text-red-600" /> Course / Discipline *
@@ -3204,7 +3212,10 @@ export default function StudentManagement() {
                     </div>
                   </div>
                 )}
+              </div>
 
+              {/* Row 3.2: Date of Birth, Age, Gender & Blood Group */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-red-600" /> Date of Birth *
@@ -3235,6 +3246,37 @@ export default function StudentManagement() {
                     onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) || 12 })}
                     className="w-full bg-emerald-50/80 border border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 transition"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-blue-600" /> Gender *
+                  </label>
+                  <select
+                    value={formData.gender || 'Male'}
+                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-red-500 transition cursor-pointer"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                    <Heart className="w-3.5 h-3.5 text-rose-600" /> Blood Group *
+                  </label>
+                  <select
+                    required
+                    value={formData.bloodGroup || formData.blood_group || 'O+'}
+                    onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value, blood_group: e.target.value })}
+                    className="w-full bg-rose-50/70 border border-rose-300 rounded-xl px-3 py-2.5 text-rose-900 font-black text-xs focus:bg-white focus:outline-none focus:border-rose-500 transition cursor-pointer"
+                  >
+                    {BLOOD_GROUP_OPTIONS.map(bg => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -3825,7 +3867,10 @@ export default function StudentManagement() {
                     </div>
                   </div>
                 )}
+              </div>
 
+              {/* Row 3.2: Date of Birth, Age, Gender & Blood Group */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date of Birth *
@@ -3856,6 +3901,37 @@ export default function StudentManagement() {
                     onChange={(e) => setEditingStudent({ ...editingStudent, age: parseInt(e.target.value) || 10 })}
                     className="w-full bg-emerald-50/80 border border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 transition"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-blue-600" /> Gender *
+                  </label>
+                  <select
+                    value={editingStudent.gender || 'Male'}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, gender: e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition cursor-pointer"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
+                    <Heart className="w-3.5 h-3.5 text-rose-600" /> Blood Group *
+                  </label>
+                  <select
+                    required
+                    value={editingStudent.bloodGroup || editingStudent.blood_group || 'O+'}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, bloodGroup: e.target.value, blood_group: e.target.value })}
+                    className="w-full bg-rose-50/70 border border-rose-300 rounded-xl px-3 py-2.5 text-rose-900 font-black text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition cursor-pointer"
+                  >
+                    {BLOOD_GROUP_OPTIONS.map(bg => (
+                      <option key={bg} value={bg}>{bg}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -4236,9 +4312,20 @@ export default function StudentManagement() {
                   <UserCheck className="w-3.5 h-3.5 text-purple-600" /> Age & Gender:
                 </span>
                 <span className="text-gray-900 font-black text-[11px]">
-                  {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'} ({activeCardStudent.bloodGroup || activeCardStudent.blood_group || 'O+'})
+                  {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
                 </span>
               </div>
+
+              {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
+                <div className="flex justify-between items-center pt-1.5 border-t border-gray-200/80">
+                  <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
+                    <Heart className="w-3.5 h-3.5 text-rose-600" /> Blood Group:
+                  </span>
+                  <span className="text-rose-700 font-black text-[11px] bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shadow-2xs">
+                    🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
