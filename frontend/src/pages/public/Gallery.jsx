@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Image as ImageIcon, Award, Video, X, ZoomIn, Maximize2, Sparkles } from 'lucide-react';
+import { Camera, Image as ImageIcon, Award, Video, X, ZoomIn, Maximize2, Sparkles, FolderOpen, ExternalLink, Download } from 'lucide-react';
 import { getCmsConfig } from '../../services/cmsService';
 import useScrollReveal from '../../hooks/useScrollReveal';
+import { fetchGoogleDrivePhotos, getStoredDrivePhotos, GOOGLE_DRIVE_FOLDER_URL } from '../../services/googleDriveService';
 
 const FALLBACK_GALLERY = [
   { id: 'g1', title: 'Annual Belt Exam 2026', category: 'GRADING', desc: 'Sensei Abdul Rahman examining green & brown belt candidates in Pulikkal Dojo.', img: '/assets/prog_competition.jpg' },
@@ -17,8 +18,9 @@ export default function Gallery() {
 
   const [filter, setFilter] = useState('ALL');
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [drivePhotos, setDrivePhotos] = useState(getStoredDrivePhotos);
 
-  const [items, setItems] = useState(() => {
+  const [rawCmsGallery, setRawCmsGallery] = useState(() => {
     try {
       const saved = localStorage.getItem('bama_cms_config');
       if (saved) {
@@ -34,23 +36,39 @@ export default function Gallery() {
     const fetchLatest = async () => {
       const data = await getCmsConfig();
       if (isMounted && data && data.gallery && data.gallery.length > 0) {
-        setItems(data.gallery);
+        setRawCmsGallery(data.gallery);
       }
     };
     fetchLatest();
 
+    fetchGoogleDrivePhotos(false).then(res => {
+      if (isMounted && Array.isArray(res) && res.length > 0) {
+        setDrivePhotos(res);
+      }
+    }).catch(() => {});
+
     const handleSync = () => {
       fetchLatest();
+      setDrivePhotos(getStoredDrivePhotos());
     };
 
     window.addEventListener('storage', handleSync);
     window.addEventListener('cms_updated', handleSync);
+    window.addEventListener('bama_gdrive_updated', handleSync);
     return () => {
       isMounted = false;
       window.removeEventListener('storage', handleSync);
       window.removeEventListener('cms_updated', handleSync);
+      window.removeEventListener('bama_gdrive_updated', handleSync);
     };
   }, []);
+
+  const items = React.useMemo(() => {
+    if (drivePhotos && drivePhotos.length > 0) {
+      return [...drivePhotos, ...rawCmsGallery];
+    }
+    return rawCmsGallery;
+  }, [drivePhotos, rawCmsGallery]);
 
   const filtered = filter === 'ALL' ? items : items.filter(i => i.category === filter);
 
@@ -67,6 +85,19 @@ export default function Gallery() {
         <p className="text-xs sm:text-sm text-gray-300 max-w-xl mx-auto font-medium leading-relaxed">
           Explore moments, tournament achievements, belt examinations, and training memories at Brave Academy of Martial Arts.
         </p>
+
+        <div className="flex items-center justify-center pt-2">
+          <a
+            href={GOOGLE_DRIVE_FOLDER_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="px-6 py-3 bg-[#111322] hover:bg-[#181B30] text-amber-300 hover:text-white border border-amber-500/50 hover:border-amber-400 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-2.5 shadow-xl transition transform hover:-translate-y-0.5 cursor-pointer"
+          >
+            <FolderOpen className="w-4 h-4 text-amber-400" />
+            <span>Open Google Drive Cloud Album ({drivePhotos.length > 0 ? `${drivePhotos.length} Photos Synced` : 'Full Archive'})</span>
+            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+          </a>
+        </div>
       </div>
 
       {/* Filter Tabs */}
@@ -97,20 +128,16 @@ export default function Gallery() {
           >
             <div className="h-56 rounded-2xl overflow-hidden mb-4 relative border border-gray-800">
               <img
-                src={item.img || '/assets/prog_competition.jpg'}
+                src={item.thumbnail || item.img || '/assets/prog_competition.jpg'}
                 alt={item.title}
-                className="w-full h-full object-cover group-hover:scale-115 transition-transform duration-700 brightness-95 contrast-110"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0F111D] via-transparent to-black/30"></div>
-
-              {/* Category Pill Tag */}
-              <span className="absolute top-3 left-3 px-3 py-1 bg-black/80 backdrop-blur-md text-amber-300 border border-amber-400/50 text-[9px] font-black font-mono rounded-full uppercase tracking-wider shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0F111D] via-transparent to-transparent opacity-80"></div>
+              <span className="absolute top-3 left-3 px-3 py-1 bg-black/80 backdrop-blur-md text-amber-400 border border-amber-500/40 text-[9px] font-black font-mono rounded-full uppercase tracking-wider shadow-lg">
                 {item.category}
               </span>
-
-              {/* Hover Expand Glassmorphic Eye Badge */}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-xs">
-                <span className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 via-red-600 to-amber-600 text-white flex items-center justify-center shadow-2xl border border-amber-300/50 transform group-hover:scale-110 transition-transform">
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="w-12 h-12 rounded-2xl bg-red-600/90 text-white flex items-center justify-center shadow-2xl border border-amber-400/50 transform group-hover:scale-110 transition-transform">
                   <Maximize2 className="w-5 h-5 text-amber-300" />
                 </span>
               </div>
@@ -143,7 +170,7 @@ export default function Gallery() {
 
             <div className="relative h-72 sm:h-96 w-full bg-black overflow-hidden border-b border-gray-800">
               <img
-                src={selectedPhoto.img || '/assets/prog_competition.jpg'}
+                src={selectedPhoto.img || selectedPhoto.thumbnail || '/assets/prog_competition.jpg'}
                 alt={selectedPhoto.title}
                 className="w-full h-full object-cover filter brightness-105 contrast-110"
               />
@@ -155,10 +182,24 @@ export default function Gallery() {
               </span>
             </div>
 
-            <div className="p-6 sm:p-8 space-y-3">
-              <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wider">
-                {selectedPhoto.title}
-              </h3>
+            <div className="p-6 sm:p-8 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-wider">
+                  {selectedPhoto.title}
+                </h3>
+                {selectedPhoto.viewUrl && (
+                  <a
+                    href={selectedPhoto.viewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black uppercase tracking-wider transition"
+                  >
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    <span>View in Google Drive</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
               <p className="text-sm text-gray-300 leading-relaxed font-medium">
                 {selectedPhoto.desc}
               </p>

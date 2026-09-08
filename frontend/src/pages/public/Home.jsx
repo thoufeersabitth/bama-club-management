@@ -4,13 +4,14 @@ import {
   Shield, Award, Users, MapPin, ArrowRight, CheckCircle2,
   Calendar, Star, Phone, Mail, ChevronRight, Zap, Target,
   Clock, Dumbbell, Flame, Trophy, ChevronLeft, Heart, Sparkles, Bell,
-  Maximize2, Eye, X, ExternalLink
+  Maximize2, Eye, X, ExternalLink, FolderOpen, Download
 } from 'lucide-react';
 import { ACADEMY_INFO, BELT_LEVELS, INITIAL_BRANCHES } from '../../services/initialData';
 import KarateBeltIcon from '../../components/common/KarateBeltIcon';
 import { getCmsConfig } from '../../services/cmsService';
 import useScrollReveal from '../../hooks/useScrollReveal';
 import { fetchBranches, sanitizeBranches, getBranchPhotoUrl } from '../../services/api';
+import { fetchGoogleDrivePhotos, getStoredDrivePhotos, GOOGLE_DRIVE_FOLDER_URL } from '../../services/googleDriveService';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -103,6 +104,8 @@ export default function Home() {
     }
   });
 
+  const [drivePhotos, setDrivePhotos] = useState(getStoredDrivePhotos);
+
   useEffect(() => {
     loadHomeBranches();
     let isMounted = true;
@@ -112,19 +115,28 @@ export default function Home() {
     };
     fetchLatest();
 
+    fetchGoogleDrivePhotos(false).then(res => {
+      if (isMounted && Array.isArray(res) && res.length > 0) {
+        setDrivePhotos(res);
+      }
+    }).catch(() => {});
+
     const handleSync = () => {
       loadHomeBranches();
       fetchLatest();
+      setDrivePhotos(getStoredDrivePhotos());
     };
 
     window.addEventListener('storage', handleSync);
     window.addEventListener('cms_updated', handleSync);
+    window.addEventListener('bama_gdrive_updated', handleSync);
     window.addEventListener('bama_branches_updated', loadHomeBranches);
     window.addEventListener('bama_data_updated', loadHomeBranches);
     return () => {
       isMounted = false;
       window.removeEventListener('storage', handleSync);
       window.removeEventListener('cms_updated', handleSync);
+      window.removeEventListener('bama_gdrive_updated', handleSync);
       window.removeEventListener('bama_branches_updated', loadHomeBranches);
       window.removeEventListener('bama_data_updated', loadHomeBranches);
     };
@@ -152,12 +164,19 @@ export default function Home() {
     { label: 'Dojo Training Branches', value: '3' }
   ];
 
-  const galleryList = cms?.gallery || [
-    { id: 'g1', title: 'Annual Belt Exam 2026', category: 'GRADING', desc: 'Sensei Abdul Rahman examining green & brown belt candidates in Pulikkal Dojo.', img: '/assets/prog_competition.jpg' },
-    { id: 'g2', title: 'Kerala State Karate Championship', category: 'COMPETITION', desc: 'B.A.M.A. cadets winning 12 Gold Medals in Kata & Kumite events.', img: '/assets/prog_adults.jpg' },
-    { id: 'g3', title: "Women's Self-Defence Workshop", category: 'EVENTS', desc: 'Special situational defense seminar conducted at Chungam branch.', img: '/assets/prog_self_defence.jpg' },
-    { id: 'g4', title: 'Kick Boxing Sparring Session', category: 'TRAINING', desc: 'High-intensity conditioning session with heavy bags and pad drills.', img: '/assets/prog_kickboxing.jpg' }
-  ];
+  const galleryList = React.useMemo(() => {
+    const baseList = cms?.gallery || [
+      { id: 'g1', title: 'Annual Belt Exam 2026', category: 'GRADING', desc: 'Sensei Abdul Rahman examining green & brown belt candidates in Pulikkal Dojo.', img: '/assets/prog_competition.jpg' },
+      { id: 'g2', title: 'Kerala State Karate Championship', category: 'COMPETITION', desc: 'B.A.M.A. cadets winning 12 Gold Medals in Kata & Kumite events.', img: '/assets/prog_adults.jpg' },
+      { id: 'g3', title: "Women's Self-Defence Workshop", category: 'EVENTS', desc: 'Special situational defense seminar conducted at Chungam branch.', img: '/assets/prog_self_defence.jpg' },
+      { id: 'g4', title: 'Kick Boxing Sparring Session', category: 'TRAINING', desc: 'High-intensity conditioning session with heavy bags and pad drills.', img: '/assets/prog_kickboxing.jpg' }
+    ];
+
+    if (drivePhotos && drivePhotos.length > 0) {
+      return [...drivePhotos, ...baseList];
+    }
+    return baseList;
+  }, [cms?.gallery, drivePhotos]);
 
   const DEFAULT_PROGRAMS = [
     {
@@ -683,13 +702,25 @@ export default function Home() {
               ACADEMY <span className="bg-gradient-to-r from-red-500 via-amber-400 to-red-600 bg-clip-text text-transparent">PHOTO GALLERY</span>
             </h2>
           </div>
-          <Link
-            to="/gallery"
-            className="shimmer-btn-wrapper px-6 py-3 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xl flex items-center gap-2 transition transform hover:-translate-y-0.5 border border-amber-400/30"
-          >
-            <span>VIEW GALLERY ({galleryList.length} PHOTOS)</span>
-            <ArrowRight className="w-4 h-4 text-amber-300" />
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href={GOOGLE_DRIVE_FOLDER_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2.5 bg-[#111322] hover:bg-[#181B30] text-amber-300 hover:text-white border border-amber-500/40 hover:border-amber-400 font-black text-xs uppercase tracking-wider rounded-xl shadow-xl flex items-center gap-2 transition transform hover:-translate-y-0.5"
+            >
+              <FolderOpen className="w-4 h-4 text-amber-400" />
+              <span>Drive Cloud Album</span>
+              <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+            </a>
+            <Link
+              to="/gallery"
+              className="shimmer-btn-wrapper px-6 py-3 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xl flex items-center gap-2 transition transform hover:-translate-y-0.5 border border-amber-400/30"
+            >
+              <span>VIEW GALLERY ({galleryList.length} PHOTOS)</span>
+              <ArrowRight className="w-4 h-4 text-amber-300" />
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
