@@ -14,12 +14,12 @@ const FALLBACK_GALLERY = [
 ];
 
 export default function Gallery() {
-  useScrollReveal();
-
   const [filter, setFilter] = useState('ALL');
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [drivePhotos, setDrivePhotos] = useState(getStoredDrivePhotos);
   const [activeViewTab, setActiveViewTab] = useState('DRIVE'); // 'DRIVE' | 'GRID'
+
+  useScrollReveal([activeViewTab, filter]);
 
   const [rawCmsGallery, setRawCmsGallery] = useState(() => {
     try {
@@ -119,7 +119,7 @@ export default function Gallery() {
 
       {/* VIEW 1: DIRECT LIVE EMBEDDED GOOGLE DRIVE WINDOW */}
       {activeViewTab === 'DRIVE' && (
-        <div className="reveal-on-scroll zoom-in bg-gradient-to-b from-[#121526] via-[#0E101D] to-[#07080E] rounded-3xl p-4 sm:p-6 border border-amber-500/40 shadow-2xl space-y-4">
+        <div className="reveal-on-scroll zoom-in is-visible bg-gradient-to-b from-[#121526] via-[#0E101D] to-[#07080E] rounded-3xl p-4 sm:p-6 border border-amber-500/40 shadow-2xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800/80 pb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-red-600 text-white flex items-center justify-center font-black shadow-lg shadow-amber-500/20">
@@ -167,7 +167,7 @@ export default function Gallery() {
       {activeViewTab === 'GRID' && (
         <>
           {/* Filter Tabs */}
-          <div className="reveal-on-scroll slide-up flex flex-wrap justify-center gap-3">
+          <div className="reveal-on-scroll slide-up is-visible flex flex-wrap justify-center gap-3">
             {['ALL', 'GRADING', 'COMPETITION', 'TRAINING', 'EVENTS'].map((cat) => (
               <button
                 key={cat}
@@ -190,7 +190,7 @@ export default function Gallery() {
             key={item.id}
             onClick={() => setSelectedPhoto(item)}
             style={{ transitionDelay: `${idx * 0.08}s` }}
-            className="reveal-on-scroll zoom-in bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-5 border border-gray-800/90 flex flex-col justify-between cursor-pointer group hover:border-amber-400 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_40px_rgba(245,158,11,0.3)] hover:-translate-y-2.5"
+            className="reveal-on-scroll zoom-in is-visible bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-5 border border-gray-800/90 flex flex-col justify-between cursor-pointer group hover:border-amber-400 transition-all duration-500 shadow-2xl hover:shadow-[0_20px_40px_rgba(245,158,11,0.3)] hover:-translate-y-2.5"
           >
             <div className="h-56 rounded-2xl overflow-hidden mb-4 relative border border-gray-800">
               <img
