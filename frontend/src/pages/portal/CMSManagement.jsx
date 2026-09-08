@@ -7,7 +7,7 @@ import {
 import { ACADEMY_INFO, INITIAL_BRANCHES } from '../../services/initialData';
 import { getCmsConfig, saveCmsConfig } from '../../services/cmsService';
 import { fetchBranches, saveBranchImageBackend, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage } from '../../services/api';
-import { fetchGoogleDrivePhotos, getStoredDrivePhotos, GOOGLE_DRIVE_FOLDER_URL } from '../../services/googleDriveService';
+import { fetchGoogleDrivePhotos, getStoredDrivePhotos, GOOGLE_DRIVE_FOLDER_URL, GOOGLE_DRIVE_FOLDER_ID } from '../../services/googleDriveService';
 
 const INITIAL_CMS_CONFIG = {
   hero: {

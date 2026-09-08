@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Camera, Image as ImageIcon, Award, Video, X, ZoomIn, Maximize2, Sparkles, FolderOpen, ExternalLink, Download } from 'lucide-react';
 import { getCmsConfig } from '../../services/cmsService';
 import useScrollReveal from '../../hooks/useScrollReveal';
-import { fetchGoogleDrivePhotos, getStoredDrivePhotos, GOOGLE_DRIVE_FOLDER_URL } from '../../services/googleDriveService';
+import { fetchGoogleDrivePhotos, getStoredDrivePhotos, GOOGLE_DRIVE_FOLDER_URL, GOOGLE_DRIVE_FOLDER_ID } from '../../services/googleDriveService';
 
 const FALLBACK_GALLERY = [
   { id: 'g1', title: 'Annual Belt Exam 2026', category: 'GRADING', desc: 'Sensei Abdul Rahman examining green & brown belt candidates in Pulikkal Dojo.', img: '/assets/prog_competition.jpg' },
