@@ -19,6 +19,7 @@ export default function Gallery() {
   const [filter, setFilter] = useState('ALL');
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [drivePhotos, setDrivePhotos] = useState(getStoredDrivePhotos);
+  const [activeViewTab, setActiveViewTab] = useState('DRIVE'); // 'DRIVE' | 'GRID'
 
   const [rawCmsGallery, setRawCmsGallery] = useState(() => {
     try {
@@ -86,36 +87,101 @@ export default function Gallery() {
           Explore moments, tournament achievements, belt examinations, and training memories at Brave Academy of Martial Arts.
         </p>
 
-        <div className="flex items-center justify-center pt-2">
-          <a
-            href={GOOGLE_DRIVE_FOLDER_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="px-6 py-3 bg-[#111322] hover:bg-[#181B30] text-amber-300 hover:text-white border border-amber-500/50 hover:border-amber-400 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-2.5 shadow-xl transition transform hover:-translate-y-0.5 cursor-pointer"
-          >
-            <FolderOpen className="w-4 h-4 text-amber-400" />
-            <span>Open Google Drive Cloud Album ({drivePhotos.length > 0 ? `${drivePhotos.length} Photos Synced` : 'Full Archive'})</span>
-            <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
-          </a>
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="reveal-on-scroll slide-up flex flex-wrap justify-center gap-3">
-        {['ALL', 'GRADING', 'COMPETITION', 'TRAINING', 'EVENTS'].map((cat) => (
+        {/* View Switcher: Live Embedded Google Drive vs Featured Showcase */}
+        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-              filter === cat
-                ? 'bg-gradient-to-r from-red-600 via-red-600 to-amber-600 text-white shadow-xl border border-amber-300/50 scale-105'
+            type="button"
+            onClick={() => setActiveViewTab('DRIVE')}
+            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-2.5 transition-all cursor-pointer shadow-xl ${
+              activeViewTab === 'DRIVE'
+                ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black border border-amber-300 scale-105 shadow-amber-500/30'
                 : 'bg-[#10121D] text-gray-300 hover:text-white border border-gray-800 hover:border-gray-700'
             }`}
           >
-            {cat}
+            <FolderOpen className="w-4 h-4" />
+            <span>☁️ Live Google Drive (Open Live)</span>
           </button>
-        ))}
+
+          <button
+            type="button"
+            onClick={() => setActiveViewTab('GRID')}
+            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-2.5 transition-all cursor-pointer shadow-xl ${
+              activeViewTab === 'GRID'
+                ? 'bg-gradient-to-r from-red-600 via-red-600 to-amber-600 text-white border border-amber-300 scale-105 shadow-red-600/30'
+                : 'bg-[#10121D] text-gray-300 hover:text-white border border-gray-800 hover:border-gray-700'
+            }`}
+          >
+            <Camera className="w-4 h-4 text-amber-400" />
+            <span>🥋 Featured Highlights ({items.length} Photos)</span>
+          </button>
+        </div>
       </div>
+
+      {/* VIEW 1: DIRECT LIVE EMBEDDED GOOGLE DRIVE WINDOW */}
+      {activeViewTab === 'DRIVE' && (
+        <div className="reveal-on-scroll zoom-in bg-gradient-to-b from-[#121526] via-[#0E101D] to-[#07080E] rounded-3xl p-4 sm:p-6 border border-amber-500/40 shadow-2xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800/80 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-red-600 text-white flex items-center justify-center font-black shadow-lg shadow-amber-500/20">
+                <FolderOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  Official Live Google Drive Archive
+                  <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-950 text-emerald-400 border border-emerald-700/60 animate-pulse">
+                    Live Auto-Sync
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-400 font-medium">
+                  Official cloud gallery • Photos uploaded to Google Drive from your phone appear here live
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <a
+                href={GOOGLE_DRIVE_FOLDER_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-black/80 hover:bg-black text-amber-300 hover:text-white border border-amber-500/40 hover:border-amber-400 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-md"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open in Drive App</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Embedded Google Drive Live Folder Frame */}
+          <div className="w-full h-[650px] sm:h-[750px] rounded-2xl overflow-hidden border border-gray-800 bg-black/90 relative shadow-2xl">
+            <iframe
+              src={`https://drive.google.com/embeddedfolderview?id=${GOOGLE_DRIVE_FOLDER_ID}#grid`}
+              className="w-full h-full border-0 rounded-2xl"
+              title="B.A.M.A. Official Google Drive Live Gallery"
+              allow="autoplay; encrypted-media; fullscreen"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* VIEW 2: CURATED PHOTO SHOWCASE GRID */}
+      {activeViewTab === 'GRID' && (
+        <>
+          {/* Filter Tabs */}
+          <div className="reveal-on-scroll slide-up flex flex-wrap justify-center gap-3">
+            {['ALL', 'GRADING', 'COMPETITION', 'TRAINING', 'EVENTS'].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setFilter(cat)}
+                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  filter === cat
+                    ? 'bg-gradient-to-r from-red-600 via-red-600 to-amber-600 text-white shadow-xl border border-amber-300/50 scale-105'
+                    : 'bg-[#10121D] text-gray-300 hover:text-white border border-gray-800 hover:border-gray-700'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
 
       {/* Photo Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -206,6 +272,8 @@ export default function Gallery() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
