@@ -36,20 +36,17 @@ export default function Branches() {
 
   const loadBranchesList = () => {
     try {
-      const saved = localStorage.getItem('bama_custom_branches');
+      const saved = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = sanitizeBranches(parsed);
-          setBranches(cleaned);
-          fetchStudents().then(stData => {
-            if (stData && stData.length > 0) setStudents(stData);
-          });
+          if (cleaned.length > 0) setBranches(cleaned);
         }
       }
     } catch (e) {}
 
-    fetchBranches(true).then(data => {
+    fetchBranches(false).then(data => {
       if (data && data.length > 0) {
         const cleaned = sanitizeBranches(data);
         if (cleaned.length > 0) {
@@ -60,19 +57,19 @@ export default function Branches() {
           } catch (e) {}
         }
       }
-    });
+    }).catch(() => {});
 
     fetchStudents().then(stData => {
       if (stData && stData.length > 0) {
         setStudents(stData);
       }
-    });
+    }).catch(() => {});
 
-    fetchTrainingSchedules(true).then(schData => {
+    fetchTrainingSchedules(false).then(schData => {
       if (Array.isArray(schData) && schData.length > 0) {
         setSchedules(schData);
       }
-    });
+    }).catch(() => {});
   };
 
   useEffect(() => {

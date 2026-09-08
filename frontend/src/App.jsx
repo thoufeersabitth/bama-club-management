@@ -93,7 +93,7 @@ export default function App() {
       if (document.visibilityState === 'visible') {
         checkFreshness();
         pingBackend();
-        fetchBranches(true).then(() => {
+        fetchBranches(false).then(() => {
           window.dispatchEvent(new Event('bama_branches_updated'));
           window.dispatchEvent(new Event('bama_data_updated'));
         }).catch(() => {});

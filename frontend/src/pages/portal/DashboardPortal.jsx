@@ -17,7 +17,7 @@ export default function DashboardPortal() {
 
   const [students, setStudents] = useState(getStoredStudents);
   const [fees, setFees] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => getStoredStudents().length === 0);
 
   // Active Branch Filtering Engine for Dashboard
   const activeBranchName = activeBranch || localStorage.getItem('bama_active_branch') || (user?.role === 'INSTRUCTOR' ? user?.branch : 'ALL');

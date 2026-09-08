@@ -17,13 +17,12 @@ export default function Home() {
 
   const [branches, setBranches] = useState(() => {
     try {
-      const saved = localStorage.getItem('bama_custom_branches');
+      const saved = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = sanitizeBranches(parsed);
-          localStorage.setItem('bama_custom_branches', JSON.stringify(cleaned));
-          return cleaned;
+          if (cleaned.length > 0) return cleaned;
         }
       }
     } catch (e) {}
@@ -34,7 +33,7 @@ export default function Home() {
 
   const loadHomeBranches = () => {
     try {
-      const saved = localStorage.getItem('bama_custom_branches');
+      const saved = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -44,7 +43,7 @@ export default function Home() {
       }
     } catch (e) {}
 
-    fetchBranches(true).then(data => {
+    fetchBranches(false).then(data => {
       if (data && data.length > 0) {
         const cleaned = sanitizeBranches(data);
         if (cleaned.length > 0) {
@@ -55,7 +54,7 @@ export default function Home() {
           } catch (e) {}
         }
       }
-    });
+    }).catch(() => {});
   };
 
   const [activePhotoModal, setActivePhotoModal] = useState(null);
@@ -736,7 +735,7 @@ export default function Home() {
 
         return (
           <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-gray-900 relative overflow-hidden">
-            <div className="reveal-on-scroll slide-up text-center mb-10 space-y-2">
+            <div className="reveal-on-scroll slide-up is-visible text-center mb-10 space-y-2">
               <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-950/80 text-amber-400 border border-red-800/60 shadow-lg">
                 Dojo Locations & Training Hubs
               </span>

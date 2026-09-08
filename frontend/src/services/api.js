@@ -36,13 +36,11 @@ export const safeLocalStorageSet = (key, value) => {
   } catch (err) {
     console.warn(`[Storage] Quota exceeded on setting "${key}". Freeing redundant cache...`, err);
     try {
-      // 1. Remove redundant duplicate keys
+      // 1. Remove redundant duplicate keys (NEVER remove bama_staff or bama_all_users!)
       const redundantKeys = [
         'bama_cadets_roster',
         'bama_students',
         'bama_cadets',
-        'bama_staff',
-        'bama_all_users',
         'bama_backup_data',
         'bama_temp_cache'
       ];
@@ -497,7 +495,24 @@ let _branchesCache = null;
 let _branchesCacheTime = 0;
 let _schedulesCache = null;
 let _schedulesCacheTime = 0;
-const CACHE_TTL_MS = 25000; // 25 seconds fast cache
+const CACHE_TTL_MS = 60000; // 60 seconds fast cache
+
+// High-Speed Resilient HTTP Fetch with Strict Timeout (Prevents UI freezing on cold start)
+export const fetchWithTimeout = async (url, options = {}, timeoutMs = 4500) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    return null;
+  }
+};
 
 export const invalidateStudentsCache = () => {
   _studentsCache = null;
@@ -534,16 +549,16 @@ export const fetchStudents = async (params = {}) => {
     url.searchParams.set('page_size', '1000');
     url.searchParams.set('_t', Date.now().toString());
 
-    // Run student fetch AND deleted announcements in PARALLEL for 2x faster load
+    // Run student fetch AND deleted announcements in PARALLEL with resilient timeout
     const [studentsRes, delRes] = await Promise.all([
-      fetch(url.toString(), {
+      fetchWithTimeout(url.toString(), {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      }).catch(() => null),
-      fetch(`https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_STUDENT&_t=${Date.now()}`, {
+      }, 4500),
+      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_STUDENT&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      }).catch(() => null)
+      }, 4500)
     ]);
 
     if (delRes && delRes.ok) {
@@ -576,10 +591,10 @@ export const fetchStudents = async (params = {}) => {
           if (nextUrl.startsWith('http:')) {
             nextUrl = nextUrl.replace('http:', 'https:');
           }
-          const nextRes = await fetch(nextUrl, {
+          const nextRes = await fetchWithTimeout(nextUrl, {
             headers: { 'Accept': 'application/json' },
             cache: 'no-store'
-          });
+          }, 4500);
           if (nextRes && nextRes.ok) {
             const nextData = await nextRes.json();
             const nextResults = nextData.results || (Array.isArray(nextData) ? nextData : []);
@@ -980,6 +995,21 @@ export const sanitizeBranches = (list) => {
   });
 };
 
+// Instantly retrieve stored branches from local storage (0ms sync UI display)
+export const getStoredBranches = () => {
+  try {
+    const saved = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const cleaned = sanitizeBranches(parsed);
+        if (cleaned.length > 0) return cleaned;
+      }
+    }
+  } catch (e) {}
+  return INITIAL_BRANCHES;
+};
+
 // Upload an image (base64 dataUrl or File blob) to high-speed global CDN with 50ms edge delivery
 export const uploadImageToCdn = async (imageDataUrlOrFile, filename = 'bama_branch.jpg') => {
   try {
@@ -1220,6 +1250,12 @@ export const fetchBranches = async (forceRefresh = false) => {
     return _branchesCache;
   }
 
+  // Pre-seed cache instantly from local storage if memory cache is empty
+  if (!_branchesCache) {
+    _branchesCache = getStoredBranches();
+    _branchesCacheTime = Date.now();
+  }
+
   const branchMap = new Map();
 
   const deletedBranchIds = (() => {
@@ -1259,22 +1295,22 @@ export const fetchBranches = async (forceRefresh = false) => {
     });
   };
 
-  // 1. Fetch directly from Fly.io live PostgreSQL server: branches, faqs, and cms-config concurrently
+  // 1. Fetch directly from Fly.io live PostgreSQL server: branches, faqs, and cms-config concurrently with 4s timeout
   let fetchedFromServer = false;
   try {
     const [res, faqsRes, cmsRes] = await Promise.all([
-      fetch(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
+      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      }).catch(() => null),
-      fetch(`https://bama-club-backend.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
+      }, 4000),
+      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      }).catch(() => null),
-      fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      }, 4000),
+      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      }).catch(() => null)
+      }, 4000)
     ]);
 
     // A) Extract images and deleted branch IDs from CMS config
