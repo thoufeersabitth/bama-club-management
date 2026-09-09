@@ -10,6 +10,7 @@ import {
 import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
+import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
 
 const FIXED_AVATAR_DIM = 300;
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
@@ -228,8 +229,8 @@ export default function StudentManagement() {
       const admission = (activeCardStudent.admissionNo || activeCardStudent.admission_no || 'ID').replace(/[^a-zA-Z0-9]/g, '_');
 
       // Wait for all images inside card to be ready
-      const images = element.getElementsByTagName('img');
-      await Promise.all(Array.from(images).map(img => {
+      const images = Array.from(element.getElementsByTagName('img'));
+      await Promise.all(images.map(img => {
         if (img.complete) return Promise.resolve();
         return new Promise(res => {
           img.onload = res;
@@ -238,15 +239,30 @@ export default function StudentManagement() {
       }));
 
       const canvas = await html2canvas(element, {
-        scale: 2.8,
+        scale: 2.5,
         useCORS: true,
-        allowTaint: false,
+        allowTaint: true,
         logging: false,
         backgroundColor: '#ffffff',
         ignoreElements: (el) => el.classList.contains('no-print')
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      let imgData = null;
+      try {
+        imgData = canvas.toDataURL('image/jpeg', 0.98);
+      } catch (e1) {
+        try {
+          imgData = canvas.toDataURL('image/png');
+        } catch (e2) {
+          console.warn('[toDataURL failed, attempting print fallback]', e2);
+        }
+      }
+
+      if (!imgData) {
+        window.print();
+        return;
+      }
+
       // Dynamically calculate exact card dimensions matching canvas aspect ratio (no trailing white space)
       const cardWidthMm = 88;
       const cardHeightMm = Math.round(((canvas.height * cardWidthMm) / canvas.width) * 10) / 10;
@@ -260,7 +276,7 @@ export default function StudentManagement() {
       pdf.save(`BAMA_CADET_ID_${cadetName}_${admission}.pdf`);
     } catch (err) {
       console.error('[ID Card PDF Download Error]', err);
-      alert('Could not download PDF directly in this browser. Please click "Print Card" to save as PDF.');
+      window.print();
     } finally {
       setIsDownloadingCard(false);
     }
@@ -4326,9 +4342,8 @@ export default function StudentManagement() {
             {/* Academy Header with Logo */}
             <div className="flex items-center gap-3 border-b-2 border-amber-500/40 pb-3">
               <img
-                src="/logo bama_240616_200739.jpg.jpeg"
+                src={BAMA_LOGO_BASE64}
                 alt="B.A.M.A. Logo"
-                crossOrigin="anonymous"
                 className="w-13 h-13 rounded-2xl object-cover border-2 border-amber-500 shadow-md flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
@@ -4360,7 +4375,6 @@ export default function StudentManagement() {
                   <img 
                     src={activeCardStudent.photo} 
                     alt={activeCardStudent.name} 
-                    crossOrigin="anonymous"
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   />
                 ) : (
