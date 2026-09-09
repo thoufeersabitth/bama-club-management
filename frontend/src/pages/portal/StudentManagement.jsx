@@ -4249,7 +4249,7 @@ export default function StudentManagement() {
               /* Hide all background layout and UI elements */
               header, aside, nav, .no-print,
               main > div > div:not(.print-modal-overlay),
-              table, form, button, input {
+              form, button:not(.print-modal-overlay button), input {
                 display: none !important;
               }
               /* Reset wrapper */
@@ -4386,82 +4386,58 @@ export default function StudentManagement() {
             </div>
 
             {/* Essential Personal Data Card */}
-            <div className="bg-gray-50/95 rounded-2xl border border-gray-200/90 overflow-hidden text-xs shadow-2xs">
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
-                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                        <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" /> Branch Dojo:
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
-                      <span className="text-gray-950 font-black text-xs">
-                        {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch' : activeCardStudent.branch)) || 'Pulikkal Branch'}
-                      </span>
-                    </td>
-                  </tr>
+            <div className="bg-slate-50/95 rounded-2xl border border-slate-200/90 overflow-hidden text-xs shadow-2xs divide-y divide-slate-200">
+              <div className="flex justify-between items-center px-3.5 py-2">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" /> Branch Dojo:
+                </span>
+                <span className="text-gray-950 font-black text-xs text-right max-w-[190px] truncate">
+                  {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch' : activeCardStudent.branch)) || 'Pulikkal Branch'}
+                </span>
+              </div>
 
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
-                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                        <Users className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" /> Parent / Guardian:
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
-                      <span className="text-gray-950 font-black text-xs">
-                        {activeCardStudent.guardianName || activeCardStudent.guardian_name || 'N/A'}
-                        {(activeCardStudent.occupation || activeCardStudent.guardian_occupation) && (
-                          <span className="text-[10px] text-amber-800 font-medium ml-1">
-                            ({activeCardStudent.occupation || activeCardStudent.guardian_occupation})
-                          </span>
-                        )}
-                      </span>
-                    </td>
-                  </tr>
-
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
-                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                        <Phone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" /> Contact Phone:
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
-                      <span className="text-emerald-800 font-mono font-black text-xs">
-                        {activeCardStudent.phone || 'N/A'}
-                      </span>
-                    </td>
-                  </tr>
-
-                  <tr style={{ borderBottom: (activeCardStudent.bloodGroup || activeCardStudent.blood_group) ? '1px solid #e2e8f0' : 'none' }}>
-                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
-                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                        <UserCheck className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" /> Age & Gender:
-                      </span>
-                    </td>
-                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
-                      <span className="text-gray-950 font-black text-xs">
-                        {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
-                      </span>
-                    </td>
-                  </tr>
-
-                  {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
-                    <tr>
-                      <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
-                        <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                          <Heart className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" /> Blood Group:
-                        </span>
-                      </td>
-                      <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
-                        <span className="inline-block text-rose-700 font-black text-xs bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                          🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
-                        </span>
-                      </td>
-                    </tr>
+              <div className="flex justify-between items-center px-3.5 py-2">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <Users className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" /> Parent / Guardian:
+                </span>
+                <span className="text-gray-950 font-black text-xs text-right truncate max-w-[190px]">
+                  {activeCardStudent.guardianName || activeCardStudent.guardian_name || 'N/A'}
+                  {(activeCardStudent.occupation || activeCardStudent.guardian_occupation) && (
+                    <span className="text-[10px] text-amber-800 font-medium ml-1">
+                      ({activeCardStudent.occupation || activeCardStudent.guardian_occupation})
+                    </span>
                   )}
-                </tbody>
-              </table>
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center px-3.5 py-2">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <Phone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" /> Contact Phone:
+                </span>
+                <span className="text-emerald-800 font-mono font-black text-xs text-right">
+                  {activeCardStudent.phone || 'N/A'}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center px-3.5 py-2">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <UserCheck className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" /> Age & Gender:
+                </span>
+                <span className="text-gray-950 font-black text-xs text-right">
+                  {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
+                </span>
+              </div>
+
+              {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
+                <div className="flex justify-between items-center px-3.5 py-2">
+                  <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                    <Heart className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" /> Blood Group:
+                  </span>
+                  <span className="inline-block text-rose-700 font-black text-xs bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-right">
+                    🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Card Footer Bar */}
