@@ -214,41 +214,75 @@ export default function StudentManagement() {
   // ID Card Download Ref & State
   const idCardRef = useRef(null);
   const [isDownloadingCard, setIsDownloadingCard] = useState(false);
+  const [isDownloadingImage, setIsDownloadingImage] = useState(false);
 
   const handleDownloadIdCard = async () => {
     if (!idCardRef.current || !activeCardStudent) return;
     setIsDownloadingCard(true);
     try {
-      const html2pdfModule = await import('html2pdf.js');
-      const html2pdf = html2pdfModule.default || html2pdfModule;
+      const html2canvasModule = await import('html2canvas');
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+      const { jsPDF } = await import('jspdf');
+
       const element = idCardRef.current;
       const cadetName = (activeCardStudent.name || 'Cadet').replace(/[^a-zA-Z0-9]/g, '_');
       const admission = (activeCardStudent.admissionNo || activeCardStudent.admission_no || 'ID').replace(/[^a-zA-Z0-9]/g, '_');
 
-      const opt = {
-        margin: 0,
-        filename: `BAMA_ID_CARD_${cadetName}_${admission}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 3,
-          useCORS: true,
-          logging: false,
-          scrollY: 0,
-          scrollX: 0
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: [85, 135],
-          orientation: 'portrait'
-        }
-      };
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        ignoreElements: (el) => el.classList.contains('no-print')
+      });
 
-      await html2pdf().set(opt).from(element).save();
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [85, 135]
+      });
+
+      pdf.addImage(imgData, 'JPEG', 0, 0, 85, 135, undefined, 'FAST');
+      pdf.save(`BAMA_ID_CARD_${cadetName}_${admission}.pdf`);
     } catch (err) {
-      console.error('[ID Card Download Error]', err);
+      console.error('[ID Card PDF Download Error]', err);
       window.print();
     } finally {
       setIsDownloadingCard(false);
+    }
+  };
+
+  const handleDownloadIdCardImage = async () => {
+    if (!idCardRef.current || !activeCardStudent) return;
+    setIsDownloadingImage(true);
+    try {
+      const html2canvasModule = await import('html2canvas');
+      const html2canvas = html2canvasModule.default || html2canvasModule;
+
+      const element = idCardRef.current;
+      const cadetName = (activeCardStudent.name || 'Cadet').replace(/[^a-zA-Z0-9]/g, '_');
+      const admission = (activeCardStudent.admissionNo || activeCardStudent.admission_no || 'ID').replace(/[^a-zA-Z0-9]/g, '_');
+
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        ignoreElements: (el) => el.classList.contains('no-print')
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const link = document.createElement('a');
+      link.href = imgData;
+      link.download = `BAMA_ID_CARD_${cadetName}_${admission}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('[ID Card Image Error]', err);
+    } finally {
+      setIsDownloadingImage(false);
     }
   };
 
@@ -4214,73 +4248,90 @@ export default function StudentManagement() {
 
       {/* MODAL: Official Cadet Digital Profile & ID Card - EXECUTIVE LIGHT WHITE PRO MAX */}
       {activeCardStudent && (
-        <div className="print-modal-overlay fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-start sm:justify-center p-3 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static min-h-screen py-6 sm:py-8">
-          {/* Print Style Rule */}
+        <div className="print-modal-overlay fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-start sm:justify-center p-2 sm:p-4 overflow-y-auto py-4 sm:py-8">
+          {/* Print Style Rule: Guarantees Strictly 1/1 Page on Mobile and Desktop */}
           <style>{`
             @media print {
               @page {
-                size: 85mm 135mm;
+                size: portrait;
                 margin: 0 !important;
               }
               html, body {
-                background: white !important;
-                color: black !important;
+                background: #ffffff !important;
+                color: #000000 !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                height: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                width: 100% !important;
+                overflow: visible !important;
               }
-              .no-print, header, nav, aside, main > div > div:not(.print-modal-overlay), table, form, button {
+              /* Hide all background and UI elements */
+              header, aside, nav, .no-print,
+              main > div > div:not(.print-modal-overlay),
+              table, form, button, input {
                 display: none !important;
               }
+              /* Strip padding, heights and backgrounds from layout parents */
+              div, main {
+                background: transparent !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                overflow: visible !important;
+                border: none !important;
+                box-shadow: none !important;
+              }
+              /* Position the modal overlay as clean block with zero margin */
               .print-modal-overlay {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
+                position: static !important;
+                left: auto !important;
+                top: auto !important;
                 width: 100% !important;
-                height: 100% !important;
-                background: white !important;
+                height: auto !important;
+                min-height: 0 !important;
+                background: #ffffff !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 z-index: 999999 !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
+                display: block !important;
               }
+              /* Center the ID card at the top of Page 1 with tight bounds */
               .bama-print-id-card {
                 position: relative !important;
+                display: block !important;
                 width: 82mm !important;
                 max-width: 82mm !important;
-                height: 130mm !important;
-                max-height: 130mm !important;
-                margin: auto !important;
-                padding: 10px 12px !important;
-                border: 2.5px solid #d97706 !important;
-                border-radius: 16px !important;
+                margin: 6mm auto 0 auto !important;
+                padding: 8px 10px !important;
+                border: 2px solid #d97706 !important;
+                border-radius: 14px !important;
                 box-shadow: none !important;
                 background-color: #ffffff !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
                 page-break-after: avoid !important;
                 page-break-before: avoid !important;
-                display: flex !important;
-                flex-direction: column !important;
-                justify-content: space-between !important;
-                visibility: visible !important;
                 overflow: hidden !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                box-sizing: border-box !important;
               }
               .bama-print-id-card * {
                 visibility: visible !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
               }
             }
           `}</style>
 
           <div 
             ref={idCardRef}
-            className="bama-print-id-card w-full max-w-sm bg-white border-2 border-amber-500/80 rounded-3xl p-4 sm:p-5 relative shadow-2xl space-y-2.5 text-gray-900 font-sans max-h-[90vh] overflow-y-auto my-auto"
+            className="bama-print-id-card w-full max-w-sm bg-white border-2 border-amber-500/80 rounded-3xl p-3.5 sm:p-4 relative shadow-2xl space-y-2 text-gray-900 font-sans max-h-[92vh] overflow-y-auto my-auto"
           >
             {/* Close Button */}
             <button
@@ -4291,11 +4342,11 @@ export default function StudentManagement() {
             </button>
 
             {/* Academy Header with Logo */}
-            <div className="flex items-center gap-2.5 border-b border-amber-500/30 pb-2.5">
+            <div className="flex items-center gap-2.5 border-b border-amber-500/30 pb-2">
               <img
                 src="/logo bama_240616_200739.jpg.jpeg"
                 alt="B.A.M.A. Logo"
-                className="w-10 h-10 rounded-xl object-cover border-2 border-amber-500 shadow-sm flex-shrink-0"
+                className="w-9 h-9 rounded-xl object-cover border-2 border-amber-500 shadow-sm flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
                 <h3 className="font-black text-xs sm:text-sm text-gray-950 tracking-wider uppercase leading-tight truncate">
@@ -4308,8 +4359,8 @@ export default function StudentManagement() {
             </div>
 
             {/* Profile Avatar & Primary Credentials */}
-            <div className="text-center space-y-2">
-              <div className="w-20 h-20 sm:w-22 sm:h-22 bg-gradient-to-br from-red-600 via-amber-600 to-yellow-500 rounded-2xl mx-auto flex items-center justify-center font-black text-2xl text-white shadow-md overflow-hidden border-3 border-amber-400">
+            <div className="text-center space-y-1.5">
+              <div className="w-18 h-18 sm:w-20 sm:h-20 bg-gradient-to-br from-red-600 via-amber-600 to-yellow-500 rounded-2xl mx-auto flex items-center justify-center font-black text-2xl text-white shadow-md overflow-hidden border-2 border-amber-400">
                 {activeCardStudent.photo ? (
                   <img src={activeCardStudent.photo} alt={activeCardStudent.name} className="w-full h-full object-cover" />
                 ) : (
@@ -4317,15 +4368,15 @@ export default function StudentManagement() {
                 )}
               </div>
 
-              <div className="space-y-1">
-                <h4 className="text-lg sm:text-xl font-black text-gray-900 capitalize leading-tight truncate">
+              <div className="space-y-0.5">
+                <h4 className="text-base sm:text-lg font-black text-gray-900 capitalize leading-tight truncate">
                   {activeCardStudent.name}
                 </h4>
                 <div className="flex flex-wrap items-center justify-center gap-1.5">
-                  <span className="px-2.5 py-0.5 bg-red-50 text-red-700 font-mono font-black text-[10px] sm:text-[11px] rounded-lg border border-red-200 shadow-2xs">
+                  <span className="px-2 py-0.5 bg-red-50 text-red-700 font-mono font-black text-[10px] rounded-lg border border-red-200 shadow-2xs">
                     ID: {activeCardStudent.admissionNo || activeCardStudent.admission_no}
                   </span>
-                  <span className="px-2.5 py-0.5 bg-amber-500 text-black font-black text-[10px] sm:text-[11px] rounded-full uppercase shadow-2xs">
+                  <span className="px-2 py-0.5 bg-amber-500 text-black font-black text-[10px] rounded-full uppercase shadow-2xs">
                     🥋 {activeCardStudent.currentBelt || activeCardStudent.current_belt || 'White Belt'}
                   </span>
                 </div>
@@ -4333,21 +4384,21 @@ export default function StudentManagement() {
             </div>
 
             {/* Essential Personal Data Card */}
-            <div className="bg-gray-50/90 p-3 rounded-2xl border border-gray-200/90 space-y-1.5 text-xs">
+            <div className="bg-gray-50/90 p-2.5 rounded-2xl border border-gray-200/90 space-y-1 text-xs">
               <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" /> Branch Dojo:
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[10.5px]">
+                  <MapPin className="w-3 h-3 text-red-600 flex-shrink-0" /> Branch Dojo:
                 </span>
-                <span className="text-gray-900 font-black text-right text-[11px] max-w-[180px] truncate">
+                <span className="text-gray-900 font-black text-right text-[10.5px] max-w-[170px] truncate">
                   {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch' : activeCardStudent.branch)) || 'Pulikkal Branch'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <Users className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" /> Parent / Guardian:
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[10.5px]">
+                  <Users className="w-3 h-3 text-blue-600 flex-shrink-0" /> Parent / Guardian:
                 </span>
-                <span className="text-gray-900 font-black text-[11px] text-right truncate">
+                <span className="text-gray-900 font-black text-[10.5px] text-right truncate max-w-[170px]">
                   {activeCardStudent.guardianName || activeCardStudent.guardian_name || 'N/A'}
                   {(activeCardStudent.occupation || activeCardStudent.guardian_occupation) && (
                     <span className="text-[9px] text-amber-800 font-medium ml-1">
@@ -4358,29 +4409,29 @@ export default function StudentManagement() {
               </div>
 
               <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <Phone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" /> Contact Phone:
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[10.5px]">
+                  <Phone className="w-3 h-3 text-emerald-600 flex-shrink-0" /> Contact Phone:
                 </span>
-                <span className="text-emerald-800 font-mono font-black text-[11px]">
+                <span className="text-emerald-800 font-mono font-black text-[10.5px]">
                   {activeCardStudent.phone || 'N/A'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <UserCheck className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" /> Age & Gender:
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[10.5px]">
+                  <UserCheck className="w-3 h-3 text-purple-600 flex-shrink-0" /> Age & Gender:
                 </span>
-                <span className="text-gray-900 font-black text-[11px]">
+                <span className="text-gray-900 font-black text-[10.5px]">
                   {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
                 </span>
               </div>
 
               {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
                 <div className="flex justify-between items-center pt-0.5">
-                  <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                    <Heart className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" /> Blood Group:
+                  <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[10.5px]">
+                    <Heart className="w-3 h-3 text-rose-600 flex-shrink-0" /> Blood Group:
                   </span>
-                  <span className="text-rose-700 font-black text-[11px] bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shadow-2xs">
+                  <span className="text-rose-700 font-black text-[10.5px] bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shadow-2xs">
                     🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
                   </span>
                 </div>
@@ -4393,14 +4444,15 @@ export default function StudentManagement() {
             </div>
 
             {/* Action Buttons (Hidden when printing or exporting) */}
-            <div className="no-print flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+            <div className="no-print grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
               <button
                 type="button"
                 onClick={() => openWhatsApp({ 
                   phone: activeCardStudent.phone, 
                   message: `OSS Cadet ${activeCardStudent.name} (Admission No: ${activeCardStudent.admissionNo || activeCardStudent.admission_no}) - Welcome to B.A.M.A Karate Academy!` 
                 })}
-                className="w-full py-2 px-3 bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl font-black text-xs text-center flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition transform hover:-translate-y-0.5 cursor-pointer"
+                className="py-2 px-2 bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl font-black text-[11px] text-center flex items-center justify-center gap-1 shadow-md shadow-emerald-600/20 transition transform hover:-translate-y-0.5 cursor-pointer"
+                title="Send on WhatsApp"
               >
                 <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
               </button>
@@ -4409,17 +4461,38 @@ export default function StudentManagement() {
                 type="button"
                 onClick={handleDownloadIdCard}
                 disabled={isDownloadingCard}
-                className="w-full py-2 px-3 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
+                className="py-2 px-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white rounded-xl font-black text-[11px] flex items-center justify-center gap-1 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
+                title="Download Single-Page PDF"
               >
                 {isDownloadingCard ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving...</span>
+                    <span>PDF...</span>
                   </>
                 ) : (
                   <>
                     <Download className="w-3.5 h-3.5" />
-                    <span>Download PDF</span>
+                    <span>PDF</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadIdCardImage}
+                disabled={isDownloadingImage}
+                className="py-2 px-2 bg-gradient-to-r from-purple-600 to-fuchsia-700 hover:from-purple-500 hover:to-fuchsia-600 text-white rounded-xl font-black text-[11px] flex items-center justify-center gap-1 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
+                title="Save Image to Phone Gallery"
+              >
+                {isDownloadingImage ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Image...</span>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    <span>Image</span>
                   </>
                 )}
               </button>
@@ -4427,7 +4500,8 @@ export default function StudentManagement() {
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
+                className="py-2 px-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 rounded-xl font-black text-[11px] flex items-center justify-center gap-1 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
+                title="Print 1-Page ID Card"
               >
                 <Printer className="w-3.5 h-3.5" /> Print
               </button>
