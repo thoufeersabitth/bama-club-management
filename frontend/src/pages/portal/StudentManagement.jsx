@@ -247,14 +247,16 @@ export default function StudentManagement() {
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      // Tall, elegant portrait ID Card dimensions (92mm x 148mm)
+      // Dynamically calculate exact card dimensions matching canvas aspect ratio (no trailing white space)
+      const cardWidthMm = 88;
+      const cardHeightMm = Math.round(((canvas.height * cardWidthMm) / canvas.width) * 10) / 10;
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: [92, 148]
+        format: [cardWidthMm, cardHeightMm]
       });
 
-      pdf.addImage(imgData, 'JPEG', 0, 0, 92, 148, undefined, 'FAST');
+      pdf.addImage(imgData, 'JPEG', 0, 0, cardWidthMm, cardHeightMm, undefined, 'FAST');
       pdf.save(`BAMA_CADET_ID_${cadetName}_${admission}.pdf`);
     } catch (err) {
       console.error('[ID Card PDF Download Error]', err);
@@ -4275,16 +4277,17 @@ export default function StudentManagement() {
                 z-index: 999999 !important;
                 display: block !important;
               }
-              /* ID Card Print: Tall, prominent, centered on single page */
+              /* ID Card Print: Prominent, centered on single page */
               .bama-print-id-card {
                 position: relative !important;
                 display: block !important;
-                width: 92mm !important;
-                max-width: 92mm !important;
-                min-height: 148mm !important;
-                margin: 12mm auto !important;
+                width: 90mm !important;
+                max-width: 90mm !important;
+                height: auto !important;
+                min-height: 0 !important;
+                margin: 10mm auto !important;
                 padding: 16px 18px !important;
-                border: 2.5px solid #d97706 !important;
+                border: 2px solid #d97706 !important;
                 border-radius: 20px !important;
                 box-shadow: none !important;
                 background-color: #ffffff !important;
@@ -4310,7 +4313,7 @@ export default function StudentManagement() {
           <div 
             ref={idCardRef}
             id="bama-cadet-id-card"
-            className="bama-print-id-card w-full max-w-[370px] sm:max-w-[395px] min-h-[560px] bg-white border-2 border-amber-500 rounded-3xl p-5 sm:p-6 relative shadow-2xl space-y-3.5 text-gray-900 font-sans mx-auto flex flex-col justify-between"
+            className="bama-print-id-card w-full max-w-[370px] sm:max-w-[395px] bg-white border-2 border-amber-500 rounded-3xl p-5 sm:p-6 relative shadow-2xl space-y-3.5 text-gray-900 font-sans mx-auto"
           >
             {/* Close Button */}
             <button
@@ -4339,26 +4342,35 @@ export default function StudentManagement() {
             </div>
 
             {/* Profile Avatar & Primary Credentials */}
-            <div className="text-center space-y-3 py-1">
+            <div style={{ textAlign: 'center', width: '100%', margin: '4px 0 2px 0' }}>
               <div 
-                style={{ width: '108px', height: '108px', minWidth: '108px', minHeight: '108px' }}
-                className="w-27 h-27 rounded-3xl mx-auto flex items-center justify-center font-black text-3xl text-white shadow-lg overflow-hidden border-2 border-amber-400 bg-gradient-to-tr from-amber-500 via-red-600 to-amber-600"
+                style={{ 
+                  display: 'inline-block',
+                  width: '106px', 
+                  height: '106px', 
+                  borderRadius: '24px', 
+                  overflow: 'hidden', 
+                  border: '3px solid #d97706',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.12)',
+                  background: 'linear-gradient(135deg, #f59e0b, #dc2626)',
+                  verticalAlign: 'middle'
+                }}
               >
                 {activeCardStudent.photo ? (
                   <img 
                     src={activeCardStudent.photo} 
                     alt={activeCardStudent.name} 
                     crossOrigin="anonymous"
-                    className="w-full h-full object-cover" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   />
                 ) : (
-                  <span className="drop-shadow-md">
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', fontWeight: 900, fontSize: '32px' }}>
                     {activeCardStudent.name ? activeCardStudent.name.charAt(0).toUpperCase() : 'C'}
-                  </span>
+                  </div>
                 )}
               </div>
 
-              <div className="space-y-1.5 pt-0.5">
+              <div style={{ marginTop: '10px' }} className="space-y-1.5">
                 <h4 className="text-xl sm:text-2xl font-black text-gray-950 uppercase tracking-wide leading-tight">
                   {activeCardStudent.name}
                 </h4>
@@ -4374,58 +4386,82 @@ export default function StudentManagement() {
             </div>
 
             {/* Essential Personal Data Card */}
-            <div className="bg-gray-50/95 p-3.5 sm:p-4 rounded-2xl border border-gray-200/90 space-y-2 text-xs">
-              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                  <MapPin className="w-4 h-4 text-red-600 flex-shrink-0" /> Branch Dojo:
-                </span>
-                <span className="text-gray-950 font-black text-right text-xs max-w-[200px] truncate">
-                  {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch' : activeCardStudent.branch)) || 'Pulikkal Branch'}
-                </span>
-              </div>
+            <div className="bg-gray-50/95 rounded-2xl border border-gray-200/90 overflow-hidden text-xs shadow-2xs">
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
+                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                        <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" /> Branch Dojo:
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
+                      <span className="text-gray-950 font-black text-xs">
+                        {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch' : activeCardStudent.branch)) || 'Pulikkal Branch'}
+                      </span>
+                    </td>
+                  </tr>
 
-              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                  <Users className="w-4 h-4 text-blue-600 flex-shrink-0" /> Parent / Guardian:
-                </span>
-                <span className="text-gray-950 font-black text-xs text-right truncate">
-                  {activeCardStudent.guardianName || activeCardStudent.guardian_name || 'N/A'}
-                  {(activeCardStudent.occupation || activeCardStudent.guardian_occupation) && (
-                    <span className="text-[10px] text-amber-800 font-medium ml-1">
-                      ({activeCardStudent.occupation || activeCardStudent.guardian_occupation})
-                    </span>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
+                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                        <Users className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" /> Parent / Guardian:
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
+                      <span className="text-gray-950 font-black text-xs">
+                        {activeCardStudent.guardianName || activeCardStudent.guardian_name || 'N/A'}
+                        {(activeCardStudent.occupation || activeCardStudent.guardian_occupation) && (
+                          <span className="text-[10px] text-amber-800 font-medium ml-1">
+                            ({activeCardStudent.occupation || activeCardStudent.guardian_occupation})
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                  </tr>
+
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
+                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" /> Contact Phone:
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
+                      <span className="text-emerald-800 font-mono font-black text-xs">
+                        {activeCardStudent.phone || 'N/A'}
+                      </span>
+                    </td>
+                  </tr>
+
+                  <tr style={{ borderBottom: (activeCardStudent.bloodGroup || activeCardStudent.blood_group) ? '1px solid #e2e8f0' : 'none' }}>
+                    <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
+                      <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                        <UserCheck className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" /> Age & Gender:
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
+                      <span className="text-gray-950 font-black text-xs">
+                        {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
+                      </span>
+                    </td>
+                  </tr>
+
+                  {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
+                    <tr>
+                      <td style={{ padding: '8px 12px', width: '42%', verticalAlign: 'middle' }}>
+                        <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                          <Heart className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" /> Blood Group:
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 12px', width: '58%', textAlign: 'right', verticalAlign: 'middle' }}>
+                        <span className="inline-block text-rose-700 font-black text-xs bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
+                        </span>
+                      </td>
+                    </tr>
                   )}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                  <Phone className="w-4 h-4 text-emerald-600 flex-shrink-0" /> Contact Phone:
-                </span>
-                <span className="text-emerald-800 font-mono font-black text-xs">
-                  {activeCardStudent.phone || 'N/A'}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                  <UserCheck className="w-4 h-4 text-purple-600 flex-shrink-0" /> Age & Gender:
-                </span>
-                <span className="text-gray-950 font-black text-xs">
-                  {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
-                </span>
-              </div>
-
-              {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
-                <div className="flex justify-between items-center pt-0.5">
-                  <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
-                    <Heart className="w-4 h-4 text-rose-600 flex-shrink-0" /> Blood Group:
-                  </span>
-                  <span className="text-rose-700 font-black text-xs bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200 shadow-2xs">
-                    🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
-                  </span>
-                </div>
-              )}
+                </tbody>
+              </table>
             </div>
 
             {/* Card Footer Bar */}
