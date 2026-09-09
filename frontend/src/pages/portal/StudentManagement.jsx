@@ -273,7 +273,24 @@ export default function StudentManagement() {
       });
 
       pdf.addImage(imgData, 'JPEG', 0, 0, cardWidthMm, cardHeightMm, undefined, 'FAST');
-      pdf.save(`BAMA_CADET_ID_${cadetName}_${admission}.pdf`);
+
+      const fileName = `BAMA_CADET_ID_${cadetName}_${admission}.pdf`;
+      try {
+        const blob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        }, 3000);
+      } catch (blobErr) {
+        console.warn('[Direct Blob Download fallback to pdf.save]', blobErr);
+        pdf.save(fileName);
+      }
     } catch (err) {
       console.error('[ID Card PDF Download Error]', err);
       window.print();
