@@ -247,14 +247,14 @@ export default function StudentManagement() {
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
-      // Exact ID Card dimensions (CR80 PVC standard ratio: 85.6mm x 135mm)
+      // Tall, elegant portrait ID Card dimensions (92mm x 148mm)
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: [85.6, 135]
+        format: [92, 148]
       });
 
-      pdf.addImage(imgData, 'JPEG', 0, 0, 85.6, 135, undefined, 'FAST');
+      pdf.addImage(imgData, 'JPEG', 0, 0, 92, 148, undefined, 'FAST');
       pdf.save(`BAMA_CADET_ID_${cadetName}_${admission}.pdf`);
     } catch (err) {
       console.error('[ID Card PDF Download Error]', err);
@@ -4275,16 +4275,17 @@ export default function StudentManagement() {
                 z-index: 999999 !important;
                 display: block !important;
               }
-              /* ID Card Print: Neatly centered, single page */
+              /* ID Card Print: Tall, prominent, centered on single page */
               .bama-print-id-card {
                 position: relative !important;
                 display: block !important;
-                width: 85mm !important;
-                max-width: 85mm !important;
-                margin: 15mm auto !important;
-                padding: 12px 14px !important;
-                border: 2px solid #d97706 !important;
-                border-radius: 16px !important;
+                width: 92mm !important;
+                max-width: 92mm !important;
+                min-height: 148mm !important;
+                margin: 12mm auto !important;
+                padding: 16px 18px !important;
+                border: 2.5px solid #d97706 !important;
+                border-radius: 20px !important;
                 box-shadow: none !important;
                 background-color: #ffffff !important;
                 page-break-inside: avoid !important;
@@ -4309,37 +4310,40 @@ export default function StudentManagement() {
           <div 
             ref={idCardRef}
             id="bama-cadet-id-card"
-            className="bama-print-id-card w-full max-w-sm bg-white border-2 border-amber-500/80 rounded-3xl p-4 sm:p-5 relative shadow-2xl space-y-2.5 text-gray-900 font-sans max-h-[90vh] overflow-y-auto my-auto"
+            className="bama-print-id-card w-full max-w-[370px] sm:max-w-[395px] min-h-[560px] bg-white border-2 border-amber-500 rounded-3xl p-5 sm:p-6 relative shadow-2xl space-y-3.5 text-gray-900 font-sans mx-auto flex flex-col justify-between"
           >
             {/* Close Button */}
             <button
               onClick={() => setActiveCardStudent(null)}
-              className="no-print absolute top-3 right-3 text-gray-400 hover:text-gray-900 bg-gray-100 p-1.5 rounded-full border border-gray-200 transition cursor-pointer"
+              className="no-print absolute top-3.5 right-3.5 text-gray-400 hover:text-gray-900 bg-gray-100 p-1.5 rounded-full border border-gray-200 transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             {/* Academy Header with Logo */}
-            <div className="flex items-center gap-2.5 border-b border-amber-500/30 pb-2.5">
+            <div className="flex items-center gap-3 border-b-2 border-amber-500/40 pb-3">
               <img
                 src="/logo bama_240616_200739.jpg.jpeg"
                 alt="B.A.M.A. Logo"
                 crossOrigin="anonymous"
-                className="w-10 h-10 rounded-xl object-cover border-2 border-amber-500 shadow-sm flex-shrink-0"
+                className="w-13 h-13 rounded-2xl object-cover border-2 border-amber-500 shadow-md flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
-                <h3 className="font-black text-xs sm:text-sm text-gray-950 tracking-wider uppercase leading-tight truncate">
+                <h3 className="font-black text-sm sm:text-base text-gray-950 tracking-wider uppercase leading-snug">
                   BRAVE ACADEMY OF MARTIAL ARTS
                 </h3>
-                <p className="text-[9px] text-amber-700 font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
-                  <Shield className="w-3 h-3 text-amber-600 flex-shrink-0" /> OFFICIAL CADET ID CARD
+                <p className="text-[10px] text-amber-800 font-black uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" /> OFFICIAL CADET ID CARD
                 </p>
               </div>
             </div>
 
             {/* Profile Avatar & Primary Credentials */}
-            <div className="text-center space-y-2">
-              <div className="w-20 h-20 sm:w-22 sm:h-22 bg-gradient-to-br from-red-600 via-amber-600 to-yellow-500 rounded-2xl mx-auto flex items-center justify-center font-black text-2xl text-white shadow-md overflow-hidden border-3 border-amber-400">
+            <div className="text-center space-y-3 py-1">
+              <div 
+                style={{ width: '108px', height: '108px', minWidth: '108px', minHeight: '108px' }}
+                className="w-27 h-27 rounded-3xl mx-auto flex items-center justify-center font-black text-3xl text-white shadow-lg overflow-hidden border-2 border-amber-400 bg-gradient-to-tr from-amber-500 via-red-600 to-amber-600"
+              >
                 {activeCardStudent.photo ? (
                   <img 
                     src={activeCardStudent.photo} 
@@ -4348,19 +4352,21 @@ export default function StudentManagement() {
                     className="w-full h-full object-cover" 
                   />
                 ) : (
-                  <span>{activeCardStudent.name ? activeCardStudent.name.charAt(0).toUpperCase() : 'C'}</span>
+                  <span className="drop-shadow-md">
+                    {activeCardStudent.name ? activeCardStudent.name.charAt(0).toUpperCase() : 'C'}
+                  </span>
                 )}
               </div>
 
-              <div className="space-y-1">
-                <h4 className="text-lg sm:text-xl font-black text-gray-900 capitalize leading-tight truncate">
+              <div className="space-y-1.5 pt-0.5">
+                <h4 className="text-xl sm:text-2xl font-black text-gray-950 uppercase tracking-wide leading-tight">
                   {activeCardStudent.name}
                 </h4>
-                <div className="flex flex-wrap items-center justify-center gap-1.5">
-                  <span className="px-2.5 py-0.5 bg-red-50 text-red-700 font-mono font-black text-[10px] sm:text-[11px] rounded-lg border border-red-200 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <span className="px-3 py-1 bg-red-50 text-red-700 font-mono font-black text-xs rounded-xl border border-red-200 shadow-2xs">
                     ID: {activeCardStudent.admissionNo || activeCardStudent.admission_no}
                   </span>
-                  <span className="px-2.5 py-0.5 bg-amber-500 text-black font-black text-[10px] sm:text-[11px] rounded-full uppercase shadow-2xs">
+                  <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-amber-600 text-gray-950 font-black text-xs rounded-full uppercase shadow-2xs">
                     🥋 {activeCardStudent.currentBelt || activeCardStudent.current_belt || 'White Belt'}
                   </span>
                 </div>
@@ -4368,54 +4374,54 @@ export default function StudentManagement() {
             </div>
 
             {/* Essential Personal Data Card */}
-            <div className="bg-gray-50/90 p-3 rounded-2xl border border-gray-200/90 space-y-1.5 text-xs">
-              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" /> Branch Dojo:
+            <div className="bg-gray-50/95 p-3.5 sm:p-4 rounded-2xl border border-gray-200/90 space-y-2 text-xs">
+              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <MapPin className="w-4 h-4 text-red-600 flex-shrink-0" /> Branch Dojo:
                 </span>
-                <span className="text-gray-900 font-black text-right text-[11px] max-w-[180px] truncate">
+                <span className="text-gray-950 font-black text-right text-xs max-w-[200px] truncate">
                   {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch' : activeCardStudent.branch)) || 'Pulikkal Branch'}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <Users className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" /> Parent / Guardian:
+              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <Users className="w-4 h-4 text-blue-600 flex-shrink-0" /> Parent / Guardian:
                 </span>
-                <span className="text-gray-900 font-black text-[11px] text-right truncate">
+                <span className="text-gray-950 font-black text-xs text-right truncate">
                   {activeCardStudent.guardianName || activeCardStudent.guardian_name || 'N/A'}
                   {(activeCardStudent.occupation || activeCardStudent.guardian_occupation) && (
-                    <span className="text-[9px] text-amber-800 font-medium ml-1">
+                    <span className="text-[10px] text-amber-800 font-medium ml-1">
                       ({activeCardStudent.occupation || activeCardStudent.guardian_occupation})
                     </span>
                   )}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <Phone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" /> Contact Phone:
+              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <Phone className="w-4 h-4 text-emerald-600 flex-shrink-0" /> Contact Phone:
                 </span>
-                <span className="text-emerald-800 font-mono font-black text-[11px]">
+                <span className="text-emerald-800 font-mono font-black text-xs">
                   {activeCardStudent.phone || 'N/A'}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
-                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <UserCheck className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" /> Age & Gender:
+              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
+                <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                  <UserCheck className="w-4 h-4 text-purple-600 flex-shrink-0" /> Age & Gender:
                 </span>
-                <span className="text-gray-900 font-black text-[11px]">
+                <span className="text-gray-950 font-black text-xs">
                   {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
                 </span>
               </div>
 
               {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
                 <div className="flex justify-between items-center pt-0.5">
-                  <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                    <Heart className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" /> Blood Group:
+                  <span className="text-gray-600 font-bold flex items-center gap-1.5 text-xs">
+                    <Heart className="w-4 h-4 text-rose-600 flex-shrink-0" /> Blood Group:
                   </span>
-                  <span className="text-rose-700 font-black text-[11px] bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shadow-2xs">
+                  <span className="text-rose-700 font-black text-xs bg-rose-50 px-2.5 py-0.5 rounded-md border border-rose-200 shadow-2xs">
                     🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
                   </span>
                 </div>
@@ -4423,7 +4429,7 @@ export default function StudentManagement() {
             </div>
 
             {/* Card Footer Bar */}
-            <div className="text-center pt-1 border-t border-gray-100 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+            <div className="text-center pt-2 border-t border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
               Brave Academy of Martial Arts &bull; Kerala State
             </div>
 
@@ -4435,7 +4441,7 @@ export default function StudentManagement() {
                   phone: activeCardStudent.phone, 
                   message: `OSS Cadet ${activeCardStudent.name} (Admission No: ${activeCardStudent.admissionNo || activeCardStudent.admission_no}) - Welcome to B.A.M.A Karate Academy!` 
                 })}
-                className="w-full py-2 px-3 bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl font-black text-xs text-center flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition transform hover:-translate-y-0.5 cursor-pointer"
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl font-black text-xs text-center flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
               </button>
@@ -4444,7 +4450,7 @@ export default function StudentManagement() {
                 type="button"
                 onClick={handleDownloadIdCard}
                 disabled={isDownloadingCard}
-                className="w-full py-2 px-3 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
               >
                 {isDownloadingCard ? (
                   <>
@@ -4462,7 +4468,7 @@ export default function StudentManagement() {
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
+                className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" /> Print
               </button>
