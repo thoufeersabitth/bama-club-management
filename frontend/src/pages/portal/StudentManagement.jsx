@@ -5,7 +5,7 @@ import {
   X, Check, Shield, Award, MapPin, Phone, Mail, FileText,
   Calendar, CreditCard, MessageSquare, UserCheck, Upload, Camera, Image as ImageIcon,
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
-  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User
+  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2
 } from 'lucide-react';
 import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
@@ -210,6 +210,47 @@ export default function StudentManagement() {
   // Automatic WhatsApp Welcome Dispatch State
   const [autoWhatsAppWelcome, setAutoWhatsAppWelcome] = useState(true);
   const [welcomeDispatchModal, setWelcomeDispatchModal] = useState(null);
+
+  // ID Card Download Ref & State
+  const idCardRef = useRef(null);
+  const [isDownloadingCard, setIsDownloadingCard] = useState(false);
+
+  const handleDownloadIdCard = async () => {
+    if (!idCardRef.current || !activeCardStudent) return;
+    setIsDownloadingCard(true);
+    try {
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default || html2pdfModule;
+      const element = idCardRef.current;
+      const cadetName = (activeCardStudent.name || 'Cadet').replace(/[^a-zA-Z0-9]/g, '_');
+      const admission = (activeCardStudent.admissionNo || activeCardStudent.admission_no || 'ID').replace(/[^a-zA-Z0-9]/g, '_');
+
+      const opt = {
+        margin: 0,
+        filename: `BAMA_ID_CARD_${cadetName}_${admission}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 3,
+          useCORS: true,
+          logging: false,
+          scrollY: 0,
+          scrollX: 0
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: [85, 135],
+          orientation: 'portrait'
+        }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('[ID Card Download Error]', err);
+      window.print();
+    } finally {
+      setIsDownloadingCard(false);
+    }
+  };
 
   // Promote Cadet Modal State
   const [promoteModalStudent, setPromoteModalStudent] = useState(null);
@@ -4178,14 +4219,17 @@ export default function StudentManagement() {
           <style>{`
             @media print {
               @page {
-                size: 85mm 120mm;
+                size: 85mm 135mm;
                 margin: 0 !important;
               }
-              body {
+              html, body {
                 background: white !important;
                 color: black !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: 100% !important;
               }
-              .no-print, header, nav, aside, main > div > div:not(.print-modal-overlay), table, form {
+              .no-print, header, nav, aside, main > div > div:not(.print-modal-overlay), table, form, button {
                 display: none !important;
               }
               .print-modal-overlay {
@@ -4193,64 +4237,79 @@ export default function StudentManagement() {
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
-                height: auto !important;
+                height: 100% !important;
                 background: white !important;
                 padding: 0 !important;
                 margin: 0 !important;
                 z-index: 999999 !important;
-                display: block !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
               }
               .bama-print-id-card {
                 position: relative !important;
-                width: 100% !important;
-                max-width: 100% !important;
-                margin: 0 auto !important;
-                padding: 16px !important;
-                border: 4px solid #d97706 !important;
+                width: 82mm !important;
+                max-width: 82mm !important;
+                height: 130mm !important;
+                max-height: 130mm !important;
+                margin: auto !important;
+                padding: 10px 12px !important;
+                border: 2.5px solid #d97706 !important;
+                border-radius: 16px !important;
                 box-shadow: none !important;
                 background-color: #ffffff !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
-                display: block !important;
+                page-break-after: avoid !important;
+                page-break-before: avoid !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
                 visibility: visible !important;
-                max-height: none !important;
-                overflow: visible !important;
+                overflow: hidden !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
               }
               .bama-print-id-card * {
                 visibility: visible !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
               }
             }
           `}</style>
 
-          <div className="bama-print-id-card w-full max-w-sm bg-white border-2 border-amber-500/60 rounded-3xl p-5 sm:p-6 relative shadow-2xl space-y-3.5 text-gray-900 font-sans max-h-[90vh] overflow-y-auto my-auto">
+          <div 
+            ref={idCardRef}
+            className="bama-print-id-card w-full max-w-sm bg-white border-2 border-amber-500/80 rounded-3xl p-4 sm:p-5 relative shadow-2xl space-y-2.5 text-gray-900 font-sans max-h-[90vh] overflow-y-auto my-auto"
+          >
             {/* Close Button */}
             <button
               onClick={() => setActiveCardStudent(null)}
-              className="no-print absolute top-3.5 right-3.5 text-gray-400 hover:text-gray-900 bg-gray-100 p-1.5 rounded-full border border-gray-200 transition cursor-pointer"
+              className="no-print absolute top-3 right-3 text-gray-400 hover:text-gray-900 bg-gray-100 p-1.5 rounded-full border border-gray-200 transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             {/* Academy Header with Logo */}
-            <div className="flex items-center gap-2.5 border-b border-gray-200 pb-3">
+            <div className="flex items-center gap-2.5 border-b border-amber-500/30 pb-2.5">
               <img
                 src="/logo bama_240616_200739.jpg.jpeg"
                 alt="B.A.M.A. Logo"
                 className="w-10 h-10 rounded-xl object-cover border-2 border-amber-500 shadow-sm flex-shrink-0"
               />
-              <div>
-                <h3 className="font-black text-xs sm:text-sm text-gray-900 tracking-wider uppercase leading-tight">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-black text-xs sm:text-sm text-gray-950 tracking-wider uppercase leading-tight truncate">
                   BRAVE ACADEMY OF MARTIAL ARTS
                 </h3>
                 <p className="text-[9px] text-amber-700 font-black uppercase tracking-widest mt-0.5 flex items-center gap-1">
-                  <Shield className="w-3 h-3 text-amber-600" /> OFFICIAL CADET ID CARD
+                  <Shield className="w-3 h-3 text-amber-600 flex-shrink-0" /> OFFICIAL CADET ID CARD
                 </p>
               </div>
             </div>
 
             {/* Profile Avatar & Primary Credentials */}
-            <div className="text-center space-y-2.5">
-              <div className="w-24 h-24 bg-gradient-to-br from-red-600 via-amber-600 to-yellow-500 rounded-2xl mx-auto flex items-center justify-center font-black text-2xl text-white shadow-md overflow-hidden border-4 border-amber-400">
+            <div className="text-center space-y-2">
+              <div className="w-20 h-20 sm:w-22 sm:h-22 bg-gradient-to-br from-red-600 via-amber-600 to-yellow-500 rounded-2xl mx-auto flex items-center justify-center font-black text-2xl text-white shadow-md overflow-hidden border-3 border-amber-400">
                 {activeCardStudent.photo ? (
                   <img src={activeCardStudent.photo} alt={activeCardStudent.name} className="w-full h-full object-cover" />
                 ) : (
@@ -4259,14 +4318,14 @@ export default function StudentManagement() {
               </div>
 
               <div className="space-y-1">
-                <h4 className="text-xl font-black text-gray-900 capitalize leading-tight">
+                <h4 className="text-lg sm:text-xl font-black text-gray-900 capitalize leading-tight truncate">
                   {activeCardStudent.name}
                 </h4>
                 <div className="flex flex-wrap items-center justify-center gap-1.5">
-                  <span className="px-2.5 py-0.5 bg-red-50 text-red-700 font-mono font-black text-[11px] rounded-lg border border-red-200 shadow-xs">
+                  <span className="px-2.5 py-0.5 bg-red-50 text-red-700 font-mono font-black text-[10px] sm:text-[11px] rounded-lg border border-red-200 shadow-2xs">
                     ID: {activeCardStudent.admissionNo || activeCardStudent.admission_no}
                   </span>
-                  <span className="px-3 py-0.5 bg-amber-500 text-black font-black text-[11px] rounded-full uppercase shadow-xs">
+                  <span className="px-2.5 py-0.5 bg-amber-500 text-black font-black text-[10px] sm:text-[11px] rounded-full uppercase shadow-2xs">
                     🥋 {activeCardStudent.currentBelt || activeCardStudent.current_belt || 'White Belt'}
                   </span>
                 </div>
@@ -4274,42 +4333,42 @@ export default function StudentManagement() {
             </div>
 
             {/* Essential Personal Data Card */}
-            <div className="bg-gray-50 p-3.5 rounded-2xl border border-gray-200 space-y-2 text-xs">
-              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
+            <div className="bg-gray-50/90 p-3 rounded-2xl border border-gray-200/90 space-y-1.5 text-xs">
+              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
                 <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <MapPin className="w-3.5 h-3.5 text-red-600" /> Branch Dojo:
+                  <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" /> Branch Dojo:
                 </span>
-                <span className="text-gray-900 font-black text-right text-[11px]">
-                  {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch (Head Office)' : activeCardStudent.branch)) || 'Pulikkal Branch (Head Office)'}
+                <span className="text-gray-900 font-black text-right text-[11px] max-w-[180px] truncate">
+                  {activeCardStudent.branch_name || activeCardStudent.branch_detail?.name || (typeof activeCardStudent.branch === 'object' ? activeCardStudent.branch?.name : (String(activeCardStudent.branch || '').length > 20 ? 'Pulikkal Branch' : activeCardStudent.branch)) || 'Pulikkal Branch'}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
+              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
                 <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <Users className="w-3.5 h-3.5 text-blue-600" /> Parent / Guardian:
+                  <Users className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" /> Parent / Guardian:
                 </span>
-                <span className="text-gray-900 font-black text-[11px]">
+                <span className="text-gray-900 font-black text-[11px] text-right truncate">
                   {activeCardStudent.guardianName || activeCardStudent.guardian_name || 'N/A'}
                   {(activeCardStudent.occupation || activeCardStudent.guardian_occupation) && (
-                    <span className="text-[9px] text-amber-800 font-medium block text-right">
+                    <span className="text-[9px] text-amber-800 font-medium ml-1">
                       ({activeCardStudent.occupation || activeCardStudent.guardian_occupation})
                     </span>
                   )}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center pb-1.5 border-b border-gray-200/80">
+              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
                 <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <Phone className="w-3.5 h-3.5 text-emerald-600" /> Contact Phone:
+                  <Phone className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" /> Contact Phone:
                 </span>
                 <span className="text-emerald-800 font-mono font-black text-[11px]">
                   {activeCardStudent.phone || 'N/A'}
                 </span>
               </div>
 
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center pb-1 border-b border-gray-200/70">
                 <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                  <UserCheck className="w-3.5 h-3.5 text-purple-600" /> Age & Gender:
+                  <UserCheck className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" /> Age & Gender:
                 </span>
                 <span className="text-gray-900 font-black text-[11px]">
                   {activeCardStudent.age || 10} Yrs &bull; {activeCardStudent.gender || 'Male'}
@@ -4317,9 +4376,9 @@ export default function StudentManagement() {
               </div>
 
               {(activeCardStudent.bloodGroup || activeCardStudent.blood_group) && (
-                <div className="flex justify-between items-center pt-1.5 border-t border-gray-200/80">
+                <div className="flex justify-between items-center pt-0.5">
                   <span className="text-gray-600 font-bold flex items-center gap-1.5 text-[11px]">
-                    <Heart className="w-3.5 h-3.5 text-rose-600" /> Blood Group:
+                    <Heart className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" /> Blood Group:
                   </span>
                   <span className="text-rose-700 font-black text-[11px] bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 shadow-2xs">
                     🩸 {activeCardStudent.bloodGroup || activeCardStudent.blood_group}
@@ -4328,23 +4387,49 @@ export default function StudentManagement() {
               )}
             </div>
 
-            {/* Action Buttons */}
-            <div className="no-print flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
+            {/* Card Footer Bar */}
+            <div className="text-center pt-1 border-t border-gray-100 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+              Brave Academy of Martial Arts &bull; Kerala State
+            </div>
+
+            {/* Action Buttons (Hidden when printing or exporting) */}
+            <div className="no-print flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => openWhatsApp({ 
                   phone: activeCardStudent.phone, 
                   message: `OSS Cadet ${activeCardStudent.name} (Admission No: ${activeCardStudent.admissionNo || activeCardStudent.admission_no}) - Welcome to B.A.M.A Karate Academy!` 
                 })}
-                className="w-full py-2 px-3 bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl font-black text-xs text-center flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition transform hover:-translate-y-0.5 cursor-pointer"
+                className="w-full py-2 px-3 bg-gradient-to-r from-emerald-600 via-emerald-600 to-green-700 hover:from-emerald-500 hover:to-green-600 text-white rounded-xl font-black text-xs text-center flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition transform hover:-translate-y-0.5 cursor-pointer"
               >
-                <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Parent
+                <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
               </button>
+
               <button
-                onClick={() => window.print()}
-                className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center justify-center gap-2 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
+                type="button"
+                onClick={handleDownloadIdCard}
+                disabled={isDownloadingCard}
+                className="w-full py-2 px-3 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer disabled:opacity-50"
               >
-                <Printer className="w-3.5 h-3.5" /> Print ID Card
+                {isDownloadingCard ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print
               </button>
             </div>
           </div>
