@@ -2333,7 +2333,8 @@ export const getStoredStaff = () => {
         if (Array.isArray(parsed) && parsed.length > 0) {
           parsed.forEach(s => {
             const key = String(s.username || s.id || s.name || '').toLowerCase().trim();
-            if (key) {
+            const isDummy = ['admin', 'instructor', 'branchadmin', 'sensei', 'stf-002', 'stf-003', 'stf-004', 'stf-005'].includes(key);
+            if (key && !isDummy) {
               const existing = staffMap.get(key) || {};
               staffMap.set(key, { ...existing, ...s });
             }

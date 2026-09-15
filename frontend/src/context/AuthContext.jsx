@@ -85,7 +85,8 @@ export const AuthProvider = ({ children }) => {
           if (Array.isArray(parsed) && parsed.length > 0) {
             parsed.forEach(u => {
               const uKey = String(u.username || u.id || u.name || '').toLowerCase().trim();
-              if (uKey) {
+              const isDummy = ['admin', 'instructor', 'branchadmin', 'sensei', 'stf-002', 'stf-003', 'stf-004', 'stf-005'].includes(uKey);
+              if (uKey && !isDummy) {
                 const existing = userMap.get(uKey) || {};
                 userMap.set(uKey, { ...existing, ...u });
               }
