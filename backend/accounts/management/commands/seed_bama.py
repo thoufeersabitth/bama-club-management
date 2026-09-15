@@ -1,3 +1,4 @@
+import os
 from django.core.management.base import BaseCommand
 from accounts.models import User, UserRole
 from branches.models import Branch
@@ -61,8 +62,9 @@ class Command(BaseCommand):
         )
 
         # 2. Create Single Official Super Admin User
+        admin_pass = os.environ.get('INITIAL_ADMIN_PASSWORD', 'BamaAdmin@2026')
         users_data = [
-            ('nafih', 'Pulikkal@1', UserRole.SUPER_ADMIN, 'Sensei Nafih', 'braveacademypkl@gmail.com', '+919544085442', 'PLK-01'),
+            ('nafih', admin_pass, UserRole.SUPER_ADMIN, 'Sensei Nafih', 'braveacademypkl@gmail.com', '+919544085442', 'PLK-01'),
         ]
 
         for username, password, role, name, email, phone, branch_id in users_data:

@@ -354,7 +354,6 @@ export const INITIAL_STAFF = [
     branch: 'Pulikkal Branch (Head Office)',
     phone: '+91 95440 85442',
     email: 'braveacademypkl@gmail.com',
-    password: 'Pulikkal@1',
     salary: '50000',
     joiningDate: '2020-01-01',
     status: 'ACTIVE',
@@ -371,7 +370,6 @@ export const INITIAL_STAFF = [
     branch: 'Pulikkal Branch (Head Office)',
     phone: '+91 95440 85442',
     email: 'admin@bama.org',
-    password: 'Pulikkal@1',
     salary: '45000',
     joiningDate: '2021-01-01',
     status: 'ACTIVE',
@@ -388,7 +386,6 @@ export const INITIAL_STAFF = [
     branch: 'Pulikkal Branch (Head Office)',
     phone: '+91 95440 85442',
     email: 'instructor@bama.org',
-    password: 'Pulikkal@1',
     salary: '30000',
     joiningDate: '2022-01-01',
     status: 'ACTIVE',
@@ -405,7 +402,6 @@ export const INITIAL_STAFF = [
     branch: 'Pulikkal Branch (Head Office)',
     phone: '+91 95440 85442',
     email: 'branchadmin@bama.org',
-    password: 'Pulikkal@1',
     salary: '35000',
     joiningDate: '2022-01-01',
     status: 'ACTIVE',
@@ -422,7 +418,6 @@ export const INITIAL_STAFF = [
     branch: 'Pulikkal Branch (Head Office)',
     phone: '+91 95440 85442',
     email: 'sensei@bama.org',
-    password: 'Pulikkal@1',
     salary: '60000',
     joiningDate: '2019-01-01',
     status: 'ACTIVE',
@@ -440,7 +435,6 @@ export const DEMO_USERS = INITIAL_STAFF.map(s => ({
   branch: s.branch,
   assigned_branch_id: s.assigned_branch_id,
   email: s.email,
-  password: s.password,
   permissions: s.permissions
 }));
 

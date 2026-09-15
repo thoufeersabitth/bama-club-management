@@ -143,13 +143,10 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {}
     }
 
-    // Try backend token authentication as well
+    // Try backend token authentication
     let jwtData = null;
     try {
       jwtData = await loginBackendUser(cleanU, cleanP);
-      if (!jwtData && (cleanP.toLowerCase() === 'pulikkal' || cleanP.toLowerCase() === 'pulikkal@1')) {
-        jwtData = await loginBackendUser(cleanU, 'Pulikkal@1');
-      }
     } catch (e) {}
 
     // Auto-Recovery Fallback: If user is attempting login, gracefully register staff session
@@ -165,7 +162,6 @@ export const AuthProvider = ({ children }) => {
         assigned_branch_id: '4d04730d-8de9-4a3f-9dc4-705b31ef2630',
         phone: '+91 95440 85442',
         email: `${cleanU}@bama.org`,
-        password: cleanP || 'Pulikkal@1',
         permissions: {
           students: true,
           attendance: true,
@@ -180,22 +176,8 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (found) {
-      const expectedPass = String(found.password || '123456').trim();
-      const pLow = cleanP.toLowerCase();
-      const expLow = expectedPass.toLowerCase();
-      const validPass = !cleanP || 
-                        cleanP === expectedPass || 
-                        pLow === expLow ||
-                        pLow === 'pulikkal' ||
-                        pLow === 'pulikkal@1' ||
-                        cleanP === 'Pulikkal' ||
-                        cleanP === 'Pulikkal@1' ||
-                        cleanP === 'admin123' || 
-                        cleanP === 'bama123' || 
-                        cleanP === '123456' || 
-                        cleanP === 'admin' || 
-                        cleanP === cleanU ||
-                        cleanP === '1234';
+      const expectedPass = String(found.password || '').trim();
+      const validPass = Boolean(jwtData) || (expectedPass && cleanP === expectedPass);
 
       if (!validPass && !jwtData) {
         return { success: false, message: 'Invalid Password. Please enter the correct password set by Super Admin.' };
