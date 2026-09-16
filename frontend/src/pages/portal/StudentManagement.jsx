@@ -7,7 +7,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2
 } from 'lucide-react';
-import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend } from '../../services/api';
+import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, importCadetsBackupJSON } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
@@ -214,6 +214,7 @@ export default function StudentManagement() {
 
   // ID Card Download Ref & State
   const idCardRef = useRef(null);
+  const backupFileInputRef = useRef(null);
   const [isDownloadingCard, setIsDownloadingCard] = useState(false);
 
   const handleDownloadIdCard = async () => {
@@ -2542,6 +2543,58 @@ export default function StudentManagement() {
           >
             <Plus className="w-4 h-4" /> <span className="whitespace-nowrap">New Cadet Admission</span>
           </button>
+
+          {/* 1-Click Backup Export & Restore Sync Buttons */}
+          <button
+            type="button"
+            title="ബാക്കപ്പ് ഫയൽ ഡൗൺലോഡ് ചെയ്യുക (Export Cadets Backup)"
+            onClick={() => {
+              const count = exportCadetsBackupJSON();
+              alert(`✅ ബാക്കപ്പ് ഫയൽ ഡൗൺലോഡ് ആയി!\n\nആകെ ${count} കുട്ടികളുടെ വിവരങ്ങൾ സേവ് ചെയ്തിട്ടുണ്ട്.\nഈ ഫയൽ പെൻഡ്രൈവ് വഴിയോ വാട്സാപ്പ് വഴിയോ സെൻസിയുടെ ലാപ്ടോപ്പിലേക്ക് അയച്ചു കൊടുക്കുക.`);
+            }}
+            className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span>Export Backup</span>
+          </button>
+
+          <button
+            type="button"
+            title="ബാക്കപ്പ് ഫയൽ ഇവിടെ റീസ്റ്റോർ ചെയ്യുക (Restore Cadets Backup)"
+            onClick={() => backupFileInputRef.current?.click()}
+            className="px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
+          >
+            <Upload className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+            <span>Restore Backup</span>
+          </button>
+
+          <input
+            type="file"
+            ref={backupFileInputRef}
+            accept=".json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files && e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                try {
+                  const res = importCadetsBackupJSON(event.target.result);
+                  if (res.success) {
+                    const updated = getStoredStudents();
+                    setStudents(updated);
+                    alert(`✅ വിജയകരമായി ${res.count} കുട്ടികളുടെ വിവരങ്ങൾ റീസ്റ്റോർ ചെയ്തു!\n\nഇപ്പോൾ ഈ ലാപ്ടോപ്പിലും 160+ കുട്ടികളുടെ വിവരങ്ങൾ പൂർണ്ണമായി കാണാം.`);
+                  } else {
+                    alert('⚠️ ബാക്കപ്പ് ഫയൽ റീഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല: ' + (res.error || 'Unknown error'));
+                  }
+                } catch (err) {
+                  alert('⚠️ അസാധുവായ ഫയൽ: ' + err.message);
+                }
+              };
+              reader.readAsText(file);
+              e.target.value = '';
+            }}
+          />
 
           <button
             type="button"

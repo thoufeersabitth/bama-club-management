@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Settings, Save, Shield, Key, Database, RefreshCw, CheckCircle2, Camera,
   Image, Sparkles, Sliders, Building2, Phone, Mail, FileText, Lock, Download,
-  MessageSquare, SlidersHorizontal, Check, AlertCircle, Trash2
+  Upload, MessageSquare, SlidersHorizontal, Check, AlertCircle, Trash2
 } from 'lucide-react';
 import { ACADEMY_INFO } from '../../services/initialData';
-import { resetDatabaseToCleanSlate } from '../../services/api';
+import { resetDatabaseToCleanSlate, exportCadetsBackupJSON, importCadetsBackupJSON, getStoredStudents } from '../../services/api';
 
 const DEFAULT_SETTINGS = {
   photo: {
@@ -59,24 +59,12 @@ export default function SettingsPortal() {
     }
   };
 
+  const settingsBackupFileInputRef = useRef(null);
+
   const handleGenerateBackup = () => {
     try {
-      const backupData = {
-        timestamp: new Date().toISOString(),
-        systemSettings: settings,
-        cmsConfig: localStorage.getItem('bama_cms_config') ? JSON.parse(localStorage.getItem('bama_cms_config')) : {},
-        version: '2.5.0-PRO-MAX'
-      };
-
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `BAMA_System_Backup_${new Date().toISOString().slice(0, 10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-
-      setBackupStatus('System JSON Database Backup downloaded successfully!');
+      const count = exportCadetsBackupJSON();
+      setBackupStatus(`Full System & Cadets Backup (${count} students) downloaded successfully!`);
       setTimeout(() => setBackupStatus(null), 4000);
     } catch (err) {
       alert('Error generating backup.');
@@ -426,13 +414,51 @@ export default function SettingsPortal() {
               <p className="text-xs text-gray-600 leading-relaxed font-medium">
                 Download a complete JSON database snapshot containing system settings, website configuration, and cadet roster state.
               </p>
-              <button
-                type="button"
-                onClick={handleGenerateBackup}
-                className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow cursor-pointer hover:from-red-500 hover:to-red-600 transition"
-              >
-                <Download className="w-4 h-4" /> Download System Backup (.json)
-              </button>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleGenerateBackup}
+                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow cursor-pointer hover:from-red-500 hover:to-red-600 transition"
+                >
+                  <Download className="w-4 h-4" /> Download System Backup (.json)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => settingsBackupFileInputRef.current?.click()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow cursor-pointer transition"
+                >
+                  <Upload className="w-4 h-4" /> Restore Backup (.json)
+                </button>
+
+                <input
+                  type="file"
+                  ref={settingsBackupFileInputRef}
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files && e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const res = importCadetsBackupJSON(event.target.result);
+                        if (res.success) {
+                          setBackupStatus(`✅ Successfully restored ${res.count} cadets & system settings!`);
+                          setTimeout(() => setBackupStatus(null), 5000);
+                          alert(`✅ വിജയകരമായി ${res.count} കുട്ടികളുടെ വിവരങ്ങൾ റീസ്റ്റോർ ചെയ്തു!\n\nഡാറ്റാബേസ് അപ്‌ഡേറ്റ് ആയിട്ടുണ്ട്.`);
+                        } else {
+                          alert('⚠️ Failed to restore backup: ' + (res.error || 'Unknown error'));
+                        }
+                      } catch (err) {
+                        alert('⚠️ Invalid backup file: ' + err.message);
+                      }
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
             </div>
 
             <div className="p-5 bg-gray-50 rounded-2xl border border-gray-200 space-y-3">

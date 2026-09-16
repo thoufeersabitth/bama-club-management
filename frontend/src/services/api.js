@@ -672,11 +672,26 @@ export const fetchStudents = async (params = {}) => {
         };
       });
 
-      const serialized = JSON.stringify(normalizedServer);
+      // SMART MERGE: Never lose students that exist in local storage but haven't synced to server yet!
+      const localCadets = getStoredStudents();
+      const serverKeySet = new Set(
+        normalizedServer.map(s => String(s.admissionNo || s.admission_no || s.id || '').toLowerCase().trim()).filter(Boolean)
+      );
+
+      const unsyncedLocals = Array.isArray(localCadets)
+        ? localCadets.filter(c => {
+            const key = String(c.admissionNo || c.admission_no || c.id || '').toLowerCase().trim();
+            return key && !serverKeySet.has(key);
+          })
+        : [];
+
+      const mergedStudents = [...normalizedServer, ...unsyncedLocals];
+
+      const serialized = JSON.stringify(mergedStudents);
       safeLocalStorageSet('bama_students_list', serialized);
-      _studentsCache = normalizedServer;
+      _studentsCache = mergedStudents;
       _studentsCacheTime = Date.now();
-      return normalizedServer;
+      return mergedStudents;
     }
   } catch (err) {
     console.error('Failed to fetch students from live server:', err);
@@ -2539,5 +2554,107 @@ export const openWhatsApp = ({ phone, message, channel }) => {
   window.open(fallbackUrl, '_blank');
 };
 
+/**
+ * 1-Click Universal Backup Export
+ * Packages all cadets, branches, training schedules, and fee settings into a clean JSON file
+ */
+export const exportCadetsBackupJSON = () => {
+  const cadets = getStoredStudents();
+  let branches = [];
+  try {
+    const rawBranches = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+    if (rawBranches) branches = JSON.parse(rawBranches);
+  } catch (e) {}
+
+  let schedules = [];
+  try {
+    const rawSchedules = localStorage.getItem('bama_training_schedules');
+    if (rawSchedules) schedules = JSON.parse(rawSchedules);
+  } catch (e) {}
+
+  const feeSettings = getGlobalFeeSettings();
+
+  const backupData = {
+    app: 'BAMA Club Management',
+    exportVersion: '2.5.0-PRO-MAX',
+    timestamp: new Date().toISOString(),
+    totalCadets: cadets.length,
+    cadets: cadets,
+    branches: branches,
+    schedules: schedules,
+    feeSettings: feeSettings
+  };
+
+  const jsonStr = JSON.stringify(backupData, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.href = url;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  downloadAnchor.download = `BAMA_Cadets_Backup_${cadets.length}_Students_${dateStr}.json`;
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return cadets.length;
+};
+
+/**
+ * 1-Click Universal Backup Restore / Import
+ * Restores cadets, branches, schedules, and fee settings from a JSON file into localStorage and cache
+ */
+export const importCadetsBackupJSON = (jsonString) => {
+  try {
+    const data = JSON.parse(jsonString);
+    let rawCadets = [];
+    if (Array.isArray(data)) {
+      rawCadets = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.cadets)) rawCadets = data.cadets;
+      else if (Array.isArray(data.students)) rawCadets = data.students;
+      else if (Array.isArray(data.roster)) rawCadets = data.roster;
+      else if (Array.isArray(data.results)) rawCadets = data.results;
+
+      // Restore branches if included
+      if (Array.isArray(data.branches) && data.branches.length > 0) {
+        localStorage.setItem('bama_custom_branches', JSON.stringify(data.branches));
+        localStorage.setItem('bama_branches', JSON.stringify(data.branches));
+        invalidateBranchesCache();
+      }
+
+      // Restore training schedules if included
+      if (Array.isArray(data.schedules) && data.schedules.length > 0) {
+        localStorage.setItem('bama_training_schedules', JSON.stringify(data.schedules));
+        invalidateSchedulesCache();
+      }
+
+      // Restore fee settings if included
+      if (data.feeSettings && typeof data.feeSettings === 'object') {
+        saveGlobalFeeSettings(data.feeSettings);
+      }
+    }
+
+    if (!Array.isArray(rawCadets) || rawCadets.length === 0) {
+      return { success: false, error: 'No student records found in backup file.' };
+    }
+
+    // Save and re-normalize
+    saveStoredStudents(rawCadets);
+    invalidateStudentsCache();
+
+    window.dispatchEvent(new Event('bama_data_updated'));
+    window.dispatchEvent(new Event('bama_branches_updated'));
+    window.dispatchEvent(new Event('bama_schedules_updated'));
+    window.dispatchEvent(new Event('bama_fee_settings_updated'));
+
+    return { success: true, count: rawCadets.length };
+  } catch (err) {
+    console.error('Failed to import backup JSON:', err);
+    return { success: false, error: err.message };
+  }
+};
+
 export default api;
+
 
