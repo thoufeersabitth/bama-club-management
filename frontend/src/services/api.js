@@ -2764,6 +2764,51 @@ export const syncAllCadetsToCloud = async (onProgress) => {
     return { success: false, message: 'No cadets found in local storage to sync.' };
   }
 
+  // 0. Pre-sync all branches so students are guaranteed to link to their exact branch
+  const branchMap = new Map();
+  try {
+    const res = await fetch('https://bama-club-api.fly.dev/api/branches/', { cache: 'no-store' });
+    let serverBranches = [];
+    if (res.ok) {
+      const data = await res.json();
+      serverBranches = data.results || (Array.isArray(data) ? data : []);
+    }
+    serverBranches.forEach(b => {
+      if (b.name) branchMap.set(b.name.toLowerCase().trim(), b.id);
+      if (b.code) branchMap.set(b.code.toLowerCase().trim(), b.id);
+    });
+
+    // Check local branches and create any missing ones
+    const localBranches = getStoredBranches();
+    for (const lb of localBranches) {
+      const nameKey = String(lb.name || '').toLowerCase().trim();
+      if (nameKey && !branchMap.has(nameKey) && nameKey !== 'cfgvhbjk' && nameKey !== 'zxcvbnm') {
+        try {
+          const created = await createBranchBackend(lb);
+          if (created && created.id) {
+            branchMap.set(nameKey, created.id);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // Check any custom branch names found directly on cadets
+    for (const c of cadets) {
+      const cBranch = String(c.branch || c.branch_name || '').trim();
+      const cKey = cBranch.toLowerCase();
+      if (cBranch && !branchMap.has(cKey) && !cBranch.includes('-') && cKey !== 'cfgvhbjk' && cKey !== 'zxcvbnm') {
+        try {
+          const created = await createBranchBackend({ name: cBranch, code: `BAMA-${cBranch.slice(0, 3).toUpperCase()}-01` });
+          if (created && created.id) {
+            branchMap.set(cKey, created.id);
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync] Branch pre-sync notice:', err);
+  }
+
   let syncedCount = 0;
   let errorCount = 0;
   const updatedCadets = [];
@@ -2786,9 +2831,14 @@ export const syncAllCadetsToCloud = async (onProgress) => {
         photoUrl = await compressAndUploadCadetPhoto(photoUrl, c.admissionNo || c.admission_no || c.id || `cadet_${i}`);
       }
 
-      // 2. Post to live Supabase API
+      // 2. Resolve exact branch ID
+      const cadetBranchName = String(c.branch_name || c.branch || '').toLowerCase().trim();
+      const matchedBranchId = branchMap.get(cadetBranchName) || c.branch;
+
+      // 3. Post to live Supabase API
       const payload = {
         ...c,
+        branch: matchedBranchId,
         photo: photoUrl
       };
 

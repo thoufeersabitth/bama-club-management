@@ -1,4 +1,5 @@
 import uuid
+import random
 from rest_framework import serializers
 from .models import Student
 from branches.models import Branch
@@ -101,17 +102,40 @@ class StudentSerializer(serializers.ModelSerializer):
             # 4. Try fuzzy name lookup
             if not branch_obj and isinstance(branch_val, str):
                 b_str = branch_val.strip().lower()
-                if 'chungam' in b_str or b_str == '2' or 'dojo-02' in b_str:
+                if 'kick boxing' in b_str or 'kbp' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='kick boxing').first()
+                elif 'chungam' in b_str or b_str == '2' or 'dojo-02' in b_str:
                     branch_obj = Branch.objects.filter(name__icontains='chungam').first()
                 elif 'mongam' in b_str or b_str == '3' or 'dojo-03' in b_str:
                     branch_obj = Branch.objects.filter(name__icontains='mongam').first()
                 elif 'feroke' in b_str or b_str == '4':
                     branch_obj = Branch.objects.filter(name__icontains='feroke').first()
                 elif 'pulikkal' in b_str or b_str == '1' or 'dojo-01' in b_str:
-                    branch_obj = Branch.objects.filter(name__icontains='pulikkal').first()
+                    branch_obj = Branch.objects.filter(name__icontains='pulikkal', is_head_office=True).first() or Branch.objects.filter(name__icontains='pulikkal').first()
                 else:
                     branch_obj = Branch.objects.filter(name__icontains=b_str).first()
-            
+
+            # 5. If branch still not found and valid custom branch name was supplied, auto-create it
+            if not branch_obj and isinstance(branch_val, str) and branch_val.strip():
+                clean_name = branch_val.strip()
+                if clean_name.lower() not in ['cfgvhbjk', 'zxcvbnm', 'null', 'undefined', 'none']:
+                    try:
+                        clean_prefix = ''.join([c for c in clean_name if c.isalnum()][:4]).upper() or "BAMA"
+                        clean_code = f"BAMA-{clean_prefix}-{random.randint(10, 999)}"
+                        branch_obj = Branch.objects.create(
+                            name=clean_name,
+                            code=clean_code,
+                            address='Kerala, India',
+                            phone='+91 95440 85442',
+                            whatsapp='+91 95440 85442',
+                            email='info@bama.org',
+                            branch_head='Sensei Abdul Rahman',
+                            is_head_office=False,
+                            status='Active'
+                        )
+                    except Exception as e:
+                        branch_obj = None
+
             if branch_obj:
                 data['branch'] = str(branch_obj.id)
             else:
