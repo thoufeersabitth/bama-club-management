@@ -641,11 +641,11 @@ export const fetchStudents = async (params = {}) => {
       fetchWithTimeout(url.toString(), {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      }, 4500),
+      }, 12000),
       fetchWithTimeout(`https://bama-club-api.fly.dev/api/announcements/?category=DELETED_STUDENT&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
-      }, 4500)
+      }, 12000)
     ]);
 
     if (delRes && delRes.ok) {

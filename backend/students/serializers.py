@@ -3,10 +3,14 @@ import random
 from rest_framework import serializers
 from .models import Student
 from branches.models import Branch
-from branches.serializers import BranchSerializer
+
+class StudentBranchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Branch
+        fields = ['id', 'name', 'code', 'is_head_office', 'address', 'phone']
 
 class StudentSerializer(serializers.ModelSerializer):
-    branch_detail = BranchSerializer(source='branch', read_only=True)
+    branch_detail = StudentBranchSerializer(source='branch', read_only=True)
     branch_name = serializers.SerializerMethodField()
     branch_id = serializers.UUIDField(source='branch.id', read_only=True)
 
