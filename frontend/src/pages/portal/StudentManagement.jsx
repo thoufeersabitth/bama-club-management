@@ -2900,7 +2900,14 @@ export default function StudentManagement() {
                     </span>
                   </td>
                   <td className="py-4 px-5 text-gray-700 font-bold text-xs">
-                    {std.branch_name || std.branch_detail?.name || (typeof std.branch === 'object' ? std.branch?.name : (String(std.branch || '').length > 20 ? 'Pulikkal Branch (Head Office)' : std.branch)) || 'Pulikkal Branch (Head Office)'}
+                    {(() => {
+                      const bVal = std.branch_name || std.branch_detail?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch);
+                      if (bVal && !bVal.includes('-')) return bVal;
+                      const matched = branchesList.find(b => b.id === bVal || b.name === bVal || b.code === bVal);
+                      if (matched && matched.name) return matched.name;
+                      if (bVal && !bVal.match(/^[0-9a-f]{8}-/i)) return bVal;
+                      return 'Pulikkal Branch (Head Office)';
+                    })()}
                   </td>
                   <td className="py-4 px-5">
                     {(() => {

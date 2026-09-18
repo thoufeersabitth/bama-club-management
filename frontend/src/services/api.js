@@ -706,7 +706,10 @@ export const fetchStudents = async (params = {}) => {
       });
 
       const normalizedServer = filteredServer.map(s => {
-        const sBranchName = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal Branch (Head Office)';
+        const sRawBranch = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch);
+        const sBranchName = (sRawBranch && !sRawBranch.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))
+          ? sRawBranch
+          : 'Pulikkal Branch (Head Office)';
         const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
 
         const adm = s.admissionNo || s.admission_no || '';
