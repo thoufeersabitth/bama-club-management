@@ -5,9 +5,9 @@ import {
   X, Check, Shield, Award, MapPin, Phone, Mail, FileText,
   Calendar, CreditCard, MessageSquare, UserCheck, Upload, Camera, Image as ImageIcon,
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
-  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, Zap
+  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2
 } from 'lucide-react';
-import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, importCadetsBackupJSON, syncAllCadetsToCloud } from '../../services/api';
+import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
@@ -214,38 +214,7 @@ export default function StudentManagement() {
 
   // ID Card Download Ref & State
   const idCardRef = useRef(null);
-  const backupFileInputRef = useRef(null);
   const [isDownloadingCard, setIsDownloadingCard] = useState(false);
-  const [cloudSyncState, setCloudSyncState] = useState(null);
-
-  const handleSyncToCloud = async () => {
-    if (!window.confirm('⚡ നിങ്ങളുടെ ലാപ്ടോപ്പിലുള്ള 160+ കുട്ടികളെയും ഫോട്ടോകളെയും സുരക്ഷിതമായി Supabase ക്ലൗഡിലേക്ക് സിങ്ക് ചെയ്യട്ടെ? (ഓട്ടോമാറ്റിക് ബാക്കപ്പും എടുക്കും).')) {
-      return;
-    }
-
-    try {
-      // 1. Safe auto backup to PC first
-      exportCadetsBackupJSON();
-
-      // 2. Start sync
-      setCloudSyncState({ current: 0, total: students.length, percent: 0, studentName: 'ആരംഭിക്കുന്നു...' });
-      const res = await syncAllCadetsToCloud((prog) => {
-        setCloudSyncState(prog);
-      });
-
-      setCloudSyncState(null);
-      if (res.success) {
-        const fresh = getStoredStudents();
-        setStudents(fresh);
-        alert(`🎉 അഭിനന്ദനങ്ങൾ! വിജയകരമായി ${res.synced} കുട്ടികളുടെ വിവരങ്ങളും ഫോട്ടോകളും Supabase ക്ലൗഡിൽ സ്ഥിരമായി സേവ് ചെയ്തു!\n\nഇനി സെൻസിയുടെ ലാപ്ടോപ്പിലും നിങ്ങളുടെ ഫോണിലും എവിടെ ലോഗിൻ ചെയ്താലും ഉടൻ തന്നെ എല്ലാ കുട്ടികളും വരും!`);
-      } else {
-        alert('⚠️ സിങ്ക് ചെയ്യുമ്പോൾ ഒരു പ്രശ്നമുണ്ടായി: ' + (res.message || 'Error'));
-      }
-    } catch (err) {
-      setCloudSyncState(null);
-      alert('⚠️ സിങ്ക് പരാജയപ്പെട്ടു: ' + err.message);
-    }
-  };
 
   const handleDownloadIdCard = async () => {
     if (!idCardRef.current || !activeCardStudent) return;
@@ -2588,55 +2557,6 @@ export default function StudentManagement() {
             <span>Export Backup</span>
           </button>
 
-          <button
-            type="button"
-            title="ബാക്കപ്പ് ഫയൽ ഇവിടെ റീസ്റ്റോർ ചെയ്യുക (Restore Cadets Backup)"
-            onClick={() => backupFileInputRef.current?.click()}
-            className="px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
-          >
-            <Upload className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-            <span>Restore Backup</span>
-          </button>
-
-          {/* ⚡ 1-Click Cloud Sync to Supabase */}
-          <button
-            type="button"
-            title="എല്ലാ കുട്ടികളുടെയും വിവരങ്ങളും ഫോട്ടോകളും സ്ഥിരമായി Supabase ക്ലൗഡിലേക്ക് സിങ്ക് ചെയ്യുക (1-Click Permanent Cloud Sync)"
-            onClick={handleSyncToCloud}
-            disabled={cloudSyncState !== null}
-            className="px-3.5 py-2.5 bg-gradient-to-r from-indigo-600 via-indigo-600 to-purple-700 hover:from-indigo-500 hover:to-purple-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md shadow-indigo-600/20 whitespace-nowrap disabled:opacity-50"
-          >
-            <Zap className="w-3.5 h-3.5 text-yellow-300 flex-shrink-0 fill-yellow-300" />
-            <span>⚡ Sync to Cloud</span>
-          </button>
-
-          <input
-            type="file"
-            ref={backupFileInputRef}
-            accept=".json"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files && e.target.files[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                try {
-                  const res = importCadetsBackupJSON(event.target.result);
-                  if (res.success) {
-                    const updated = getStoredStudents();
-                    setStudents(updated);
-                    alert(`✅ വിജയകരമായി ${res.count} കുട്ടികളുടെ വിവരങ്ങൾ റീസ്റ്റോർ ചെയ്തു!\n\nഇപ്പോൾ ഈ ലാപ്ടോപ്പിലും 160+ കുട്ടികളുടെ വിവരങ്ങൾ പൂർണ്ണമായി കാണാം.`);
-                  } else {
-                    alert('⚠️ ബാക്കപ്പ് ഫയൽ റീഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല: ' + (res.error || 'Unknown error'));
-                  }
-                } catch (err) {
-                  alert('⚠️ അസാധുവായ ഫയൽ: ' + err.message);
-                }
-              };
-              reader.readAsText(file);
-              e.target.value = '';
-            }}
-          />
 
           <button
             type="button"
@@ -4942,38 +4862,7 @@ export default function StudentManagement() {
         </div>
       )}
 
-      {/* MODAL: Cloud Sync Progress */}
-      {cloudSyncState && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl border border-indigo-100 flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 mb-4 shadow-inner">
-              <Loader2 className="w-8 h-8 animate-spin" />
-            </div>
-            <h3 className="text-lg font-black text-gray-900 mb-1">
-              ⚡ ക്ലൗഡിലേക്ക് സിങ്ക് ചെയ്യുന്നു...
-            </h3>
-            <p className="text-xs text-gray-500 mb-4 font-medium leading-relaxed">
-              കുട്ടികളുടെ വിവരങ്ങളും ഫോട്ടോകളും ചുരുക്കി Supabase ക്ലൗഡിൽ സ്ഥിരമായി സൂക്ഷിക്കുന്നു. ദയവായി കാത്തിരിക്കൂ...
-            </p>
 
-            <div className="w-full bg-gray-100 rounded-full h-3.5 mb-2 overflow-hidden border border-gray-200">
-              <div
-                className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 h-full rounded-full transition-all duration-300"
-                style={{ width: `${cloudSyncState.percent || 0}%` }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between w-full text-xs font-black text-gray-700 mb-3 px-1">
-              <span>{cloudSyncState.current} / {cloudSyncState.total} കുട്ടികൾ</span>
-              <span className="text-indigo-600 font-black text-sm">{cloudSyncState.percent || 0}%</span>
-            </div>
-
-            <div className="text-xs text-indigo-900 bg-indigo-50/70 px-3 py-2 rounded-xl border border-indigo-100 w-full truncate font-bold">
-              🥋 {cloudSyncState.studentName || 'പ്രോസസ്സ് ചെയ്യുന്നു...'}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL: Promote Cadet Belt Rank & Issue Certificate */}
       {renderPromoteModal()}

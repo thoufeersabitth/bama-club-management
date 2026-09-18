@@ -120,8 +120,8 @@ export default function BranchManagement() {
         const img = new Image();
         img.onload = async () => {
           try {
-            const targetWidth = 640;
-            const targetHeight = 360; // Standard 16:9 widescreen banner
+            const targetWidth = 560;
+            const targetHeight = 315; // Standard 16:9 widescreen banner optimized for ~20KB
             const targetAspect = targetWidth / targetHeight;
             const sourceAspect = img.width / img.height;
 
@@ -147,10 +147,13 @@ export default function BranchManagement() {
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
 
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+            let compressedDataUrl = canvas.toDataURL('image/webp', 0.76);
+            if (!compressedDataUrl.startsWith('data:image/webp')) {
+              compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+            }
 
-            // Plan 1: Upload to ultra-fast global Cloud CDN with 50ms edge delivery
-            const cdnUrl = await uploadImageToCdn(compressedDataUrl, `branch_${Date.now()}.jpg`);
+            // Upload directly to Supabase CDN (~20KB WebP)
+            const cdnUrl = await uploadImageToCdn(compressedDataUrl, `branch_${Date.now()}.webp`);
             const finalImage = (cdnUrl && cdnUrl.startsWith('http')) ? cdnUrl : compressedDataUrl;
             callback(finalImage);
           } catch (err) {

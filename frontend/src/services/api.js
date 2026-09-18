@@ -99,6 +99,107 @@ export const compressAndUploadCadetPhoto = async (photoSrc, cadetIdentifier = 'c
   return photoSrc;
 };
 
+/**
+ * Automatically compress any branch image into a lightweight ~20KB WebP photo (16:9 banner)
+ * and upload directly to Supabase Storage bucket. Returns public CDN URL.
+ */
+export const compressAndUploadBranchPhoto = async (photoSrc, branchIdentifier = 'branch') => {
+  if (!photoSrc) return '';
+  if (typeof photoSrc === 'string' && (photoSrc.startsWith('http://') || photoSrc.startsWith('https://'))) {
+    return photoSrc;
+  }
+
+  try {
+    const compressedBlob = await new Promise((resolve) => {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        // Standard 16:9 widescreen banner dimensions, optimized for ~20KB WebP
+        const targetWidth = 560;
+        const targetHeight = 315;
+        const targetAspect = targetWidth / targetHeight;
+        const sourceAspect = img.width / img.height;
+
+        let sx = 0;
+        let sy = 0;
+        let sWidth = img.width;
+        let sHeight = img.height;
+
+        if (sourceAspect > targetAspect) {
+          sWidth = Math.round(img.height * targetAspect);
+          sx = Math.round((img.width - sWidth) / 2);
+        } else {
+          sHeight = Math.round(img.width / targetAspect);
+          sy = Math.round((img.height - sHeight) / 2);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+
+        // Compress to WebP targeting ~20KB
+        canvas.toBlob((blob) => {
+          if (blob) {
+            if (blob.size > 25000) {
+              // If slightly above 25KB, step down quality to strictly keep it ~20KB
+              canvas.toBlob((smallerBlob) => {
+                resolve(smallerBlob || blob);
+              }, 'image/webp', 0.65);
+            } else {
+              resolve(blob);
+            }
+          } else {
+            canvas.toBlob((jpgBlob) => resolve(jpgBlob), 'image/jpeg', 0.72);
+          }
+        }, 'image/webp', 0.76);
+      };
+
+      img.onerror = () => resolve(null);
+
+      if (typeof photoSrc === 'string') {
+        img.src = photoSrc;
+      } else if (photoSrc instanceof Blob) {
+        const reader = new FileReader();
+        reader.onload = (e) => { img.src = e.target.result; };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(photoSrc);
+      } else {
+        resolve(null);
+      }
+    });
+
+    if (!compressedBlob) return typeof photoSrc === 'string' ? photoSrc : '';
+
+    const cleanId = String(branchIdentifier).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    const filename = `branch_${cleanId}_${Date.now()}.webp`;
+    const uploadUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/${SUPABASE_CONFIG.bucket}/${filename}`;
+
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'image/webp',
+        'x-upsert': 'true'
+      },
+      body: compressedBlob
+    });
+
+    if (res.ok) {
+      const publicCdnUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${filename}`;
+      return publicCdnUrl;
+    }
+  } catch (err) {
+    console.warn('[Storage] Branch photo compression/upload fallback:', err);
+  }
+
+  return typeof photoSrc === 'string' ? photoSrc : '';
+};
+
 const DUMMY_EXACT_IDS = ['std-101', 'std-102', 'std-103', 'std-104', 'std-105'];
 const DUMMY_ADMISSIONS = ['bama-2024-001', 'bama-2024-002', 'bama-2024-003', 'bama-2024-004', 'bama-2024-005'];
 
@@ -1126,51 +1227,16 @@ export const getStoredBranches = () => {
   return INITIAL_BRANCHES;
 };
 
-// Upload an image (base64 dataUrl or File blob) to high-speed global CDN with 50ms edge delivery
-export const uploadImageToCdn = async (imageDataUrlOrFile, filename = 'bama_branch.jpg') => {
+// Upload an image (base64 dataUrl or File blob) directly to Supabase Storage CDN (~20KB WebP)
+export const uploadImageToCdn = async (imageDataUrlOrFile, filename = 'bama_branch.webp') => {
   try {
-    let blob;
-    if (imageDataUrlOrFile instanceof Blob) {
-      blob = imageDataUrlOrFile;
-    } else if (typeof imageDataUrlOrFile === 'string' && imageDataUrlOrFile.startsWith('data:image/')) {
-      const parts = imageDataUrlOrFile.split(',');
-      const mimeMatch = parts[0].match(/:(.*?);/);
-      const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-      const byteString = atob(parts[1]);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-      }
-      blob = new Blob([ab], { type: mimeType });
-    } else if (typeof imageDataUrlOrFile === 'string' && imageDataUrlOrFile.startsWith('http')) {
-      return imageDataUrlOrFile;
-    }
-
-    if (blob) {
-      const fd = new FormData();
-      fd.append('reqtype', 'fileupload');
-      fd.append('fileToUpload', blob, filename);
-
-      const ac = new AbortController();
-      const timer = setTimeout(() => ac.abort(), 7000);
-
-      const res = await fetch('https://catbox.moe/user/api.php', {
-        method: 'POST',
-        body: fd,
-        signal: ac.signal
-      });
-      clearTimeout(timer);
-
-      if (res.ok) {
-        const cdnUrl = await res.text();
-        if (cdnUrl && cdnUrl.startsWith('http')) {
-          return cdnUrl.trim();
-        }
-      }
+    const cleanName = String(filename || 'branch').replace(/\.[^/.]+$/, "");
+    const cdnUrl = await compressAndUploadBranchPhoto(imageDataUrlOrFile, cleanName);
+    if (cdnUrl && cdnUrl.startsWith('http')) {
+      return cdnUrl;
     }
   } catch (e) {
-    console.warn('Fast CDN upload fell back to local optimized storage:', e?.message);
+    console.warn('[Storage] Fast CDN upload fell back to local image data:', e?.message);
   }
   return typeof imageDataUrlOrFile === 'string' ? imageDataUrlOrFile : null;
 };
@@ -1256,6 +1322,15 @@ export const getBranchPhotoUrl = (b) => {
 export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = '', branchName = '') => {
   if (!isValidBranchImage(imageUrl)) return;
   try {
+    let finalImageUrl = imageUrl;
+    // Auto-compress base64 to ~20KB WebP and upload directly to Supabase Storage bucket
+    if (typeof finalImageUrl === 'string' && finalImageUrl.startsWith('data:image')) {
+      const cdnUrl = await compressAndUploadBranchPhoto(finalImageUrl, branchCode || branchId || branchName || 'branch');
+      if (cdnUrl && cdnUrl.startsWith('http')) {
+        finalImageUrl = cdnUrl;
+      }
+    }
+
     const idKey = branchId ? String(branchId).toLowerCase().trim() : '';
     const codeKey = branchCode ? String(branchCode).toUpperCase().trim() : '';
     const nameKey = branchName ? String(branchName).toLowerCase().trim() : '';
@@ -1266,12 +1341,12 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
       localImages = JSON.parse(localStorage.getItem('bama_branch_images') || '{}');
     } catch (e) {}
     
-    if (branchId) localImages[String(branchId)] = imageUrl;
-    if (idKey) localImages[idKey] = imageUrl;
-    if (branchCode) localImages[String(branchCode)] = imageUrl;
-    if (codeKey) localImages[codeKey] = imageUrl;
-    if (branchName) localImages[String(branchName)] = imageUrl;
-    if (nameKey) localImages[nameKey] = imageUrl;
+    if (branchId) localImages[String(branchId)] = finalImageUrl;
+    if (idKey) localImages[idKey] = finalImageUrl;
+    if (branchCode) localImages[String(branchCode)] = finalImageUrl;
+    if (codeKey) localImages[codeKey] = finalImageUrl;
+    if (branchName) localImages[String(branchName)] = finalImageUrl;
+    if (nameKey) localImages[nameKey] = finalImageUrl;
     try {
       localStorage.setItem('bama_branch_images', JSON.stringify(localImages));
     } catch (e) {}
@@ -1285,7 +1360,7 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
                           (codeKey && String(b.code || '').toUpperCase().trim() === codeKey) ||
                           (nameKey && String(b.name || '').toLowerCase().trim() === nameKey);
           if (isMatch) {
-            return { ...b, image: imageUrl, img: imageUrl, photo: imageUrl };
+            return { ...b, image: finalImageUrl, img: finalImageUrl, photo: finalImageUrl };
           }
           return b;
         });
@@ -1321,7 +1396,7 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
           await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' }),
+            body: JSON.stringify({ answer: finalImageUrl, category: 'BRANCH_PHOTO' }),
             signal: acPost.signal
           }).catch(() => {});
         } else {
@@ -1330,7 +1405,7 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({
               question: tQ,
-              answer: imageUrl,
+              answer: finalImageUrl,
               category: 'BRANCH_PHOTO',
               order: 999
             }),
@@ -1345,12 +1420,12 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
 
     // B) Central cms-config branch_images registry in PostgreSQL
     const imagesToMerge = {};
-    if (branchId) imagesToMerge[String(branchId)] = imageUrl;
-    if (idKey) imagesToMerge[idKey] = imageUrl;
-    if (branchCode) imagesToMerge[String(branchCode)] = imageUrl;
-    if (codeKey) imagesToMerge[codeKey] = imageUrl;
-    if (branchName) imagesToMerge[String(branchName)] = imageUrl;
-    if (nameKey) imagesToMerge[nameKey] = imageUrl;
+    if (branchId) imagesToMerge[String(branchId)] = finalImageUrl;
+    if (idKey) imagesToMerge[idKey] = finalImageUrl;
+    if (branchCode) imagesToMerge[String(branchCode)] = finalImageUrl;
+    if (codeKey) imagesToMerge[codeKey] = finalImageUrl;
+    if (branchName) imagesToMerge[String(branchName)] = finalImageUrl;
+    if (nameKey) imagesToMerge[nameKey] = finalImageUrl;
     await syncAllBranchImagesBackend(imagesToMerge).catch(() => {});
 
     invalidateBranchesCache();
