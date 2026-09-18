@@ -7,7 +7,7 @@ import {
   PieChart, Activity, UserPlus, Check, Star, Sparkles, Flame, LogIn, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { fetchStudents, fetchFees, getStoredStudents } from '../../services/api';
+import { fetchStudents, fetchFees, getStoredStudents, getStandardBranchName } from '../../services/api';
 import { INITIAL_BRANCHES } from '../../services/initialData';
 import { buildRealDatabaseActivities } from '../../services/activityLogger';
 
@@ -29,20 +29,22 @@ export default function DashboardPortal() {
 
   const getBranchKey = (item) => {
     if (!item) return 'pulikkal';
-    const rawBranch = item.branch_name || item.branch || item.branchName || item.dojo_branch || item.dojoBranch || item.branch_detail?.name || (typeof item.branch === 'object' ? item.branch?.name : '') || '';
-    const bId = item.branch_id || (typeof item.branch === 'object' ? item.branch?.id : null) || '';
-    const bStr = (String(rawBranch) + ' ' + String(bId) + ' ' + String(item.branch || '')).toLowerCase().trim();
+    const rawBranch = item.branch_name || item.branch || item.branchName || item.dojo_branch || item.dojoBranch || item.branch_detail?.name || (typeof item.branch === 'object' ? item.branch?.name : '') || item.branch_id || (item.shift ? String(item.shift).split('(')[0] : '');
+    const norm = getStandardBranchName(rawBranch);
+    const bStr = String(norm).toLowerCase().trim();
     if (bStr.includes('kick')) return 'kickboxing';
-    if (bStr.includes('pengad') || bStr.includes('btmamups')) return 'pengad';
-    if (bStr.includes('airport')) return 'airport';
-    if (bStr.includes('neerad') || bStr.includes('amlps')) return 'neerad';
+    if (bStr.includes('chanda') || bStr.includes('gmup')) return 'chanda';
     if (bStr.includes('ansar')) return 'ansar';
-    if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02') || bStr.includes('20c924cd')) return 'chungam';
-    if (bStr.includes('mongam') || bStr.includes('dojo-03') || bStr.includes('d4639193')) return 'mongam';
-    if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
-    if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('dojo-01') || bStr.includes('283e0cc2')) return 'pulikkal';
-    if (rawBranch.length > 0) return rawBranch.toLowerCase();
-    return 'pulikkal';
+    if (bStr.includes('kanjiraparaba') || bStr.includes('gmlp')) return 'kanjiraparaba';
+    if (bStr.includes('pengad') || bStr.includes('btmamups') || bStr.includes('btamup')) return 'pengad';
+    if (bStr.includes('ganapath')) return 'ganapath';
+    if (bStr.includes('airport')) return 'airport';
+    if (bStr.includes('neerad') || bStr.includes('amlps') || bStr.includes('amlp')) return 'neerad';
+    if (bStr.includes('chungam') || bStr.includes('cgm')) return 'chungam';
+    if (bStr.includes('mongam')) return 'mongam';
+    if (bStr.includes('feroke') || bStr.includes('frk')) return 'feroke';
+    if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('head office')) return 'pulikkal';
+    return bStr;
   };
 
   const matchesActiveBranch = (item) => {
@@ -51,14 +53,17 @@ export default function DashboardPortal() {
 
     const itemKey = getBranchKey(item);
     if (scopeLower.includes('kick')) return itemKey === 'kickboxing';
-    if (scopeLower.includes('pengad') || scopeLower.includes('btmamups')) return itemKey === 'pengad';
-    if (scopeLower.includes('airport')) return itemKey === 'airport';
-    if (scopeLower.includes('neerad') || scopeLower.includes('amlps')) return itemKey === 'neerad';
+    if (scopeLower.includes('chanda') || scopeLower.includes('gmup')) return itemKey === 'chanda';
     if (scopeLower.includes('ansar')) return itemKey === 'ansar';
-    if (scopeLower.includes('chungam') || scopeLower.includes('cgm') || scopeLower.includes('dojo-02') || scopeLower.includes('20c924cd')) return itemKey === 'chungam';
-    if (scopeLower.includes('mongam') || scopeLower.includes('dojo-03') || scopeLower.includes('d4639193')) return itemKey === 'mongam';
-    if (scopeLower.includes('feroke') || scopeLower.includes('dojo-04') || scopeLower.includes('5f429f1f')) return itemKey === 'feroke';
-    if (scopeLower.includes('pulikkal') || scopeLower.includes('plk') || scopeLower.includes('dojo-01') || scopeLower.includes('283e0cc2')) return itemKey === 'pulikkal';
+    if (scopeLower.includes('kanjiraparaba') || scopeLower.includes('gmlp')) return itemKey === 'kanjiraparaba';
+    if (scopeLower.includes('pengad') || scopeLower.includes('btmamups') || scopeLower.includes('btamup')) return itemKey === 'pengad';
+    if (scopeLower.includes('ganapath')) return itemKey === 'ganapath';
+    if (scopeLower.includes('airport')) return itemKey === 'airport';
+    if (scopeLower.includes('neerad') || scopeLower.includes('amlps') || scopeLower.includes('amlp')) return itemKey === 'neerad';
+    if (scopeLower.includes('chungam') || scopeLower.includes('cgm')) return itemKey === 'chungam';
+    if (scopeLower.includes('mongam')) return itemKey === 'mongam';
+    if (scopeLower.includes('feroke') || scopeLower.includes('frk')) return itemKey === 'feroke';
+    if (scopeLower.includes('pulikkal') || scopeLower.includes('plk') || scopeLower.includes('head office')) return itemKey === 'pulikkal';
     
     if (item.branch_id && String(item.branch_id).toLowerCase() === scopeLower) return true;
     if (item.branch && String(item.branch).toLowerCase() === scopeLower) return true;

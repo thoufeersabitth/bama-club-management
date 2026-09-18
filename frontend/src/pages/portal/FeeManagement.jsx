@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Search, DollarSign, Printer, CheckCircle2, FileText, X, AlertCircle, MessageSquare, Calendar, Filter, CheckSquare, Square, Send, Check, Zap, ExternalLink, Clock, Settings } from 'lucide-react';
-import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
+import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
 import { ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions, INITIAL_BRANCHES } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -522,18 +522,26 @@ export default function FeeManagement() {
     setQueueIndex(prev => prev + 1);
   };
 
-  // Filter Fees with 100% Precision
+  // Filter Fees with 100% Precision across all 11 branches
   const filteredFees = fees.filter(f => {
     const std = f.student_detail || {};
     const getCadetBranchKey = (cadet) => {
-      const rawBranch = cadet.branch_name || cadet.branch_detail?.name || cadet.branchName || (typeof cadet.branch === 'object' ? cadet.branch?.name : cadet.branch) || '';
-      const bStr = (String(rawBranch) + ' ' + String(cadet.branch_id || '')).toLowerCase();
+      const rawBranch = cadet.branch_name || cadet.branch_detail?.name || cadet.branchName || (typeof cadet.branch === 'object' ? cadet.branch?.name : cadet.branch) || cadet.branch_id || (cadet.shift ? String(cadet.shift).split('(')[0] : '');
+      const norm = getStandardBranchName(rawBranch, branchesList);
+      const bStr = String(norm).toLowerCase().trim();
       if (bStr.includes('kick')) return 'kickboxing';
-      if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02') || bStr.includes('20c924cd')) return 'chungam';
-      if (bStr.includes('mongam') || bStr.includes('dojo-03') || bStr.includes('d4639193')) return 'mongam';
-      if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
-      if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('dojo-01') || bStr.includes('283e0cc2')) return 'pulikkal';
-      return rawBranch ? String(rawBranch).toLowerCase().trim() : '';
+      if (bStr.includes('chanda') || bStr.includes('gmup')) return 'chanda';
+      if (bStr.includes('ansar')) return 'ansar';
+      if (bStr.includes('kanjiraparaba') || bStr.includes('gmlp')) return 'kanjiraparaba';
+      if (bStr.includes('pengad') || bStr.includes('btmamups') || bStr.includes('btamup')) return 'pengad';
+      if (bStr.includes('ganapath')) return 'ganapath';
+      if (bStr.includes('airport')) return 'airport';
+      if (bStr.includes('neerad') || bStr.includes('amlps') || bStr.includes('amlp')) return 'neerad';
+      if (bStr.includes('chungam') || bStr.includes('cgm')) return 'chungam';
+      if (bStr.includes('mongam')) return 'mongam';
+      if (bStr.includes('feroke') || bStr.includes('frk')) return 'feroke';
+      if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('head office')) return 'pulikkal';
+      return bStr;
     };
 
     const cadetBranchKey = getCadetBranchKey(std);
@@ -541,10 +549,17 @@ export default function FeeManagement() {
     if (!matchesBranch) {
       const selStr = String(selectedBranch).toLowerCase().trim();
       if (selStr.includes('kick')) matchesBranch = (cadetBranchKey === 'kickboxing');
-      else if (selStr.includes('pulikkal') || selStr.includes('plk') || selStr.includes('dojo-01') || selStr.includes('283e0cc2')) matchesBranch = (cadetBranchKey === 'pulikkal');
-      else if (selStr.includes('chungam') || selStr.includes('cgm') || selStr.includes('dojo-02') || selStr.includes('20c924cd')) matchesBranch = (cadetBranchKey === 'chungam');
-      else if (selStr.includes('mongam') || selStr.includes('dojo-03') || selStr.includes('d4639193')) matchesBranch = (cadetBranchKey === 'mongam');
-      else if (selStr.includes('feroke') || selStr.includes('dojo-04') || selStr.includes('5f429f1f')) matchesBranch = (cadetBranchKey === 'feroke');
+      else if (selStr.includes('chanda') || selStr.includes('gmup')) matchesBranch = (cadetBranchKey === 'chanda');
+      else if (selStr.includes('ansar')) matchesBranch = (cadetBranchKey === 'ansar');
+      else if (selStr.includes('kanjiraparaba') || selStr.includes('gmlp')) matchesBranch = (cadetBranchKey === 'kanjiraparaba');
+      else if (selStr.includes('pengad') || selStr.includes('btmamups') || selStr.includes('btamup')) matchesBranch = (cadetBranchKey === 'pengad');
+      else if (selStr.includes('ganapath')) matchesBranch = (cadetBranchKey === 'ganapath');
+      else if (selStr.includes('airport')) matchesBranch = (cadetBranchKey === 'airport');
+      else if (selStr.includes('neerad') || selStr.includes('amlps') || selStr.includes('amlp')) matchesBranch = (cadetBranchKey === 'neerad');
+      else if (selStr.includes('chungam') || selStr.includes('cgm')) matchesBranch = (cadetBranchKey === 'chungam');
+      else if (selStr.includes('mongam')) matchesBranch = (cadetBranchKey === 'mongam');
+      else if (selStr.includes('feroke') || selStr.includes('frk')) matchesBranch = (cadetBranchKey === 'feroke');
+      else if (selStr.includes('pulikkal') || selStr.includes('plk') || selStr.includes('head office')) matchesBranch = (cadetBranchKey === 'pulikkal');
       else {
         const cadetBranchName = String(std.branch_name || std.branch || std.branch_id || '').toLowerCase().trim();
         matchesBranch = (cadetBranchKey === selStr || cadetBranchName.includes(selStr) || selStr.includes(cadetBranchName) || String(std.branch_id) === String(selectedBranch));

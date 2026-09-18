@@ -3,7 +3,7 @@ import {
   BarChart3, Download, FileSpreadsheet, FileText, Calendar, Filter,
   Users, CreditCard, CalendarCheck, Award, Building2, TrendingUp, CheckCircle2, DollarSign, AlertCircle, Clock, Check, RefreshCw, Briefcase, BookOpen, Trash2
 } from 'lucide-react';
-import { fetchStudents, fetchFees, getStoredStaff, fetchBranches } from '../../services/api';
+import { fetchStudents, fetchFees, getStoredStaff, fetchBranches, getStandardBranchName } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -191,7 +191,8 @@ export default function ReportsAnalytics() {
 
   // Filtered Students with Date-to-Date Filter
   const filteredStudents = students.filter(s => {
-    const branchName = typeof s.branch === 'object' ? (s.branch?.name || '') : (s.branch || '');
+    const rawBranch = s.branch_name || s.branch_detail?.name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_id || (s.shift ? String(s.shift).split('(')[0] : '');
+    const branchName = getStandardBranchName(rawBranch, branchesList);
 
     if (isInstructor) {
       const instructorBranch = user?.branch || 'Chungam Branch';
@@ -235,7 +236,8 @@ export default function ReportsAnalytics() {
   // Filtered Fee Invoices with Date-to-Date Filter
   const filteredFees = fees.filter(f => {
     const std = f.student_detail || {};
-    const branchName = typeof std.branch === 'object' ? (std.branch?.name || '') : (std.branch || '');
+    const rawBranch = std.branch_name || std.branch_detail?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch) || std.branch_id || (std.shift ? String(std.shift).split('(')[0] : '');
+    const branchName = getStandardBranchName(rawBranch, branchesList);
 
     if (isInstructor) {
       const instructorBranch = user?.branch || 'Chungam Branch';

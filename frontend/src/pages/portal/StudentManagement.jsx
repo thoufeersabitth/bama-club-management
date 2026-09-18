@@ -7,7 +7,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2
 } from 'lucide-react';
-import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON } from '../../services/api';
+import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
@@ -1076,24 +1076,27 @@ export default function StudentManagement() {
                           (s.phone || '').includes(search);
     const matchesBelt = selectedBelt === 'ALL' || (s.currentBelt || s.current_belt) === selectedBelt;
     
-    // Strict & Bulletproof Branch Filtering (Supports Active Branch Scope system-wide)
+    // Strict & Bulletproof Branch Filtering (Supports all 11 branches & Active Branch Scope)
     const getCadetBranchKey = (cadet) => {
       if (!cadet) return '';
       const bObj = cadet.branch_detail || (typeof cadet.branch === 'object' ? cadet.branch : null);
       const bObjName = bObj ? (bObj.name || bObj.title || '') : '';
       const bId = cadet.branch_id || (typeof cadet.branch === 'object' ? cadet.branch?.id : '');
       const rawBranch = cadet.branch_name || cadet.branchName || cadet.dojo_branch || cadet.dojoBranch || cadet.branch_dojo || bObjName || cadet.branch || '';
-      const bStr = (String(rawBranch) + ' ' + String(bId) + ' ' + String(cadet.branch || '')).toLowerCase().trim();
+      const bStr = (String(rawBranch) + ' ' + String(bId) + ' ' + String(cadet.branch || '') + ' ' + String(cadet.shift || '')).toLowerCase().trim();
 
       if (bStr.includes('kick')) return 'kickboxing_pulikkal';
-      if (bStr.includes('pengad') || bStr.includes('btmamups')) return 'pengad';
-      if (bStr.includes('neerad') || bStr.includes('amlps')) return 'neerad';
+      if (bStr.includes('chanda') || bStr.includes('gmup')) return 'chanda';
       if (bStr.includes('ansar')) return 'ansar';
+      if (bStr.includes('kanjiraparaba') || bStr.includes('gmlp')) return 'kanjiraparaba';
+      if (bStr.includes('pengad') || bStr.includes('btmamups') || bStr.includes('btamup')) return 'pengad';
+      if (bStr.includes('ganapath')) return 'ganapath';
       if (bStr.includes('airport')) return 'airport';
-      if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02') || bStr.includes('20c924cd')) return 'chungam';
-      if (bStr.includes('mongam') || bStr.includes('dojo-03') || bStr.includes('d4639193')) return 'mongam';
-      if (bStr.includes('feroke') || bStr.includes('dojo-04') || bStr.includes('5f429f1f')) return 'feroke';
-      if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('dojo-01') || bStr.includes('283e0cc2')) return 'pulikkal';
+      if (bStr.includes('neerad') || bStr.includes('amlps') || bStr.includes('amlp')) return 'neerad';
+      if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02')) return 'chungam';
+      if (bStr.includes('mongam') || bStr.includes('dojo-03')) return 'mongam';
+      if (bStr.includes('feroke') || bStr.includes('dojo-04')) return 'feroke';
+      if (bStr.includes('pulikkal') || bStr.includes('plk') || bStr.includes('dojo-01') || bStr.includes('head office')) return 'pulikkal';
       
       return rawBranch ? String(rawBranch).toLowerCase().trim() : '';
     };
@@ -1134,25 +1137,31 @@ export default function StudentManagement() {
           const sId = String(s.branch_id || (typeof s.branch === 'object' ? s.branch?.id : '') || s.branch_detail?.id || '').toLowerCase().trim();
           const sCode = String(s.branch_code || s.branch_detail?.code || '').toLowerCase().trim();
           const sName = String(s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_detail?.name || '').toLowerCase().trim();
-          matchesBranch = (targetId && sId && targetId === sId) || (targetCode && sCode && targetCode === sCode) || (targetName && sName && targetName === sName);
+          matchesBranch = (targetId && sId && targetId === sId) || (targetCode && sCode && targetCode === sCode) || (targetName && sName && targetName === sName) || (targetName && cadetBranchKey && cadetBranchKey === getCadetBranchKey({ branch_name: targetName }));
         }
       } else if (scopeLower.includes('kick')) {
         matchesBranch = (cadetBranchKey === 'kickboxing_pulikkal');
-      } else if (scopeLower.includes('pengad') || scopeLower.includes('btmamups')) {
-        matchesBranch = (cadetBranchKey === 'pengad');
-      } else if (scopeLower.includes('neerad') || scopeLower.includes('amlps')) {
-        matchesBranch = (cadetBranchKey === 'neerad');
+      } else if (scopeLower.includes('chanda') || scopeLower.includes('gmup')) {
+        matchesBranch = (cadetBranchKey === 'chanda');
       } else if (scopeLower.includes('ansar')) {
         matchesBranch = (cadetBranchKey === 'ansar');
+      } else if (scopeLower.includes('kanjiraparaba') || scopeLower.includes('gmlp')) {
+        matchesBranch = (cadetBranchKey === 'kanjiraparaba');
+      } else if (scopeLower.includes('pengad') || scopeLower.includes('btmamups') || scopeLower.includes('btamup')) {
+        matchesBranch = (cadetBranchKey === 'pengad');
+      } else if (scopeLower.includes('ganapath')) {
+        matchesBranch = (cadetBranchKey === 'ganapath');
       } else if (scopeLower.includes('airport')) {
         matchesBranch = (cadetBranchKey === 'airport');
-      } else if (scopeLower.includes('chungam') || scopeLower.includes('cgm') || scopeLower.includes('dojo-02') || scopeLower.includes('20c924cd')) {
+      } else if (scopeLower.includes('neerad') || scopeLower.includes('amlps') || scopeLower.includes('amlp')) {
+        matchesBranch = (cadetBranchKey === 'neerad');
+      } else if (scopeLower.includes('chungam') || scopeLower.includes('cgm') || scopeLower.includes('dojo-02')) {
         matchesBranch = (cadetBranchKey === 'chungam');
-      } else if (scopeLower.includes('mongam') || scopeLower.includes('dojo-03') || scopeLower.includes('d4639193')) {
+      } else if (scopeLower.includes('mongam') || scopeLower.includes('dojo-03')) {
         matchesBranch = (cadetBranchKey === 'mongam');
-      } else if (scopeLower.includes('feroke') || scopeLower.includes('dojo-04') || scopeLower.includes('5f429f1f')) {
+      } else if (scopeLower.includes('feroke') || scopeLower.includes('dojo-04')) {
         matchesBranch = (cadetBranchKey === 'feroke');
-      } else if (scopeLower === 'pulikkal branch (head office)' || scopeLower === 'head office' || scopeLower === 'plk-01') {
+      } else if (scopeLower.includes('pulikkal') || scopeLower.includes('plk') || scopeLower.includes('head office')) {
         matchesBranch = (cadetBranchKey === 'pulikkal');
       } else {
         const cadetBranchName = String(s.branch_name || s.branch || s.branch_id || '').toLowerCase().trim();
@@ -2821,12 +2830,8 @@ export default function StudentManagement() {
                   </td>
                   <td className="py-4 px-5 text-gray-700 font-bold text-xs">
                     {(() => {
-                      const bVal = std.branch_name || std.branch_detail?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch);
-                      if (bVal && !bVal.includes('-')) return bVal;
-                      const matched = branchesList.find(b => b.id === bVal || b.name === bVal || b.code === bVal);
-                      if (matched && matched.name) return matched.name;
-                      if (bVal && !bVal.match(/^[0-9a-f]{8}-/i)) return bVal;
-                      return 'Pulikkal Branch (Head Office)';
+                      const bVal = std.branch_name || std.branch_detail?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch) || std.branch_id || (std.shift ? String(std.shift).split('(')[0] : '');
+                      return getStandardBranchName(bVal, branchesList);
                     })()}
                   </td>
                   <td className="py-4 px-5">

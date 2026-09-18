@@ -18,6 +18,91 @@ export const SUPABASE_CONFIG = {
   bucket: 'cadet-photos'
 };
 
+// Automatic one-time cache purge for clean 177 roster deduplication & branch sync
+export const BAMA_DATA_VERSION = 'v2_clean_177_roster';
+if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+  try {
+    if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {
+      localStorage.removeItem('bama_cadets_roster');
+      localStorage.removeItem('bama_students');
+      localStorage.removeItem('bama_cadets');
+      localStorage.removeItem('bama_students_list');
+      localStorage.removeItem('bama_branches');
+      localStorage.removeItem('bama_branches_list');
+      localStorage.removeItem('bama_custom_branches');
+      localStorage.setItem('bama_data_version', BAMA_DATA_VERSION);
+    }
+  } catch (e) {}
+}
+
+/**
+ * Authoritative Canonical Branch Resolver for all 11 BAMA Dojo Branches
+ * Resolves UUID, code, name, shift string, or object with 100% accuracy.
+ */
+export const getStandardBranchName = (val, branchesList = []) => {
+  if (!val) return 'Pulikkal Branch (Head Office)';
+  if (typeof val === 'object') {
+    val = val.name || val.branch_name || val.id || val.code || '';
+  }
+  const s = String(val).trim();
+  if (!s) return 'Pulikkal Branch (Head Office)';
+
+  // 1. Direct match with branchesList if provided
+  if (Array.isArray(branchesList) && branchesList.length > 0) {
+    const sLow = s.toLowerCase();
+    const found = branchesList.find(b => 
+      String(b.id || '').toLowerCase() === sLow ||
+      String(b.name || '').toLowerCase() === sLow ||
+      String(b.code || '').toLowerCase() === sLow
+    );
+    if (found && found.name) return found.name;
+  }
+
+  const sLow = s.toLowerCase();
+
+  // Kick boxing must be tested BEFORE pulikkal
+  if (sLow.includes('3bf0add8') || sLow.includes('bd5c0955') || sLow.includes('bama-kbp-01') || sLow.includes('bama-dojo-10') || sLow.includes('kick')) {
+    return 'KICK BOXING PULIKKAL';
+  }
+  if (sLow.includes('c6602171') || sLow.includes('4d04730d') || sLow.includes('plk-01') || sLow.includes('pulikkal') || sLow.includes('head office')) {
+    return 'Pulikkal Branch (Head Office)';
+  }
+  if (sLow.includes('f1e4df64') || sLow.includes('bama-gmup-01') || sLow.includes('chanda') || sLow.includes('gmup')) {
+    return 'GMUP SCHOOL CHANDA';
+  }
+  if (sLow.includes('0bde2093') || sLow.includes('3cbb7511') || sLow.includes('bama-ans-01') || sLow.includes('bama-dojo-09') || sLow.includes('ansar')) {
+    return 'ANSARAR SCHOOL';
+  }
+  if (sLow.includes('182c10b2') || sLow.includes('bama-gmlp-01') || sLow.includes('kanjiraparaba') || sLow.includes('gmlp')) {
+    return 'GMLP SCHOOL KANJIRAPARABA KDY';
+  }
+  if (sLow.includes('f7003ca2') || sLow.includes('b226a5e3') || sLow.includes('bama-bta-01') || sLow.includes('bama-dojo-07') || sLow.includes('pengad') || sLow.includes('btamup') || sLow.includes('btmamup')) {
+    return 'BTAMUP SCHOOL PENGAD';
+  }
+  if (sLow.includes('9aed244a') || sLow.includes('bama-gan-01') || sLow.includes('ganapath')) {
+    return 'GANAPATH V H S S FEROKE';
+  }
+  if (sLow.includes('6eccd83a') || sLow.includes('4348ee03') || sLow.includes('bama-air-01') || sLow.includes('bama-dojo-010') || sLow.includes('airport')) {
+    return 'AIRPORT KARATE';
+  }
+  if (sLow.includes('af13fe03') || sLow.includes('b65c2bbc') || sLow.includes('bama-amlp-01') || sLow.includes('bama-dojo-05') || sLow.includes('neerad') || sLow.includes('amlp')) {
+    return 'AMLP SCHOOL NEERAD';
+  }
+  if (sLow.includes('e2dd8c32') || sLow.includes('17e47ded') || sLow.includes('cgm-02') || sLow.includes('chungam')) {
+    return 'Chungam Branch';
+  }
+  if (sLow.includes('3ba86860') || sLow.includes('0d4a652e') || sLow.includes('frk-03') || sLow.includes('frk-04') || sLow.includes('feroke')) {
+    return 'Feroke Branch';
+  }
+
+  // If not a UUID string, return the original trimmed name
+  if (!s.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    return s;
+  }
+
+  return 'Pulikkal Branch (Head Office)';
+};
+
 /**
  * Automatically compress any base64/dataURL photo into a lightweight 20KB WebP photo
  * and upload to Supabase Storage bucket. Returns public CDN URL.
@@ -459,7 +544,8 @@ export const getStoredStudents = () => {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = filterOutDummyCadets(parsed).map(st => {
-            const normBranch = st.branch_name || st.branchName || st.dojo_branch || st.dojoBranch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || 'Pulikkal Branch (Head Office)';
+            const rawBranch = st.branch_name || st.branchName || st.dojo_branch || st.dojoBranch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || st.branch_id || (st.shift ? String(st.shift).split('(')[0] : '');
+            const normBranch = getStandardBranchName(rawBranch);
             const branchId = st.branch_id || st.branchId || (typeof st.branch === 'object' ? st.branch?.id : st.branch) || normBranch;
 
             const adm = st.admissionNo || st.admission_no || st.registration_no || '';
@@ -807,10 +893,8 @@ export const fetchStudents = async (params = {}) => {
       });
 
       const normalizedServer = filteredServer.map(s => {
-        const sRawBranch = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch);
-        const sBranchName = (sRawBranch && !sRawBranch.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))
-          ? sRawBranch
-          : 'Pulikkal Branch (Head Office)';
+        const sRawBranch = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_id || (s.shift ? String(s.shift).split('(')[0] : '');
+        const sBranchName = getStandardBranchName(sRawBranch);
         const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
 
         const adm = s.admissionNo || s.admission_no || '';
@@ -863,26 +947,12 @@ export const fetchStudents = async (params = {}) => {
         };
       });
 
-      // SMART MERGE: Never lose students that exist in local storage but haven't synced to server yet!
-      const localCadets = getStoredStudents();
-      const serverKeySet = new Set(
-        normalizedServer.map(s => String(s.admissionNo || s.admission_no || s.id || '').toLowerCase().trim()).filter(Boolean)
-      );
-
-      const unsyncedLocals = Array.isArray(localCadets)
-        ? localCadets.filter(c => {
-            const key = String(c.admissionNo || c.admission_no || c.id || '').toLowerCase().trim();
-            return key && !serverKeySet.has(key);
-          })
-        : [];
-
-      const mergedStudents = [...normalizedServer, ...unsyncedLocals];
-
-      const serialized = JSON.stringify(mergedStudents);
+      // Server is the single source of truth - save clean roster directly to localStorage and cache
+      const serialized = JSON.stringify(normalizedServer);
       safeLocalStorageSet('bama_students_list', serialized);
-      _studentsCache = mergedStudents;
+      _studentsCache = normalizedServer;
       _studentsCacheTime = Date.now();
-      return mergedStudents;
+      return normalizedServer;
     }
   } catch (err) {
     console.error('Failed to fetch students from live server:', err);

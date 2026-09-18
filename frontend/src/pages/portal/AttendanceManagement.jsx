@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings } from 'lucide-react';
-import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches } from '../../services/api';
+import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -257,36 +257,26 @@ export default function AttendanceManagement() {
   // Helper to resolve standard canonical branch key for 100% accurate branch separation
   const getBranchKey = (val) => {
     if (!val) return '';
-    if (typeof val === 'object') {
-      val = val.name || val.id || '';
-    }
-    const s = String(val).toLowerCase().trim();
+    const norm = getStandardBranchName(val, branchesList);
+    const s = String(norm).toLowerCase().trim();
     if (s === 'all') return 'all';
 
-    // 1. Direct UUID & Code matching
-    if (s === 'bd5c0955-002e-4c21-a661-940d6e334ad4' || s === 'bama-dojo-10') return 'kickboxing';
-    if (s === '4d04730d-8de9-4a3f-9dc4-705b31ef2630' || s === 'plk-01') return 'pulikkal';
-    if (s === 'b226a5e3-877d-40bc-b846-4ecf7e27d96f' || s === 'bama-dojo-07') return 'pengad';
-    if (s === '4348ee03-32c3-4464-b6fb-4c8050b530ce' || s === 'bama-dojo-010') return 'airport';
-    if (s === 'b65c2bbc-7423-4c11-9cda-89a104528085' || s === 'bama-dojo-05') return 'neerad';
-    if (s === '3cbb7511-5c87-4703-aad0-e28d75869d9c' || s === 'bama-dojo-09') return 'ansar';
-    if (s === '17e47ded-5595-4dc1-b0e6-01d46f8ba7fc' || s === 'cgm-02') return 'chungam';
-    if (s === '0d4a652e-a978-4aaf-b5a3-ba6bb2be8cb2' || s === 'frk-04') return 'feroke';
-
-    // 2. Keyword matching - MUST CHECK 'kick' FIRST so 'KICK BOXING PULIKKAL' is NEVER matched as 'pulikkal'!
     if (s.includes('kick')) return 'kickboxing';
-    if (s.includes('pulikkal') || s.includes('head office') || s.includes('plk')) return 'pulikkal';
-    if (s.includes('pengad') || s.includes('btmamups')) return 'pengad';
-    if (s.includes('airport')) return 'airport';
-    if (s.includes('neerad') || s.includes('amlps')) return 'neerad';
+    if (s.includes('chanda') || s.includes('gmup')) return 'chanda';
     if (s.includes('ansar')) return 'ansar';
-    if (s.includes('feroke') || s.includes('frk')) return 'feroke';
+    if (s.includes('kanjiraparaba') || s.includes('gmlp')) return 'kanjiraparaba';
+    if (s.includes('pengad') || s.includes('btmamups') || s.includes('btamup')) return 'pengad';
+    if (s.includes('ganapath')) return 'ganapath';
+    if (s.includes('airport')) return 'airport';
+    if (s.includes('neerad') || s.includes('amlps') || s.includes('amlp')) return 'neerad';
     if (s.includes('chungam') || s.includes('cgm')) return 'chungam';
+    if (s.includes('feroke') || s.includes('frk')) return 'feroke';
+    if (s.includes('pulikkal') || s.includes('head office') || s.includes('plk')) return 'pulikkal';
 
     return s;
   };
 
-  // 100% Robust Branch Cadets Matching (Handles UUID, Name, Code, Keywords across all 8 branches)
+  // 100% Robust Branch Cadets Matching (Handles all 11 branches, UUID, Name, Code, Shift fallback)
   const isStudentInBranch = (student, branchFilter) => {
     if (!branchFilter || branchFilter === 'All' || branchFilter === 'ALL') return true;
 
@@ -308,7 +298,9 @@ export default function AttendanceManagement() {
       ''
     );
 
-    return targetKey === cadetNameKey || targetKey === cadetIdKey;
+    const cadetShiftKey = student.shift ? getBranchKey(student.shift.split('(')[0]) : '';
+
+    return targetKey === cadetNameKey || targetKey === cadetIdKey || targetKey === cadetShiftKey;
   };
 
   // Smart Shift / Batch Matcher (Direct match, timing match, keyword match)
