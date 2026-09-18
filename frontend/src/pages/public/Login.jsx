@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Lock, User, Key, ArrowRight, UserCheck, AlertCircle } from 'lucide-react';
+import { Shield, Lock, User, Key, ArrowRight, UserCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { DEMO_USERS } from '../../services/initialData';
 
@@ -92,10 +92,20 @@ export default function Login() {
 
           <button
             type="submit"
-            className="w-full py-3.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition cursor-pointer"
+            disabled={loading}
+            className="w-full py-3.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <span>Sign In To Portal</span>
-            <ArrowRight className="w-4 h-4" />
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Signing In...</span>
+              </>
+            ) : (
+              <>
+                <span>Sign In To Portal</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
 
