@@ -1132,35 +1132,12 @@ export const updateStudent = async (id, data) => {
     payload.photo = await compressAndUploadCadetPhoto(payload.photo, payload.admission_no || targetIdStr);
   }
 
-  const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);
-  let serverData = null;
-  for (const ident of identifiers) {
-    try {
-      const res = await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(ident)}/`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        try {
-          serverData = await res.json();
-        } catch (e) {}
-        break;
-      }
-    } catch (err) {
-      console.warn('API update failed for identifier:', ident, err);
-    }
-  }
-
+  // Optimistically construct final updated object & persist immediately to local storage
   const finalUpdated = {
     ...payload,
-    ...(serverData || {}),
     branch: payload.branch_name || payload.branch,
     branch_name: payload.branch_name || payload.branch,
-    branch_id: payload.branch_id || (serverData?.branch_id || serverData?.branch),
+    branch_id: payload.branch_id,
     dojo_branch: payload.branch_name || payload.branch,
     branchName: payload.branch_name || payload.branch
   };
@@ -1169,6 +1146,34 @@ export const updateStudent = async (id, data) => {
   saveStoredStudents(updatedRoster);
   invalidateStudentsCache();
   window.dispatchEvent(new Event('bama_data_updated'));
+
+  // Sync with backend using resilient timeout so UI is never blocked
+  const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);
+  const primaryIdent = identifiers[0];
+  if (primaryIdent) {
+    try {
+      const res = await fetchWithTimeout(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(primaryIdent)}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }, 4000);
+      if (res.ok) {
+        try {
+          const serverData = await res.json();
+          if (serverData && serverData.id) {
+            const syncedRoster = getStoredStudents().map(s => (isMatch(s) ? { ...s, ...serverData } : s));
+            saveStoredStudents(syncedRoster);
+          }
+        } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('API update background sync note:', primaryIdent, err);
+    }
+  }
+
   return finalUpdated;
 };
 

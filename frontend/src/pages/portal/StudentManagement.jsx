@@ -159,6 +159,7 @@ export default function StudentManagement() {
   // Modals State
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [isSavingCadet, setIsSavingCadet] = useState(false);
   const [deletingStudent, setDeletingStudent] = useState(null);
   const [activeCardStudent, setActiveCardStudent] = useState(null);
   const [detailStudent, setDetailStudent] = useState(null);
@@ -952,109 +953,112 @@ export default function StudentManagement() {
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (!editingStudent) return;
-
-    const finalPhoto = editPhotoState.rawSrc ? getCanvasDataUrl(editCanvasRef, editingStudent.photo) : editingStudent.photo;
-    const initialPaid = parseInt(editingStudent.initialPaidAmount || editingStudent.initial_paid_amount || 0);
-    const feeAmt = parseInt(editingStudent.feeAmount || editingStudent.fee_amount || 500);
-    const admissionFeeAmt = editingStudent.admissionFee !== undefined ? Math.max(0, parseInt(editingStudent.admissionFee) || 0) : (editingStudent.admission_fee !== undefined ? Math.max(0, parseInt(editingStudent.admission_fee) || 0) : 1000);
-    const isAdmissionPaid = admissionFeeAmt === 0 || !!(editingStudent.admissionFeePaid ?? editingStudent.admission_fee_paid ?? true);
-    const pending = Math.max(0, feeAmt - initialPaid);
-    const calculatedFeeStatus = pending === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
-
-    // 100% Guaranteed Target Branch Resolution from the user selection in Edit Modal
-    const chosenBranchName = editingStudent.branch_name || editingStudent.branch || '';
-    const matchedEditB = (branchesList || []).find(b => 
-      String(b.name).toLowerCase() === String(chosenBranchName).toLowerCase() ||
-      String(b.id) === String(editingStudent.branch_id) ||
-      String(b.code).toLowerCase() === String(chosenBranchName).toLowerCase()
-    );
-    const editBranchName = matchedEditB ? matchedEditB.name : getStandardBranchName(chosenBranchName, branchesList);
-    const editBranchId = matchedEditB ? matchedEditB.id : (editingStudent.branch_id || editBranchName);
-
-    const editProg = editingStudent.program || editingStudent.course || editingStudent.discipline || 'Karate (Shotokan)';
-    const editIsKarate = editProg.toLowerCase().includes('karate');
-    const editRawBelt = String(editingStudent.currentBelt || editingStudent.current_belt || '').trim();
-    const editHasRealBelt = Boolean(editRawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(editRawBelt.toLowerCase()));
-    const finalBelt = editIsKarate ? (editHasRealBelt ? editRawBelt : 'White Belt') : 'No Belt';
-
-    // Ensure training shift aligns with the new branch
-    let editShift = editingStudent.shift || '';
-    const branchShifts = getDynamicShiftOptions(editBranchName, editProg, branchesList);
-    if (!editShift || (branchShifts.length > 0 && !branchShifts.includes(editShift))) {
-      editShift = branchShifts.length > 0 ? branchShifts[0] : (editShift || 'Evening Batch (5:00 PM - 7:00 PM)');
-    }
-
-    const updatedData = {
-      ...editingStudent,
-      program: editProg,
-      course: editProg,
-      hasCustomFee: true,
-      has_custom_fee: true,
-      photo: finalPhoto,
-      name: editingStudent.name,
-      guardianName: editingStudent.guardianName || editingStudent.guardian_name,
-      guardian_name: editingStudent.guardianName || editingStudent.guardian_name,
-      occupation: editingStudent.occupation || '',
-      guardian_occupation: editingStudent.occupation || '',
-      phone: editingStudent.phone,
-      whatsapp: editingStudent.whatsapp || editingStudent.phone,
-      age: parseInt(editingStudent.age) || 10,
-      gender: editingStudent.gender || 'Male',
-      bloodGroup: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
-      blood_group: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
-      currentBelt: finalBelt,
-      current_belt: finalBelt,
-      branch: editBranchId, // UUID for Django ForeignKey
-      branch_id: editBranchId,
-      branch_name: editBranchName,
-      branchName: editBranchName,
-      dojo_branch: editBranchName,
-      branch_detail: matchedEditB ? { id: matchedEditB.id, name: matchedEditB.name, code: matchedEditB.code } : { id: editBranchId, name: editBranchName },
-      shift: editShift,
-      admissionFee: admissionFeeAmt,
-      admission_fee: admissionFeeAmt,
-      admissionFeePaid: isAdmissionPaid,
-      admission_fee_paid: isAdmissionPaid,
-      feeFrequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY',
-      fee_frequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY',
-      feeCycleMonths: (editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY') === 'MONTHLY' ? 1 : 3,
-      feeAmount: feeAmt,
-      fee_amount: feeAmt,
-      pendingAmount: pending,
-      pending_amount: pending,
-      feeStatus: calculatedFeeStatus,
-      fee_status: calculatedFeeStatus,
-      address: editingStudent.address || '',
-      medicalNotes: editingStudent.medicalNotes || editingStudent.medical_notes || '',
-      medical_notes: editingStudent.medicalNotes || editingStudent.medical_notes || ''
-    };
-
-    const isMatch = (s) => String(s.id).trim() === String(editingStudent.id).trim() ||
-      (s.admissionNo && editingStudent.admissionNo && String(s.admissionNo).trim() === String(editingStudent.admissionNo).trim()) ||
-      (s.admission_no && editingStudent.admission_no && String(s.admission_no).trim() === String(editingStudent.admission_no).trim());
+    setIsSavingCadet(true);
 
     try {
-      const saved = await updateStudent(editingStudent.id, updatedData);
-      const mergedSaved = { ...updatedData, ...(saved || {}) };
-      const updatedList = students.map(s => isMatch(s) ? { ...s, ...mergedSaved } : s);
-      setStudents(updatedList);
-      saveStoredStudents(updatedList);
-      invalidateStudentsCache();
-      if (detailStudent && isMatch(detailStudent)) {
-        setDetailStudent(prev => ({ ...prev, ...mergedSaved }));
+      const finalPhoto = editPhotoState.rawSrc ? getCanvasDataUrl(editCanvasRef, editingStudent.photo) : editingStudent.photo;
+      const initialPaid = parseInt(editingStudent.initialPaidAmount || editingStudent.initial_paid_amount || 0);
+      const feeAmt = parseInt(editingStudent.feeAmount || editingStudent.fee_amount || 500);
+      const admissionFeeAmt = editingStudent.admissionFee !== undefined ? Math.max(0, parseInt(editingStudent.admissionFee) || 0) : (editingStudent.admission_fee !== undefined ? Math.max(0, parseInt(editingStudent.admission_fee) || 0) : 1000);
+      const isAdmissionPaid = admissionFeeAmt === 0 || !!(editingStudent.admissionFeePaid ?? editingStudent.admission_fee_paid ?? true);
+      const pending = Math.max(0, feeAmt - initialPaid);
+      const calculatedFeeStatus = pending === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
+
+      // 100% Guaranteed Target Branch Resolution from the user selection in Edit Modal
+      const chosenBranchName = editingStudent.branch_name || editingStudent.branch || '';
+      const matchedEditB = (branchesList || []).find(b => 
+        String(b.name).toLowerCase() === String(chosenBranchName).toLowerCase() ||
+        String(b.id) === String(editingStudent.branch_id) ||
+        String(b.code).toLowerCase() === String(chosenBranchName).toLowerCase()
+      );
+      const editBranchName = matchedEditB ? matchedEditB.name : getStandardBranchName(chosenBranchName, branchesList);
+      const editBranchId = matchedEditB ? matchedEditB.id : (editingStudent.branch_id || editBranchName);
+
+      const editProg = editingStudent.program || editingStudent.course || editingStudent.discipline || 'Karate (Shotokan)';
+      const editIsKarate = editProg.toLowerCase().includes('karate');
+      const editRawBelt = String(editingStudent.currentBelt || editingStudent.current_belt || '').trim();
+      const editHasRealBelt = Boolean(editRawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(editRawBelt.toLowerCase()));
+      const finalBelt = editIsKarate ? (editHasRealBelt ? editRawBelt : 'White Belt') : 'No Belt';
+
+      // Ensure training shift aligns with the new branch
+      let editShift = editingStudent.shift || '';
+      const branchShifts = getDynamicShiftOptions(editBranchName, editProg, branchesList);
+      if (!editShift || (branchShifts.length > 0 && !branchShifts.includes(editShift))) {
+        editShift = branchShifts.length > 0 ? branchShifts[0] : (editShift || 'Evening Batch (5:00 PM - 7:00 PM)');
       }
-      setEditingStudent(null);
-      setEditPhotoState({ rawSrc: '', zoom: 1.0, panX: 0, panY: 0 });
-    } catch (err) {
-      const updatedList = students.map(s => isMatch(s) ? { ...s, ...updatedData } : s);
-      setStudents(updatedList);
-      saveStoredStudents(updatedList);
-      invalidateStudentsCache();
+
+      const updatedData = {
+        ...editingStudent,
+        program: editProg,
+        course: editProg,
+        hasCustomFee: true,
+        has_custom_fee: true,
+        photo: finalPhoto,
+        name: editingStudent.name,
+        guardianName: editingStudent.guardianName || editingStudent.guardian_name,
+        guardian_name: editingStudent.guardianName || editingStudent.guardian_name,
+        occupation: editingStudent.occupation || '',
+        guardian_occupation: editingStudent.occupation || '',
+        phone: editingStudent.phone,
+        whatsapp: editingStudent.whatsapp || editingStudent.phone,
+        age: parseInt(editingStudent.age) || 10,
+        gender: editingStudent.gender || 'Male',
+        bloodGroup: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
+        blood_group: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
+        currentBelt: finalBelt,
+        current_belt: finalBelt,
+        branch: editBranchId, // UUID for Django ForeignKey
+        branch_id: editBranchId,
+        branch_name: editBranchName,
+        branchName: editBranchName,
+        dojo_branch: editBranchName,
+        branch_detail: matchedEditB ? { id: matchedEditB.id, name: matchedEditB.name, code: matchedEditB.code } : { id: editBranchId, name: editBranchName },
+        shift: editShift,
+        admissionFee: admissionFeeAmt,
+        admission_fee: admissionFeeAmt,
+        admissionFeePaid: isAdmissionPaid,
+        admission_fee_paid: isAdmissionPaid,
+        feeFrequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY',
+        fee_frequency: editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY',
+        feeCycleMonths: (editingStudent.feeFrequency || editingStudent.fee_frequency || 'MONTHLY') === 'MONTHLY' ? 1 : 3,
+        feeAmount: feeAmt,
+        fee_amount: feeAmt,
+        pendingAmount: pending,
+        pending_amount: pending,
+        feeStatus: calculatedFeeStatus,
+        fee_status: calculatedFeeStatus,
+        address: editingStudent.address || '',
+        medicalNotes: editingStudent.medicalNotes || editingStudent.medical_notes || '',
+        medical_notes: editingStudent.medicalNotes || editingStudent.medical_notes || ''
+      };
+
+      const isMatch = (s) => String(s.id).trim() === String(editingStudent.id).trim() ||
+        (s.admissionNo && editingStudent.admissionNo && String(s.admissionNo).trim() === String(editingStudent.admissionNo).trim()) ||
+        (s.admission_no && editingStudent.admission_no && String(s.admission_no).trim() === String(editingStudent.admission_no).trim());
+
+      // Optimistic local state update
+      setStudents(prev => prev.map(s => isMatch(s) ? { ...s, ...updatedData } : s));
       if (detailStudent && isMatch(detailStudent)) {
         setDetailStudent(prev => ({ ...prev, ...updatedData }));
       }
+
+      // Perform update with background persistence
+      const saved = await updateStudent(editingStudent.id, updatedData);
+      const mergedSaved = { ...updatedData, ...(saved || {}) };
+      
+      setStudents(prev => prev.map(s => isMatch(s) ? { ...s, ...mergedSaved } : s));
+      if (detailStudent && isMatch(detailStudent)) {
+        setDetailStudent(prev => ({ ...prev, ...mergedSaved }));
+      }
+      
       setEditingStudent(null);
       setEditPhotoState({ rawSrc: '', zoom: 1.0, panX: 0, panY: 0 });
+    } catch (err) {
+      console.error('Error during student update:', err);
+      setEditingStudent(null);
+      setEditPhotoState({ rawSrc: '', zoom: 1.0, panX: 0, panY: 0 });
+    } finally {
+      setIsSavingCadet(false);
     }
   };
 
@@ -4261,9 +4265,20 @@ export default function StudentManagement() {
                 </button>
                 <button
                   type="submit"
-                  className="px-7 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md shadow-blue-500/25 flex items-center gap-2 transform hover:-translate-y-0.5 transition cursor-pointer"
+                  disabled={isSavingCadet}
+                  className="px-7 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-black text-xs shadow-md shadow-blue-500/25 flex items-center gap-2 transform hover:-translate-y-0.5 transition cursor-pointer"
                 >
-                  <Check className="w-4 h-4" /> Save Updated Details
+                  {isSavingCadet ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 text-white" />
+                      <span>Save Updated Details</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
