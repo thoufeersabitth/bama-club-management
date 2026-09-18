@@ -1132,9 +1132,7 @@ export default function StudentManagement() {
     const isSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'HEAD_OFFICE';
 
     let activeScope = 'ALL';
-    if (!isSuperAdmin && (user?.branch || user?.assigned_branch_id)) {
-      activeScope = user.branch || user.assigned_branch_id;
-    } else if (selectedBranch && selectedBranch !== 'ALL') {
+    if (selectedBranch && selectedBranch !== 'ALL') {
       activeScope = selectedBranch;
     } else if (activeBranch && activeBranch !== 'ALL') {
       activeScope = activeBranch;

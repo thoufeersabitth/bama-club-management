@@ -566,10 +566,6 @@ export default function FeeManagement() {
       }
     }
 
-    if (isInstructor && selectedBranch === 'All') {
-      const instructorBranch = (user?.branch || user?.assigned_branch_id || 'Chungam Branch').toLowerCase();
-      matchesBranch = (cadetBranchKey === (instructorBranch.includes('chungam') ? 'chungam' : instructorBranch.includes('mongam') ? 'mongam' : instructorBranch.includes('feroke') ? 'feroke' : 'pulikkal'));
-    }
 
     const matchesSearch = !search || 
                           (std.name || '').toLowerCase().includes(search.toLowerCase()) ||

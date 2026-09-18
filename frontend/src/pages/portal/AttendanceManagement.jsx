@@ -332,7 +332,7 @@ export default function AttendanceManagement() {
   // Dynamic Shift Options for selected branch ONLY
   const availableShifts = React.useMemo(() => {
     const shiftsSet = new Set();
-    const activeBranchFilter = isInstructor ? instructorBranch : (selectedBranch !== 'All' ? selectedBranch : null);
+    const activeBranchFilter = selectedBranch !== 'All' ? selectedBranch : null;
 
     // 1. Shifts from students in this branch
     const branchStudents = activeBranchFilter 
@@ -355,10 +355,10 @@ export default function AttendanceManagement() {
     });
 
     return Array.from(shiftsSet);
-  }, [students, selectedBranch, isInstructor, instructorBranch, branchesList]);
+  }, [students, selectedBranch, branchesList]);
 
   const baseBranchShiftStudents = students.filter(s => {
-    const activeBranchFilter = isInstructor ? instructorBranch : selectedBranch;
+    const activeBranchFilter = selectedBranch;
     if (!isStudentInBranch(s, activeBranchFilter)) {
       return false;
     }

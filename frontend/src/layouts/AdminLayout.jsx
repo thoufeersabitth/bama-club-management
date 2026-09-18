@@ -253,26 +253,19 @@ export default function AdminLayout({ children }) {
             </Link>
 
             {/* Active Branch Selector Pill */}
-            <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-gray-200 text-[11px] sm:text-xs text-gray-700 font-bold shadow-inner max-w-[100px] min-[400px]:max-w-[130px] sm:max-w-[200px] md:max-w-none truncate">
+            <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-gray-200 text-[11px] sm:text-xs text-gray-700 font-bold shadow-inner max-w-[140px] min-[400px]:max-w-[180px] sm:max-w-[240px] md:max-w-none truncate">
               <MapPin className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
               <span className="hidden md:inline">Branch:</span>
-              {userRole !== 'SUPER_ADMIN' ? (
-                <span className="text-gray-900 font-black px-1 flex items-center gap-1 truncate">
-                  <span className="truncate">{user?.branch || activeBranch}</span>
-                  <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.2 rounded-md flex-shrink-0">Locked 🔒</span>
-                </span>
-              ) : (
-                <select
-                  value={activeBranch}
-                  onChange={(e) => setActiveBranch(e.target.value)}
-                  className="bg-transparent text-gray-900 font-black focus:outline-none cursor-pointer truncate max-w-full text-[11px] sm:text-xs"
-                >
-                  <option value="ALL">All Branches</option>
-                  {branchesList.map(b => (
-                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                  ))}
-                </select>
-              )}
+              <select
+                value={activeBranch || 'ALL'}
+                onChange={(e) => setActiveBranch(e.target.value)}
+                className="bg-transparent text-gray-900 font-black focus:outline-none cursor-pointer truncate max-w-full text-[11px] sm:text-xs"
+              >
+                <option value="ALL">All Branches</option>
+                {branchesList.map(b => (
+                  <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 

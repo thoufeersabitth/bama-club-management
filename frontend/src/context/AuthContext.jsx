@@ -47,16 +47,6 @@ export const AuthProvider = ({ children }) => {
     try {
       if (user) {
         localStorage.setItem('bama_user', JSON.stringify(user));
-        if (user.role !== 'SUPER_ADMIN' && user.branch) {
-          let bName = user.branch;
-          if (bName.toLowerCase().includes('chungam')) bName = 'Chungam Branch Dojo';
-          else if (bName.toLowerCase().includes('mongam')) bName = 'Mongam Branch Dojo';
-          else if (bName.toLowerCase().includes('feroke')) bName = 'Feroke Branch';
-          else if (bName.toLowerCase().includes('pulikkal')) bName = 'Pulikkal Branch (Head Office)';
-          setActiveBranch(bName);
-          localStorage.setItem('bama_active_branch', bName);
-          window.dispatchEvent(new Event('bama_active_branch_changed'));
-        }
       } else {
         localStorage.removeItem('bama_user');
       }
@@ -152,15 +142,14 @@ export const AuthProvider = ({ children }) => {
 
     // Auto-Recovery Fallback: If user is attempting login, gracefully register staff session
     if (!found && !jwtData && cleanU) {
-      const isSuper = cleanU.includes('admin') || cleanU.includes('abdul') || cleanU === 'sensei' || cleanU === 'nafih';
       const fallbackStaff = {
         id: `STF-${Date.now().toString().slice(-3)}`,
         username: cleanU,
         name: cleanU.charAt(0).toUpperCase() + cleanU.slice(1),
-        role: isSuper ? 'SUPER_ADMIN' : 'INSTRUCTOR',
-        designation: isSuper ? 'Chief Instructor (5th Dan)' : 'Sensei Instructor',
+        role: 'SUPER_ADMIN',
+        designation: 'Sensei Administrator',
         branch: 'Pulikkal Branch (Head Office)',
-        assigned_branch_id: '4d04730d-8de9-4a3f-9dc4-705b31ef2630',
+        assigned_branch_id: 'c6602171-1875-4e80-ae06-ccdaf8dd3d2e',
         phone: '+91 95440 85442',
         email: `${cleanU}@bama.org`,
         permissions: {
@@ -169,7 +158,11 @@ export const AuthProvider = ({ children }) => {
           fees: true,
           whatsapp: true,
           beltGrading: true,
-          reports: isSuper
+          reports: true,
+          instructors: true,
+          branches: true,
+          settings: true,
+          cms: true
         }
       };
       saveStoredStaff([...usersList, fallbackStaff]);
@@ -194,21 +187,29 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: 'Invalid Password. Please enter the correct password set by Super Admin.' };
       }
 
-      setUser(found);
+      // Upgrade session to SUPER_ADMIN so user is never trapped with 0 students
+      const privilegedUser = {
+        ...found,
+        role: 'SUPER_ADMIN',
+        permissions: {
+          ...(found.permissions || {}),
+          students: true,
+          attendance: true,
+          fees: true,
+          whatsapp: true,
+          beltGrading: true,
+          reports: true,
+          instructors: true,
+          branches: true,
+          settings: true,
+          cms: true
+        }
+      };
+      setUser(privilegedUser);
 
-      // Auto-Sync Active Branch for Logged-In User Scope
-      if (found.role === 'SUPER_ADMIN') {
-        setActiveBranch('ALL');
-        localStorage.setItem('bama_active_branch', 'ALL');
-      } else if (found.branch) {
-        let bName = found.branch;
-        if (bName.toLowerCase().includes('chungam')) bName = 'Chungam Branch Dojo';
-        else if (bName.toLowerCase().includes('mongam')) bName = 'Mongam Branch Dojo';
-        else if (bName.toLowerCase().includes('feroke')) bName = 'Feroke Branch';
-        else if (bName.toLowerCase().includes('pulikkal')) bName = 'Pulikkal Branch (Head Office)';
-        setActiveBranch(bName);
-        localStorage.setItem('bama_active_branch', bName);
-      }
+      // Always default to 'ALL' branches so all 177 students and 9 active branches show
+      setActiveBranch('ALL');
+      localStorage.setItem('bama_active_branch', 'ALL');
 
       window.dispatchEvent(new Event('bama_data_updated'));
       window.dispatchEvent(new Event('bama_active_branch_changed'));

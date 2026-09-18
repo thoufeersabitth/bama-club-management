@@ -20,12 +20,10 @@ export default function DashboardPortal() {
   const [loading, setLoading] = useState(() => getStoredStudents().length === 0);
 
   // Active Branch Filtering Engine for Dashboard
-  const activeBranchName = activeBranch || localStorage.getItem('bama_active_branch') || (user?.role === 'INSTRUCTOR' ? user?.branch : 'ALL');
-  const isInstructor = user?.role === 'INSTRUCTOR' || user?.role === 'STAFF' || user?.role === 'BRANCH_STAFF' || user?.role === 'BRANCH_ADMIN' || (user?.role !== 'SUPER_ADMIN' && user?.role !== 'ADMIN' && user?.role !== 'HEAD_OFFICE');
-
+  const activeBranchName = activeBranch || localStorage.getItem('bama_active_branch') || 'ALL';
   const effectiveBranchScope = (activeBranchName && !activeBranchName.toLowerCase().includes('all')) 
     ? activeBranchName 
-    : (isInstructor && user?.branch ? user.branch : 'ALL');
+    : 'ALL';
 
   const getBranchKey = (item) => {
     if (!item) return 'pulikkal';

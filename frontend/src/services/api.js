@@ -19,7 +19,7 @@ export const SUPABASE_CONFIG = {
 };
 
 // Automatic one-time cache purge for clean 177 roster deduplication & branch sync
-export const BAMA_DATA_VERSION = 'v2_clean_177_roster';
+export const BAMA_DATA_VERSION = 'v3_live_177_roster';
 if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   try {
     if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {
@@ -30,6 +30,7 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       localStorage.removeItem('bama_branches');
       localStorage.removeItem('bama_branches_list');
       localStorage.removeItem('bama_custom_branches');
+      localStorage.removeItem('bama_active_branch');
       localStorage.setItem('bama_data_version', BAMA_DATA_VERSION);
     }
   } catch (e) {}
