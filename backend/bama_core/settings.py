@@ -144,6 +144,7 @@ SIMPLE_JWT = {
 
 # CSRF & CORS Trusted Origins
 CSRF_TRUSTED_ORIGINS = [
+    'https://bama-club-api.fly.dev',
     'https://bama-club-backend.fly.dev',
     'https://*.fly.dev',
     'https://bama-academy.vercel.app',

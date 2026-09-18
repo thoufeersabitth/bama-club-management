@@ -191,9 +191,9 @@ export default function GradingRegistration() {
 
     // 1. Try Backend API
     const urlsToTry = [
-      `https://bama-club-backend.fly.dev/api/grading-registrations/lookup-student/?query=${encodeURIComponent(q)}`,
-      `https://bama-club-backend.fly.dev/api/students/?search=${encodeURIComponent(q)}`,
-      `https://bama-club-backend.fly.dev/api/students/`
+      `https://bama-club-api.fly.dev/api/grading-registrations/lookup-student/?query=${encodeURIComponent(q)}`,
+      `https://bama-club-api.fly.dev/api/students/?search=${encodeURIComponent(q)}`,
+      `https://bama-club-api.fly.dev/api/students/`
     ];
 
     for (const url of urlsToTry) {
@@ -352,7 +352,7 @@ export default function GradingRegistration() {
     };
 
     try {
-      const res = await fetch('https://bama-club-backend.fly.dev/api/grading-registrations/', {
+      const res = await fetch('https://bama-club-api.fly.dev/api/grading-registrations/', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

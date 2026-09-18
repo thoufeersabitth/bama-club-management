@@ -8,7 +8,7 @@ import GradingFormPrint from '../../components/grading/GradingFormPrint';
 import { fetchStudents, saveStoredStudents, openWhatsApp } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
-const API_ROOT = 'https://bama-club-backend.fly.dev/api';
+const API_ROOT = 'https://bama-club-api.fly.dev/api';
 
 export const DEFAULT_BELT_FEE_MAP = {
   'Yellow Belt': 500,

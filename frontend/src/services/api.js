@@ -2,7 +2,7 @@ import React from 'react';
 import axios from 'axios';
 import { SAMPLE_STUDENTS, INITIAL_BRANCHES, BELT_LEVELS, WHATSAPP_TEMPLATES, INITIAL_STAFF } from './initialData';
 
-const API_BASE = 'https://bama-club-backend.fly.dev/api';
+const API_BASE = 'https://bama-club-api.fly.dev/api';
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -11,6 +11,93 @@ const api = axios.create({
     'ngrok-skip-browser-warning': 'true',
   },
 });
+
+export const SUPABASE_CONFIG = {
+  url: 'https://lhcnfcsrpwgauhvaqkty.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoY25mY3NycHdnYXVodmFxa3R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2NzEyMDUsImV4cCI6MjEwNTI0NzIwNX0.U1AzXgeC09ANzzPJjvJI4x_3V7TuMd5RJ6lCRXjwX58',
+  bucket: 'cadet-photos'
+};
+
+/**
+ * Automatically compress any base64/dataURL photo into a lightweight 20KB WebP photo
+ * and upload to Supabase Storage bucket. Returns public CDN URL.
+ */
+export const compressAndUploadCadetPhoto = async (photoSrc, cadetIdentifier = 'cadet') => {
+  if (!photoSrc || typeof photoSrc !== 'string') return '';
+  // If already an HTTP/HTTPS URL, don't re-upload
+  if (photoSrc.startsWith('http://') || photoSrc.startsWith('https://')) {
+    return photoSrc;
+  }
+  // Only compress/upload data URLs
+  if (!photoSrc.startsWith('data:image')) {
+    return photoSrc;
+  }
+
+  try {
+    const compressedBlob = await new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_DIM = 300;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else {
+            canvas.toBlob((jpgBlob) => resolve(jpgBlob), 'image/jpeg', 0.82);
+          }
+        }, 'image/webp', 0.82);
+      };
+      img.onerror = () => resolve(null);
+      img.src = photoSrc;
+    });
+
+    if (!compressedBlob) return photoSrc;
+
+    const cleanId = String(cadetIdentifier).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `cadet_${cleanId}_${Date.now()}.webp`;
+    const uploadUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/${SUPABASE_CONFIG.bucket}/${filename}`;
+
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'image/webp',
+        'x-upsert': 'true'
+      },
+      body: compressedBlob
+    });
+
+    if (res.ok) {
+      const publicCdnUrl = `${SUPABASE_CONFIG.url}/storage/v1/object/public/${SUPABASE_CONFIG.bucket}/${filename}`;
+      return publicCdnUrl;
+    }
+  } catch (err) {
+    console.warn('[Storage] Photo compression/upload fallback:', err);
+  }
+
+  return photoSrc;
+};
 
 const DUMMY_EXACT_IDS = ['std-101', 'std-102', 'std-103', 'std-104', 'std-105'];
 const DUMMY_ADMISSIONS = ['bama-2024-001', 'bama-2024-002', 'bama-2024-003', 'bama-2024-004', 'bama-2024-005'];
@@ -545,7 +632,7 @@ export const fetchStudents = async (params = {}) => {
   } catch (e) {}
 
   try {
-    const url = new URL('https://bama-club-backend.fly.dev/api/students/');
+    const url = new URL('https://bama-club-api.fly.dev/api/students/');
     url.searchParams.set('page_size', '1000');
     url.searchParams.set('_t', Date.now().toString());
 
@@ -555,7 +642,7 @@ export const fetchStudents = async (params = {}) => {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }, 4500),
-      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/announcements/?category=DELETED_STUDENT&_t=${Date.now()}`, {
+      fetchWithTimeout(`https://bama-club-api.fly.dev/api/announcements/?category=DELETED_STUDENT&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }, 4500)
@@ -759,8 +846,14 @@ export const createStudent = async (data) => {
     status: data.status || 'Active'
   };
 
+  // Automatically compress and upload base64 photo to Supabase CDN bucket
+  if (payload.photo && typeof payload.photo === 'string' && payload.photo.startsWith('data:image')) {
+    const cleanId = payload.admission_no || data.admissionNo || data.name || 'new';
+    payload.photo = await compressAndUploadCadetPhoto(payload.photo, cleanId);
+  }
+
   try {
-    const res = await fetch('https://bama-club-backend.fly.dev/api/students/', {
+    const res = await fetch('https://bama-club-api.fly.dev/api/students/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -860,10 +953,15 @@ export const updateStudent = async (id, data) => {
     gender: data.gender || 'Male'
   };
 
+  // Automatically compress & upload photo to Supabase CDN if base64
+  if (payload.photo && typeof payload.photo === 'string' && payload.photo.startsWith('data:image')) {
+    payload.photo = await compressAndUploadCadetPhoto(payload.photo, payload.admission_no || targetIdStr);
+  }
+
   const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);
   for (const ident of identifiers) {
     try {
-      const res = await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(ident)}/`, {
+      const res = await fetch(`https://bama-club-api.fly.dev/api/students/${encodeURIComponent(ident)}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -900,7 +998,7 @@ export const promoteStudent = async (studentId, { target_belt, exam_date, examin
   window.dispatchEvent(new Event('bama_data_updated'));
 
   try {
-    const res = await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(targetIdStr)}/promote/`, {
+    const res = await fetch(`https://bama-club-api.fly.dev/api/students/${encodeURIComponent(targetIdStr)}/promote/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -919,7 +1017,7 @@ export const promoteStudent = async (studentId, { target_belt, exam_date, examin
     }
   } catch (err) {
     try {
-      await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(targetIdStr)}/`, {
+      await fetch(`https://bama-club-api.fly.dev/api/students/${encodeURIComponent(targetIdStr)}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ current_belt: target_belt })
@@ -937,7 +1035,7 @@ export const deleteStudent = async (id, admissionNo) => {
   const idsToDelete = [stdIdStr, admNoStr].filter(Boolean);
   for (const identifier of idsToDelete) {
     try {
-      await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(identifier)}/`, {
+      await fetch(`https://bama-club-api.fly.dev/api/students/${encodeURIComponent(identifier)}/`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -965,7 +1063,7 @@ export const deleteStudent = async (id, admissionNo) => {
       category: 'DELETED_STUDENT',
       is_important: false
     };
-    await fetch('https://bama-club-backend.fly.dev/api/announcements/', {
+    await fetch('https://bama-club-api.fly.dev/api/announcements/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(tombstonePayload)
@@ -1077,7 +1175,7 @@ export const uploadImageToCdn = async (imageDataUrlOrFile, filename = 'bama_bran
 export const syncAllBranchImagesBackend = async (imagesMap) => {
   if (!imagesMap || typeof imagesMap !== 'object' || Object.keys(imagesMap).length === 0) return;
   try {
-    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+    const existingRes = await fetch(`https://bama-club-api.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
@@ -1101,7 +1199,7 @@ export const syncAllBranchImagesBackend = async (imagesMap) => {
       }
     });
     
-    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+    await fetch('https://bama-club-api.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
@@ -1203,7 +1301,7 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
     try {
       const acGet = new AbortController();
       const getTimeout = setTimeout(() => acGet.abort(), 12000);
-      const getRes = await fetch(`https://bama-club-backend.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
+      const getRes = await fetch(`https://bama-club-api.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store',
         signal: acGet.signal
@@ -1217,14 +1315,14 @@ export const saveBranchImageBackend = async (branchId, imageUrl, branchCode = ''
         const acPost = new AbortController();
         const postTimeout = setTimeout(() => acPost.abort(), 12000);
         if (existing && existing.id) {
-          await fetch(`https://bama-club-backend.fly.dev/api/faqs/${existing.id}/`, {
+          await fetch(`https://bama-club-api.fly.dev/api/faqs/${existing.id}/`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({ answer: imageUrl, category: 'BRANCH_PHOTO' }),
             signal: acPost.signal
           }).catch(() => {});
         } else {
-          await fetch('https://bama-club-backend.fly.dev/api/faqs/', {
+          await fetch('https://bama-club-api.fly.dev/api/faqs/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({
@@ -1314,15 +1412,15 @@ export const fetchBranches = async (forceRefresh = false) => {
   let fetchedFromServer = false;
   try {
     const [res, faqsRes, cmsRes] = await Promise.all([
-      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/branches/?_t=${Date.now()}`, {
+      fetchWithTimeout(`https://bama-club-api.fly.dev/api/branches/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }, 4000),
-      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
+      fetchWithTimeout(`https://bama-club-api.fly.dev/api/faqs/?page_size=100&_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }, 4000),
-      fetchWithTimeout(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      fetchWithTimeout(`https://bama-club-api.fly.dev/api/cms-config/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store'
       }, 4000)
@@ -1558,7 +1656,7 @@ export const createBranchBackend = async (branchData, retryCount = 2) => {
 
   for (let attempt = 0; attempt <= retryCount; attempt++) {
     try {
-      const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', {
+      const res = await fetch('https://bama-club-api.fly.dev/api/branches/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
@@ -1633,7 +1731,7 @@ export const updateBranchBackend = async (id, branchData) => {
       try {
         const ac = new AbortController();
         const timeout = setTimeout(() => ac.abort(), 4000);
-        const bRes = await fetch('https://bama-club-backend.fly.dev/api/branches/', { signal: ac.signal });
+        const bRes = await fetch('https://bama-club-api.fly.dev/api/branches/', { signal: ac.signal });
         clearTimeout(timeout);
         if (bRes.ok) {
           const bData = await bRes.json();
@@ -1650,7 +1748,7 @@ export const updateBranchBackend = async (id, branchData) => {
     if (targetBackendId) {
       const ac = new AbortController();
       const timeout = setTimeout(() => ac.abort(), 5000);
-      await fetch(`https://bama-club-backend.fly.dev/api/branches/${targetBackendId}/`, {
+      await fetch(`https://bama-club-api.fly.dev/api/branches/${targetBackendId}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload),
@@ -1685,7 +1783,7 @@ export const deleteBranchBackend = async (id, branchName = '') => {
 
   // Synchronize deleted IDs and clean up schedules in global cms-config so all devices immediately purge it
   try {
-    const cmsRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`);
+    const cmsRes = await fetch(`https://bama-club-api.fly.dev/api/cms-config/?_t=${Date.now()}`);
     if (cmsRes.ok) {
       const cms = await cmsRes.json();
       const curDeleted = Array.isArray(cms.deleted_branch_ids) ? cms.deleted_branch_ids : [];
@@ -1702,7 +1800,7 @@ export const deleteBranchBackend = async (id, branchName = '') => {
         });
       }
 
-      await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      await fetch('https://bama-club-api.fly.dev/api/cms-config/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1716,7 +1814,7 @@ export const deleteBranchBackend = async (id, branchName = '') => {
 
   try {
     if (typeof id === 'string' && id.length > 20) {
-      const res = await fetch(`https://bama-club-backend.fly.dev/api/branches/${id}/`, {
+      const res = await fetch(`https://bama-club-api.fly.dev/api/branches/${id}/`, {
         method: 'DELETE'
       });
       if (res.ok || res.status === 204) {
@@ -1724,7 +1822,7 @@ export const deleteBranchBackend = async (id, branchName = '') => {
       }
     }
 
-    const res = await fetch('https://bama-club-backend.fly.dev/api/branches/', { cache: 'no-store' });
+    const res = await fetch('https://bama-club-api.fly.dev/api/branches/', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       const serverBranches = data.results || (Array.isArray(data) ? data : []);
@@ -1733,7 +1831,7 @@ export const deleteBranchBackend = async (id, branchName = '') => {
         (branchName && String(b.name || '').toLowerCase().trim() === String(branchName).toLowerCase().trim())
       );
       if (match && match.id) {
-        await fetch(`https://bama-club-backend.fly.dev/api/branches/${match.id}/`, {
+        await fetch(`https://bama-club-api.fly.dev/api/branches/${match.id}/`, {
           method: 'DELETE'
         });
       }
@@ -1775,7 +1873,7 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
 
   // 3. Delete matching shift announcements on Fly.io PostgreSQL database
   try {
-    const res = await fetch('https://bama-club-backend.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
+    const res = await fetch('https://bama-club-api.fly.dev/api/announcements/?category=TRAINING_SHIFT', {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
@@ -1796,7 +1894,7 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
         }
 
         if (isMatch) {
-          await fetch(`https://bama-club-backend.fly.dev/api/announcements/${a.id}/`, {
+          await fetch(`https://bama-club-api.fly.dev/api/announcements/${a.id}/`, {
             method: 'DELETE'
           });
         }
@@ -1814,7 +1912,7 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
       category: 'DELETED_SHIFT',
       is_important: false
     };
-    await fetch('https://bama-club-backend.fly.dev/api/announcements/', {
+    await fetch('https://bama-club-api.fly.dev/api/announcements/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(tombstonePayload)
@@ -1862,13 +1960,13 @@ export const saveTrainingSchedulesBackend = async (schedules) => {
   invalidateSchedulesCache();
   const cleanSchedules = deduplicateSchedules(schedules);
   try {
-    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+    const existingRes = await fetch(`https://bama-club-api.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
     const existingData = existingRes.ok ? await existingRes.json() : {};
     const updatedData = { ...existingData, training_schedules: cleanSchedules };
-    const res = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+    const res = await fetch('https://bama-club-api.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(updatedData)
@@ -1953,7 +2051,7 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
 
   // 1. Fetch persistent schedules directly from Fly.io PostgreSQL cms-config
   try {
-    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+    const res = await fetch(`https://bama-club-api.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
@@ -2140,7 +2238,7 @@ export const updateExamScheduleBackend = async (id, data) => {
 
 export const fetchCompetitionsBackend = async () => {
   try {
-    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+    const res = await fetch(`https://bama-club-api.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
@@ -2156,12 +2254,12 @@ export const fetchCompetitionsBackend = async () => {
 
 export const saveCompetitionsBackend = async (competitions) => {
   try {
-    const existingRes = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+    const existingRes = await fetch('https://bama-club-api.fly.dev/api/cms-config/', {
       headers: { 'Accept': 'application/json' }
     });
     const existingData = existingRes.ok ? await existingRes.json() : {};
     const updated = { ...existingData, competitions };
-    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+    await fetch('https://bama-club-api.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(updated)
@@ -2171,7 +2269,7 @@ export const saveCompetitionsBackend = async (competitions) => {
 
 export const fetchStaffBackend = async () => {
   try {
-    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+    const res = await fetch(`https://bama-club-api.fly.dev/api/cms-config/?_t=${Date.now()}`, {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
@@ -2185,12 +2283,12 @@ export const fetchStaffBackend = async () => {
 
 export const saveStaffBackend = async (staffList) => {
   try {
-    const existingRes = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+    const existingRes = await fetch('https://bama-club-api.fly.dev/api/cms-config/', {
       headers: { 'Accept': 'application/json' }
     });
     const existingData = existingRes.ok ? await existingRes.json() : {};
     const updated = { ...existingData, staff_list: staffList };
-    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+    await fetch('https://bama-club-api.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(updated)
@@ -2653,6 +2751,72 @@ export const importCadetsBackupJSON = (jsonString) => {
     console.error('Failed to import backup JSON:', err);
     return { success: false, error: err.message };
   }
+};
+
+/**
+ * One-Click Bulk Cloud Sync:
+ * Takes all cadets stored in local storage, automatically compresses any local base64 photos to 20KB WebP on Supabase Storage,
+ * creates/updates them in the Supabase PostgreSQL backend, and normalizes local cache.
+ */
+export const syncAllCadetsToCloud = async (onProgress) => {
+  const cadets = getStoredStudents();
+  if (!Array.isArray(cadets) || cadets.length === 0) {
+    return { success: false, message: 'No cadets found in local storage to sync.' };
+  }
+
+  let syncedCount = 0;
+  let errorCount = 0;
+  const updatedCadets = [];
+
+  for (let i = 0; i < cadets.length; i++) {
+    const c = cadets[i];
+    if (onProgress) {
+      onProgress({
+        current: i + 1,
+        total: cadets.length,
+        studentName: c.name || c.student_name || 'Cadet',
+        percent: Math.round(((i + 1) / cadets.length) * 100)
+      });
+    }
+
+    try {
+      // 1. Optimize photo to 20KB WebP on Supabase Storage if base64
+      let photoUrl = c.photo || '';
+      if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+        photoUrl = await compressAndUploadCadetPhoto(photoUrl, c.admissionNo || c.admission_no || c.id || `cadet_${i}`);
+      }
+
+      // 2. Post to live Supabase API
+      const payload = {
+        ...c,
+        photo: photoUrl
+      };
+
+      const serverCadet = await createStudent(payload);
+      syncedCount++;
+      updatedCadets.push({
+        ...c,
+        ...(serverCadet || {}),
+        photo: photoUrl
+      });
+    } catch (err) {
+      console.warn(`[Sync] Failed to sync cadet ${c.name}:`, err);
+      errorCount++;
+      updatedCadets.push(c);
+    }
+  }
+
+  // Update local storage with clean, CDN-backed cadets
+  saveStoredStudents(updatedCadets);
+  invalidateStudentsCache();
+  window.dispatchEvent(new Event('bama_data_updated'));
+
+  return {
+    success: true,
+    total: cadets.length,
+    synced: syncedCount,
+    failed: errorCount
+  };
 };
 
 export default api;
