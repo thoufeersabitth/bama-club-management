@@ -1133,6 +1133,7 @@ export const updateStudent = async (id, data) => {
   }
 
   const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);
+  let serverData = null;
   for (const ident of identifiers) {
     try {
       const res = await fetch(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(ident)}/`, {
@@ -1143,16 +1144,32 @@ export const updateStudent = async (id, data) => {
         },
         body: JSON.stringify(payload)
       });
-      if (res.ok) break;
+      if (res.ok) {
+        try {
+          serverData = await res.json();
+        } catch (e) {}
+        break;
+      }
     } catch (err) {
       console.warn('API update failed for identifier:', ident, err);
     }
   }
 
-  const updatedRoster = currentList.map(s => (isMatch(s) ? { ...s, ...payload } : s));
+  const finalUpdated = {
+    ...payload,
+    ...(serverData || {}),
+    branch: payload.branch_name || payload.branch,
+    branch_name: payload.branch_name || payload.branch,
+    branch_id: payload.branch_id || (serverData?.branch_id || serverData?.branch),
+    dojo_branch: payload.branch_name || payload.branch,
+    branchName: payload.branch_name || payload.branch
+  };
+
+  const updatedRoster = currentList.map(s => (isMatch(s) ? { ...s, ...finalUpdated } : s));
   saveStoredStudents(updatedRoster);
+  invalidateStudentsCache();
   window.dispatchEvent(new Event('bama_data_updated'));
-  return payload;
+  return finalUpdated;
 };
 
 export const promoteStudent = async (studentId, { target_belt, exam_date, examiner, certificate_no, remarks }) => {

@@ -898,8 +898,14 @@ export default function StudentManagement() {
 
   // Open Edit Modal & Pre-populate ALL Personal Details
   const handleOpenEditModal = (student) => {
-    const cleanBranch = student.branch_name || student.branch_detail?.name || student.branchName || (typeof student.branch === 'object' ? student.branch?.name : student.branch) || 'Pulikkal Branch (Head Office)';
-    const exactBranchName = cleanBranch;
+    const rawBranch = student.branch_name || student.branch_detail?.name || student.branchName || (typeof student.branch === 'object' ? student.branch?.name : student.branch) || student.branch_id || (student.shift ? String(student.shift).split('(')[0] : '');
+    const exactBranchName = getStandardBranchName(rawBranch, branchesList);
+    const matchedB = (branchesList || []).find(b => 
+      String(b.name).toLowerCase() === exactBranchName.toLowerCase() ||
+      String(b.id) === String(student.branch_id) ||
+      String(b.code).toLowerCase() === exactBranchName.toLowerCase()
+    );
+    const exactBranchId = matchedB ? matchedB.id : (student.branch_id || exactBranchName);
 
     const courseProg = resolveStudentProgram(student);
     const isKarate = courseProg.toLowerCase().includes('karate');
@@ -926,7 +932,10 @@ export default function StudentManagement() {
       currentBelt: resolvedBelt,
       current_belt: resolvedBelt,
       branch: exactBranchName,
+      branch_id: exactBranchId,
       branch_name: exactBranchName,
+      branchName: exactBranchName,
+      dojo_branch: exactBranchName,
       shift: resolvedShift,
       admissionFee: student.admission_fee ?? student.admissionFee ?? 1000,
       admission_fee: student.admission_fee ?? student.admissionFee ?? 1000,
@@ -952,14 +961,14 @@ export default function StudentManagement() {
     const pending = Math.max(0, feeAmt - initialPaid);
     const calculatedFeeStatus = pending === 0 ? 'Paid' : initialPaid > 0 ? 'Partial' : 'Pending';
 
-    const rawEditBranch = editingStudent.branch_name || editingStudent.branch || editingStudent.branch_id || 'Pulikkal Branch (Head Office)';
-    const matchedEditB = branchesList.find(b => 
+    // 100% Guaranteed Target Branch Resolution from the user selection in Edit Modal
+    const chosenBranchName = editingStudent.branch_name || editingStudent.branch || '';
+    const matchedEditB = (branchesList || []).find(b => 
+      String(b.name).toLowerCase() === String(chosenBranchName).toLowerCase() ||
       String(b.id) === String(editingStudent.branch_id) ||
-      String(b.id) === String(editingStudent.branch) ||
-      String(b.name).toLowerCase() === String(rawEditBranch).toLowerCase() ||
-      String(b.code).toLowerCase() === String(rawEditBranch).toLowerCase()
+      String(b.code).toLowerCase() === String(chosenBranchName).toLowerCase()
     );
-    const editBranchName = matchedEditB ? matchedEditB.name : (editingStudent.branch_name || editingStudent.branch || 'Pulikkal Branch (Head Office)');
+    const editBranchName = matchedEditB ? matchedEditB.name : getStandardBranchName(chosenBranchName, branchesList);
     const editBranchId = matchedEditB ? matchedEditB.id : (editingStudent.branch_id || editBranchName);
 
     const editProg = editingStudent.program || editingStudent.course || editingStudent.discipline || 'Karate (Shotokan)';
@@ -967,6 +976,13 @@ export default function StudentManagement() {
     const editRawBelt = String(editingStudent.currentBelt || editingStudent.current_belt || '').trim();
     const editHasRealBelt = Boolean(editRawBelt && !['no belt', 'no_belt', 'no-belt', 'n/a', 'none', 'null', 'undefined', ''].includes(editRawBelt.toLowerCase()));
     const finalBelt = editIsKarate ? (editHasRealBelt ? editRawBelt : 'White Belt') : 'No Belt';
+
+    // Ensure training shift aligns with the new branch
+    let editShift = editingStudent.shift || '';
+    const branchShifts = getDynamicShiftOptions(editBranchName, editProg, branchesList);
+    if (!editShift || (branchShifts.length > 0 && !branchShifts.includes(editShift))) {
+      editShift = branchShifts.length > 0 ? branchShifts[0] : (editShift || 'Evening Batch (5:00 PM - 7:00 PM)');
+    }
 
     const updatedData = {
       ...editingStudent,
@@ -988,12 +1004,13 @@ export default function StudentManagement() {
       blood_group: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
       currentBelt: finalBelt,
       current_belt: finalBelt,
-      branch: editBranchId,
+      branch: editBranchId, // UUID for Django ForeignKey
       branch_id: editBranchId,
       branch_name: editBranchName,
       branchName: editBranchName,
       dojo_branch: editBranchName,
-      shift: editingStudent.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
+      branch_detail: matchedEditB ? { id: matchedEditB.id, name: matchedEditB.name, code: matchedEditB.code } : { id: editBranchId, name: editBranchName },
+      shift: editShift,
       admissionFee: admissionFeeAmt,
       admission_fee: admissionFeeAmt,
       admissionFeePaid: isAdmissionPaid,
@@ -1018,11 +1035,13 @@ export default function StudentManagement() {
 
     try {
       const saved = await updateStudent(editingStudent.id, updatedData);
-      const updatedList = students.map(s => isMatch(s) ? { ...s, ...saved } : s);
+      const mergedSaved = { ...updatedData, ...(saved || {}) };
+      const updatedList = students.map(s => isMatch(s) ? { ...s, ...mergedSaved } : s);
       setStudents(updatedList);
       saveStoredStudents(updatedList);
+      invalidateStudentsCache();
       if (detailStudent && isMatch(detailStudent)) {
-        setDetailStudent(prev => ({ ...prev, ...saved }));
+        setDetailStudent(prev => ({ ...prev, ...mergedSaved }));
       }
       setEditingStudent(null);
       setEditPhotoState({ rawSrc: '', zoom: 1.0, panX: 0, panY: 0 });
@@ -1030,6 +1049,7 @@ export default function StudentManagement() {
       const updatedList = students.map(s => isMatch(s) ? { ...s, ...updatedData } : s);
       setStudents(updatedList);
       saveStoredStudents(updatedList);
+      invalidateStudentsCache();
       if (detailStudent && isMatch(detailStudent)) {
         setDetailStudent(prev => ({ ...prev, ...updatedData }));
       }
@@ -4057,31 +4077,31 @@ export default function StudentManagement() {
                   <span className="text-[9px] text-emerald-800 font-black bg-emerald-100/80 px-1.5 py-0.5 rounded border border-emerald-300 ml-1">✓ Change Branch</span>
                 </label>
                 <select
-                  value={editingStudent.branch_id || editingStudent.branch || editingStudent.branch_name || ''}
+                  value={editingStudent.branch_name || editingStudent.branch || ''}
                   onChange={(e) => {
-                    const selectedVal = e.target.value;
+                    const selectedName = e.target.value;
                     const matchedB = branchesList.find(b => 
-                      String(b.id) === String(selectedVal) || 
-                      String(b.name).toLowerCase() === String(selectedVal).toLowerCase() ||
-                      String(b.code).toLowerCase() === String(selectedVal).toLowerCase()
+                      String(b.name).toLowerCase() === String(selectedName).toLowerCase() ||
+                      String(b.id) === String(selectedName) ||
+                      String(b.code).toLowerCase() === String(selectedName).toLowerCase()
                     );
-                    const bName = matchedB ? matchedB.name : selectedVal;
-                    const bId = matchedB ? matchedB.id : selectedVal;
+                    const bName = matchedB ? matchedB.name : selectedName;
+                    const bId = matchedB ? matchedB.id : selectedName;
                     const bShifts = getDynamicShiftOptions(bName, editingStudent.program || 'Karate (Shotokan)', branchesList);
-                    setEditingStudent({
-                      ...editingStudent,
-                      branch: bId,
+                    setEditingStudent(prev => ({
+                      ...prev,
+                      branch: bName,
                       branch_id: bId,
                       branch_name: bName,
                       branchName: bName,
                       dojo_branch: bName,
-                      shift: bShifts[0] || editingStudent.shift
-                    });
+                      shift: bShifts.length > 0 ? bShifts[0] : prev.shift
+                    }));
                   }}
                   className="w-full bg-white border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:outline-none focus:border-red-500 cursor-pointer shadow-sm"
                 >
                   {branchesList.map(b => (
-                    <option key={b.id || b.name} value={b.id || b.name}>
+                    <option key={b.id || b.name} value={b.name}>
                       {b.name} ({b.code || 'DOJO'})
                     </option>
                   ))}
