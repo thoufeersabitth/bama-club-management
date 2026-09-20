@@ -956,7 +956,7 @@ export default function StudentManagement() {
     setIsSavingCadet(true);
 
     try {
-      const finalPhoto = editPhotoState.rawSrc ? getCanvasDataUrl(editCanvasRef, editingStudent.photo) : editingStudent.photo;
+      const finalPhoto = editPhotoState.rawSrc ? (getCanvasDataUrl(editCanvasRef, editPhotoState.rawSrc) || editPhotoState.rawSrc) : editingStudent.photo;
       const initialPaid = parseInt(editingStudent.initialPaidAmount || editingStudent.initial_paid_amount || 0);
       const feeAmt = parseInt(editingStudent.feeAmount || editingStudent.fee_amount || 500);
       const admissionFeeAmt = editingStudent.admissionFee !== undefined ? Math.max(0, parseInt(editingStudent.admissionFee) || 0) : (editingStudent.admission_fee !== undefined ? Math.max(0, parseInt(editingStudent.admission_fee) || 0) : 1000);
@@ -3809,10 +3809,10 @@ export default function StudentManagement() {
 
                 <div className="flex items-start gap-4">
                   <div className="w-24 h-24 rounded-2xl bg-gray-100 border-2 border-blue-500/30 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm relative">
-                    {editingStudent.photo ? (
-                      <img src={editingStudent.photo} alt="Preview" className="w-full h-full object-cover rounded-xl" />
-                    ) : editPhotoState.rawSrc ? (
+                    {editPhotoState.rawSrc ? (
                       <canvas ref={editCanvasRef} className="w-full h-full object-cover rounded-xl" />
+                    ) : editingStudent.photo ? (
+                      <img src={editingStudent.photo} alt="Preview" className="w-full h-full object-cover rounded-xl" />
                     ) : (
                       <div className="flex flex-col items-center gap-1 text-gray-400">
                         <ImageIcon className="w-6 h-6" />

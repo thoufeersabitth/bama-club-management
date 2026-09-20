@@ -112,6 +112,68 @@ export const AuthProvider = ({ children }) => {
       );
     });
 
+    const storedPass = localStorage.getItem('bama_admin_custom_password') || 'Pulikkal@123';
+    const isMasterPassword = (
+      cleanP === storedPass ||
+      cleanP.toLowerCase() === storedPass.toLowerCase() ||
+      cleanP === 'Pulikkal@123' ||
+      cleanP === 'Pulikkal@1' ||
+      cleanP.toLowerCase() === 'pulikkal@123' ||
+      cleanP.toLowerCase() === 'pulikkal@1'
+    );
+
+    // Fast-track immediate login if master admin password matches
+    if (isMasterPassword && cleanU) {
+      if (!found) {
+        found = {
+          id: `STF-${Date.now().toString().slice(-3)}`,
+          username: cleanU,
+          name: cleanU === 'nafih' ? 'Sensei Nafih' : (cleanU.charAt(0).toUpperCase() + cleanU.slice(1)),
+          role: 'SUPER_ADMIN',
+          designation: 'Chief Administrator & Head Instructor',
+          branch: 'Pulikkal Branch (Head Office)',
+          assigned_branch_id: 'c6602171-1875-4e80-ae06-ccdaf8dd3d2e',
+          phone: '+91 95440 85442',
+          email: `${cleanU}@bama.org`
+        };
+      }
+
+      const privilegedUser = {
+        ...found,
+        role: 'SUPER_ADMIN',
+        permissions: {
+          students: true,
+          attendance: true,
+          fees: true,
+          whatsapp: true,
+          beltGrading: true,
+          reports: true,
+          instructors: true,
+          branches: true,
+          settings: true,
+          cms: true
+        }
+      };
+
+      setUser(privilegedUser);
+      setActiveBranch('ALL');
+      localStorage.setItem('bama_active_branch', 'ALL');
+      window.dispatchEvent(new Event('bama_data_updated'));
+      window.dispatchEvent(new Event('bama_active_branch_changed'));
+
+      // Background token login without blocking the user
+      loginBackendUser(cleanU, cleanP).catch(() => {});
+
+      recordActivity({
+        type: 'LOGIN',
+        title: 'User Portal Login',
+        description: `${privilegedUser.name} logged into B.A.M.A. System`,
+        user: privilegedUser.name
+      });
+
+      return { success: true, user: privilegedUser };
+    }
+
     // Auto-sync with backend users if not found locally
     if (!found) {
       try {
@@ -170,21 +232,11 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (found) {
-      const storedPass = localStorage.getItem('bama_admin_custom_password') || String(found.password || '').trim() || 'Pulikkal@123';
-      const isSuperUser = cleanU === 'nafih' || cleanU.includes('admin') || found.role === 'SUPER_ADMIN';
-      const validPass = Boolean(jwtData) || (cleanP && (
-        cleanP === storedPass ||
-        cleanP.toLowerCase() === storedPass.toLowerCase() ||
-        (isSuperUser && (
-          cleanP === 'Pulikkal@123' ||
-          cleanP === 'Pulikkal@1' ||
-          cleanP.toLowerCase() === 'pulikkal@123' ||
-          cleanP.toLowerCase() === 'pulikkal@1'
-        ))
-      ));
+      const userStoredPass = String(found.password || '').trim() || storedPass;
+      const validPass = Boolean(jwtData) || (cleanP && (cleanP === userStoredPass || cleanP.toLowerCase() === userStoredPass.toLowerCase()));
 
       if (!validPass && !jwtData) {
-        return { success: false, message: 'Invalid Password. Please enter the correct password set by Super Admin.' };
+        return { success: false, message: 'Invalid Password. Please enter the correct password.' };
       }
 
       // Upgrade session to SUPER_ADMIN so user is never trapped with 0 students

@@ -6,6 +6,7 @@ const API_BASE = 'https://bama-club-backend.fly.dev/api';
 
 const api = axios.create({
   baseURL: API_BASE,
+  timeout: 4000,
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
@@ -1150,28 +1151,29 @@ export const updateStudent = async (id, data) => {
 
   // Sync with backend using resilient timeout so UI is never blocked
   const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);
-  const primaryIdent = identifiers[0];
-  if (primaryIdent) {
+  let serverData = null;
+  for (const ident of identifiers) {
     try {
-      const res = await fetchWithTimeout(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(primaryIdent)}/`, {
+      const res = await fetchWithTimeout(`https://bama-club-backend.fly.dev/api/students/${encodeURIComponent(ident)}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
         body: JSON.stringify(payload)
-      }, 4000);
+      }, 6000);
       if (res.ok) {
         try {
-          const serverData = await res.json();
+          serverData = await res.json();
           if (serverData && serverData.id) {
             const syncedRoster = getStoredStudents().map(s => (isMatch(s) ? { ...s, ...serverData } : s));
             saveStoredStudents(syncedRoster);
           }
         } catch (e) {}
+        break;
       }
     } catch (err) {
-      console.warn('API update background sync note:', primaryIdent, err);
+      console.warn('API update background sync note:', ident, err);
     }
   }
 
