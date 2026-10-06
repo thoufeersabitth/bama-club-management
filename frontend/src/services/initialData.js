@@ -343,6 +343,22 @@ export const INITIAL_BRANCHES = [
     mapUrl: "https://maps.google.com/?q=Airport+Malappuram"
   },
   {
+    id: "4d38ae92-3eff-4eeb-b244-9b19dd0de186",
+    name: "AMLP SCHOOL KOONOLMADU",
+    code: "BAMA-DOJO-12",
+    address: "Koonolmadu Pallikal, Malappuram, Kerala",
+    phone: "+91 95440 85442",
+    whatsapp: "+91 95440 85442",
+    email: "info@bama.org",
+    branch_head: "Sensei Abdul Nafih.p",
+    head: "Sensei Abdul Nafih.p",
+    timings: "Sat: 3:30 PM - 4:30 PM",
+    facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags"],
+    status: "Active",
+    isHeadOffice: false,
+    mapUrl: "https://maps.google.com/?q=Pallikal+Malappuram"
+  },
+  {
     id: "af13fe03-4a60-4c2e-991f-d22d6489317b",
     name: "AMLP SCHOOL NEERAD",
     code: "BAMA-AMLP-01",

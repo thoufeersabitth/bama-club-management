@@ -19,8 +19,8 @@ export const SUPABASE_CONFIG = {
   bucket: 'cadet-photos'
 };
 
-// Automatic one-time cache purge for clean 177 roster deduplication & branch sync
-export const BAMA_DATA_VERSION = 'v3_live_177_roster';
+// Automatic one-time cache purge for clean roster deduplication & branch sync
+export const BAMA_DATA_VERSION = 'v4_live_koonolmadu_branch';
 if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   try {
     if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {
@@ -87,7 +87,10 @@ export const getStandardBranchName = (val, branchesList = []) => {
   if (sLow.includes('6eccd83a') || sLow.includes('4348ee03') || sLow.includes('bama-air-01') || sLow.includes('bama-dojo-010') || sLow.includes('airport')) {
     return 'AIRPORT KARATE';
   }
-  if (sLow.includes('af13fe03') || sLow.includes('b65c2bbc') || sLow.includes('bama-amlp-01') || sLow.includes('bama-dojo-05') || sLow.includes('neerad') || sLow.includes('amlp')) {
+  if (sLow.includes('4d38ae92') || sLow.includes('koonolmadu') || sLow.includes('koonol') || sLow.includes('bama-dojo-12')) {
+    return 'AMLP SCHOOL KOONOLMADU';
+  }
+  if (sLow.includes('af13fe03') || sLow.includes('b65c2bbc') || sLow.includes('bama-amlp-01') || sLow.includes('bama-dojo-05') || sLow.includes('neerad') || (sLow.includes('amlp') && !sLow.includes('koonol'))) {
     return 'AMLP SCHOOL NEERAD';
   }
   if (sLow.includes('e2dd8c32') || sLow.includes('17e47ded') || sLow.includes('cgm-02') || sLow.includes('chungam')) {

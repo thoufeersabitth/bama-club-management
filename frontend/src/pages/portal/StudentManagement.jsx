@@ -1116,7 +1116,8 @@ export default function StudentManagement() {
       if (bStr.includes('pengad') || bStr.includes('btmamups') || bStr.includes('btamup')) return 'pengad';
       if (bStr.includes('ganapath')) return 'ganapath';
       if (bStr.includes('airport')) return 'airport';
-      if (bStr.includes('neerad') || bStr.includes('amlps') || bStr.includes('amlp')) return 'neerad';
+      if (bStr.includes('koonolmadu') || bStr.includes('koonol') || bStr.includes('dojo-12') || bStr.includes('4d38ae92')) return 'koonolmadu';
+      if (bStr.includes('neerad') || (bStr.includes('amlp') && !bStr.includes('koonol'))) return 'neerad';
       if (bStr.includes('chungam') || bStr.includes('cgm') || bStr.includes('dojo-02')) return 'chungam';
       if (bStr.includes('mongam') || bStr.includes('dojo-03')) return 'mongam';
       if (bStr.includes('feroke') || bStr.includes('dojo-04')) return 'feroke';
@@ -1175,7 +1176,9 @@ export default function StudentManagement() {
         matchesBranch = (cadetBranchKey === 'ganapath');
       } else if (scopeLower.includes('airport')) {
         matchesBranch = (cadetBranchKey === 'airport');
-      } else if (scopeLower.includes('neerad') || scopeLower.includes('amlps') || scopeLower.includes('amlp')) {
+      } else if (scopeLower.includes('koonolmadu') || scopeLower.includes('koonol') || scopeLower.includes('dojo-12')) {
+        matchesBranch = (cadetBranchKey === 'koonolmadu');
+      } else if (scopeLower.includes('neerad') || (scopeLower.includes('amlp') && !scopeLower.includes('koonol'))) {
         matchesBranch = (cadetBranchKey === 'neerad');
       } else if (scopeLower.includes('chungam') || scopeLower.includes('cgm') || scopeLower.includes('dojo-02')) {
         matchesBranch = (cadetBranchKey === 'chungam');

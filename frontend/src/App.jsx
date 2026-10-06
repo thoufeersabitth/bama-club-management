@@ -33,7 +33,7 @@ import { INITIAL_BRANCHES } from './services/initialData';
 
 export default function App() {
   React.useEffect(() => {
-    const APP_VERSION = 'bama_v2026_09_07_blood_group_sync_v24';
+    const APP_VERSION = 'bama_v2026_10_06_koonolmadu_branch_v25';
     if (localStorage.getItem('bama_app_cache_version') !== APP_VERSION) {
       // Clean stale cadet/user cache, branch caches, schedule caches and dummy logs
       localStorage.removeItem('bama_cadets_roster');
@@ -57,7 +57,7 @@ export default function App() {
     // Safety: ensure official branches like Chungam are NEVER stuck in deleted_branch_ids
     try {
       const del = JSON.parse(localStorage.getItem('bama_deleted_branch_ids') || '[]');
-      const protectedWords = ['pulikkal', 'neerad', 'airport', 'ansar', 'pengad', 'chungam', 'feroke', 'kick boxing', 'cgm-02', 'plk-01'];
+      const protectedWords = ['pulikkal', 'neerad', 'koonolmadu', 'airport', 'ansar', 'pengad', 'chungam', 'feroke', 'kick boxing', 'cgm-02', 'plk-01'];
       const cleanedDel = del.filter(item => {
         const itemLow = String(item || '').toLowerCase().trim();
         return !protectedWords.some(p => itemLow.includes(p));

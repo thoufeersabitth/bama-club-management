@@ -268,7 +268,8 @@ export default function AttendanceManagement() {
     if (s.includes('pengad') || s.includes('btmamups') || s.includes('btamup')) return 'pengad';
     if (s.includes('ganapath')) return 'ganapath';
     if (s.includes('airport')) return 'airport';
-    if (s.includes('neerad') || s.includes('amlps') || s.includes('amlp')) return 'neerad';
+    if (s.includes('koonolmadu') || s.includes('koonol') || s.includes('dojo-12') || s.includes('4d38ae92')) return 'koonolmadu';
+    if (s.includes('neerad') || (s.includes('amlp') && !s.includes('koonol'))) return 'neerad';
     if (s.includes('chungam') || s.includes('cgm')) return 'chungam';
     if (s.includes('feroke') || s.includes('frk')) return 'feroke';
     if (s.includes('pulikkal') || s.includes('head office') || s.includes('plk')) return 'pulikkal';

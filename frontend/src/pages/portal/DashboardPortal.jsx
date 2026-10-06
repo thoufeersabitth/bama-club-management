@@ -37,7 +37,8 @@ export default function DashboardPortal() {
     if (bStr.includes('pengad') || bStr.includes('btmamups') || bStr.includes('btamup')) return 'pengad';
     if (bStr.includes('ganapath')) return 'ganapath';
     if (bStr.includes('airport')) return 'airport';
-    if (bStr.includes('neerad') || bStr.includes('amlps') || bStr.includes('amlp')) return 'neerad';
+    if (bStr.includes('koonolmadu') || bStr.includes('koonol') || bStr.includes('dojo-12') || bStr.includes('4d38ae92')) return 'koonolmadu';
+    if (bStr.includes('neerad') || (bStr.includes('amlp') && !bStr.includes('koonol'))) return 'neerad';
     if (bStr.includes('chungam') || bStr.includes('cgm')) return 'chungam';
     if (bStr.includes('mongam')) return 'mongam';
     if (bStr.includes('feroke') || bStr.includes('frk')) return 'feroke';
@@ -57,7 +58,8 @@ export default function DashboardPortal() {
     if (scopeLower.includes('pengad') || scopeLower.includes('btmamups') || scopeLower.includes('btamup')) return itemKey === 'pengad';
     if (scopeLower.includes('ganapath')) return itemKey === 'ganapath';
     if (scopeLower.includes('airport')) return itemKey === 'airport';
-    if (scopeLower.includes('neerad') || scopeLower.includes('amlps') || scopeLower.includes('amlp')) return itemKey === 'neerad';
+    if (scopeLower.includes('koonolmadu') || scopeLower.includes('koonol') || scopeLower.includes('dojo-12')) return itemKey === 'koonolmadu';
+    if (scopeLower.includes('neerad') || (scopeLower.includes('amlp') && !scopeLower.includes('koonol'))) return itemKey === 'neerad';
     if (scopeLower.includes('chungam') || scopeLower.includes('cgm')) return itemKey === 'chungam';
     if (scopeLower.includes('mongam')) return itemKey === 'mongam';
     if (scopeLower.includes('feroke') || scopeLower.includes('frk')) return itemKey === 'feroke';

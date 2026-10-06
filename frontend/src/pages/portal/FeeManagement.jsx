@@ -536,7 +536,8 @@ export default function FeeManagement() {
       if (bStr.includes('pengad') || bStr.includes('btmamups') || bStr.includes('btamup')) return 'pengad';
       if (bStr.includes('ganapath')) return 'ganapath';
       if (bStr.includes('airport')) return 'airport';
-      if (bStr.includes('neerad') || bStr.includes('amlps') || bStr.includes('amlp')) return 'neerad';
+      if (bStr.includes('koonolmadu') || bStr.includes('koonol') || bStr.includes('dojo-12') || bStr.includes('4d38ae92')) return 'koonolmadu';
+      if (bStr.includes('neerad') || (bStr.includes('amlp') && !bStr.includes('koonol'))) return 'neerad';
       if (bStr.includes('chungam') || bStr.includes('cgm')) return 'chungam';
       if (bStr.includes('mongam')) return 'mongam';
       if (bStr.includes('feroke') || bStr.includes('frk')) return 'feroke';
@@ -555,7 +556,8 @@ export default function FeeManagement() {
       else if (selStr.includes('pengad') || selStr.includes('btmamups') || selStr.includes('btamup')) matchesBranch = (cadetBranchKey === 'pengad');
       else if (selStr.includes('ganapath')) matchesBranch = (cadetBranchKey === 'ganapath');
       else if (selStr.includes('airport')) matchesBranch = (cadetBranchKey === 'airport');
-      else if (selStr.includes('neerad') || selStr.includes('amlps') || selStr.includes('amlp')) matchesBranch = (cadetBranchKey === 'neerad');
+      else if (selStr.includes('koonolmadu') || selStr.includes('koonol') || selStr.includes('dojo-12')) matchesBranch = (cadetBranchKey === 'koonolmadu');
+      else if (selStr.includes('neerad') || (selStr.includes('amlp') && !selStr.includes('koonol'))) matchesBranch = (cadetBranchKey === 'neerad');
       else if (selStr.includes('chungam') || selStr.includes('cgm')) matchesBranch = (cadetBranchKey === 'chungam');
       else if (selStr.includes('mongam')) matchesBranch = (cadetBranchKey === 'mongam');
       else if (selStr.includes('feroke') || selStr.includes('frk')) matchesBranch = (cadetBranchKey === 'feroke');
