@@ -55,6 +55,9 @@ export default function AttendanceManagement() {
   const [applyAllBranches, setApplyAllBranches] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [reportFormat, setReportFormat] = useState('full'); // 'full' | 'absentees_only' | 'rollcall'
+  const [reportBranch, setReportBranch] = useState('All');
+  const [reportShift, setReportShift] = useState('All');
 
   // Day Status State (CLASS vs HOLIDAY)
   const [dayStatus, setDayStatus] = useState('CLASS');
@@ -273,48 +276,120 @@ export default function AttendanceManagement() {
     }
   };
 
-  // WhatsApp Branch Attendance Report Generator
-  const generateWhatsAppAttendanceReport = () => {
-    const branchTitle = selectedBranch === 'All' ? 'ALL DOJO BRANCHES' : selectedBranch;
-    const shiftTitle = selectedShift === 'All' ? 'All Batches' : selectedShift;
-    const absentees = baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'ABSENT');
-    const latecomers = baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'LATE');
-    
+  // Open Report Modal with default active branch
+  const openReportModal = () => {
+    const initBranch = selectedBranch !== 'All' ? selectedBranch : (branchesList[0]?.name || 'All');
+    setReportBranch(initBranch);
+    setReportShift(selectedShift);
+    setReportFormat('full');
+    setShowReportModal(true);
+  };
+
+  // WhatsApp Branch Attendance Report Generator (Full names of Absent & Present Cadets)
+  const generateWhatsAppAttendanceReport = (targetBranch = reportBranch, targetShift = reportShift, targetFormat = reportFormat) => {
+    const activeBranch = targetBranch || selectedBranch;
+    const activeShift = targetShift || selectedShift;
+    const format = targetFormat || reportFormat;
+
+    const branchTitle = activeBranch === 'All' ? 'ALL DOJO BRANCHES' : activeBranch;
+    const shiftTitle = activeShift === 'All' ? 'All Batches' : activeShift;
+
+    // Strict Cadet Filter for this Branch & Batch
+    const targetStudents = students.filter(s => {
+      if (activeBranch !== 'All' && !isStudentInBranch(s, activeBranch)) return false;
+      if (activeShift !== 'All') {
+        if (!matchesShift(s, activeShift)) return false;
+      }
+      return true;
+    });
+
+    const isTargetHoliday = dayStatus === 'HOLIDAY';
+
+    const absentees = isTargetHoliday ? [] : targetStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'ABSENT');
+    const latecomers = isTargetHoliday ? [] : targetStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'LATE');
+    const presentees = isTargetHoliday ? [] : targetStudents.filter(s => (attendanceRecords[s.id || s.admissionNo] || 'PRESENT') === 'PRESENT');
+
+    const total = targetStudents.length;
+    const pCount = presentees.length;
+    const aCount = absentees.length;
+    const lCount = latecomers.length;
+    const rate = total > 0 ? ((pCount / total) * 100).toFixed(1) : '100.0';
+
     let msg = `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n`;
     msg += `📍 *Dojo Branch:* ${branchTitle}\n`;
     msg += `📅 *Date:* ${selectedDate}\n`;
     msg += `⏰ *Batch / Shift:* ${shiftTitle}\n\n`;
 
-    if (dayStatus === 'HOLIDAY') {
+    if (isTargetHoliday) {
       msg += `🏖️ *STATUS: OFFICIAL DOJO HOLIDAY*\n`;
       msg += `📌 *Reason:* ${holidayReason || 'Weekly Off / Class Cancelled'}\n\n`;
-    } else {
-      msg += `📊 *DAILY ATTENDANCE SUMMARY*\n`;
-      msg += `━━━━━━━━━━━━━━━━━━━━\n`;
-      msg += `👥 *Total Enrolled:* ${totalCount} Cadets\n`;
-      msg += `✅ *Present:* ${presentCount} Cadets\n`;
-      msg += `❌ *Absent:* ${absentCount} Cadets\n`;
-      if (lateCount > 0) msg += `⏳ *Late:* ${lateCount} Cadets\n`;
-      msg += `📈 *Attendance Rate:* ${attendanceRate}%\n`;
-      msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+      const senseiName = user?.name || 'Sensei Abdul Nafih.p';
+      msg += `🥋 *Sensei In-Charge:* ${senseiName}\n`;
+      msg += `_B.A.M.A. Official Digital Roster_`;
+      return msg;
+    }
 
+    msg += `📊 *DAILY ATTENDANCE SUMMARY*\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `👥 *Total Enrolled:* ${total} Cadets\n`;
+    msg += `✅ *Present:* ${pCount} Cadets\n`;
+    msg += `❌ *Absent:* ${aCount} Cadets\n`;
+    if (lCount > 0) msg += `⏳ *Late:* ${lCount} Cadets\n`;
+    msg += `📈 *Attendance Rate:* ${rate}%\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    if (format === 'absentees_only') {
       if (absentees.length > 0) {
-        msg += `📋 *Absentee Cadets (${absentees.length}):*\n`;
+        msg += `❌ *ABSENT CADETS LIST (${absentees.length}):*\n`;
         absentees.forEach((a, i) => {
-          msg += `${i + 1}. ${a.name} (${a.admissionNo || a.admission_no || 'N/A'})\n`;
+          const adm = a.admissionNo || a.admission_no ? ` (${a.admissionNo || a.admission_no})` : '';
+          msg += `${i + 1}. ${a.name || a.student_name}${adm}\n`;
         });
         msg += `\n`;
       } else {
-        msg += `🌟 *100% Full Attendance Today! Excellent dedication! OSS 🥋*\n\n`;
+        msg += `🌟 *100% Full Attendance Today! No Absentees! OSS 🥋*\n\n`;
+      }
+    } else if (format === 'rollcall') {
+      msg += `📋 *ROLL CALL REGISTER (${total}):*\n`;
+      targetStudents.forEach((st, i) => {
+        const stStatus = attendanceRecords[st.id || st.admissionNo] || 'PRESENT';
+        const icon = stStatus === 'PRESENT' ? '✅' : stStatus === 'ABSENT' ? '❌' : '⏳';
+        const adm = st.admissionNo || st.admission_no ? ` [${st.admissionNo || st.admission_no}]` : '';
+        msg += `${i + 1}. ${icon} ${st.name || st.student_name}${adm} - *${stStatus}*\n`;
+      });
+      msg += `\n`;
+    } else {
+      // Default 'full': Shows Absentees prominently with names, then all Present students!
+      if (absentees.length > 0) {
+        msg += `❌ *ABSENT CADETS (${absentees.length}):*\n`;
+        absentees.forEach((a, i) => {
+          const adm = a.admissionNo || a.admission_no ? ` (${a.admissionNo || a.admission_no})` : '';
+          msg += `${i + 1}. ${a.name || a.student_name}${adm}\n`;
+        });
+        msg += `\n`;
+      } else {
+        msg += `❌ *ABSENT CADETS:*\nNone (100% Full Attendance! 🎉)\n\n`;
       }
 
       if (latecomers.length > 0) {
-        msg += `⏳ *Late Cadets (${latecomers.length}):*\n`;
+        msg += `⏳ *LATE CADETS (${latecomers.length}):*\n`;
         latecomers.forEach((l, i) => {
-          msg += `${i + 1}. ${l.name} (${l.admissionNo || l.admission_no || 'N/A'})\n`;
+          const adm = l.admissionNo || l.admission_no ? ` (${l.admissionNo || l.admission_no})` : '';
+          msg += `${i + 1}. ${l.name || l.student_name}${adm}\n`;
         });
         msg += `\n`;
       }
+
+      msg += `✅ *PRESENT CADETS (${presentees.length}):*\n`;
+      if (presentees.length > 0) {
+        presentees.forEach((p, i) => {
+          const adm = p.admissionNo || p.admission_no ? ` (${p.admissionNo || p.admission_no})` : '';
+          msg += `${i + 1}. ${p.name || p.student_name}${adm}\n`;
+        });
+      } else {
+        msg += `None\n`;
+      }
+      msg += `\n`;
     }
 
     const senseiName = user?.name || 'Sensei Abdul Nafih.p';
@@ -323,15 +398,15 @@ export default function AttendanceManagement() {
     return msg;
   };
 
-  const handleShareReportWhatsApp = () => {
-    const reportText = generateWhatsAppAttendanceReport();
+  const handleShareReportWhatsApp = (targetBranch = reportBranch, targetShift = reportShift, targetFormat = reportFormat) => {
+    const reportText = generateWhatsAppAttendanceReport(targetBranch, targetShift, targetFormat);
     openWhatsApp({
       message: reportText
     });
   };
 
-  const handleCopyReport = () => {
-    const reportText = generateWhatsAppAttendanceReport();
+  const handleCopyReport = (targetBranch = reportBranch, targetShift = reportShift, targetFormat = reportFormat) => {
+    const reportText = generateWhatsAppAttendanceReport(targetBranch, targetShift, targetFormat);
     navigator.clipboard.writeText(reportText);
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 3000);
@@ -565,7 +640,7 @@ export default function AttendanceManagement() {
 
           <button
             type="button"
-            onClick={() => setShowReportModal(true)}
+            onClick={openReportModal}
             className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
             title="Share Branch Attendance on WhatsApp"
           >
@@ -1161,47 +1236,121 @@ export default function AttendanceManagement() {
 
       {/* 📲 BRANCH ATTENDANCE REPORT SHARE MODAL */}
       {showReportModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-7 border border-gray-200 space-y-4 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="w-full max-w-xl bg-white rounded-3xl p-5 sm:p-6 border border-gray-200 space-y-3.5 shadow-2xl relative max-h-[92vh] flex flex-col">
             <button
               onClick={() => setShowReportModal(false)}
-              className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 transition"
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 transition p-1 hover:bg-gray-100 rounded-lg cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-3 flex-shrink-0">
               <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
                 <Share2 className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="text-base font-black text-gray-900">Branch Attendance Report</h3>
-                <p className="text-xs text-gray-500 font-medium">Ready-to-share formatted summary for WhatsApp & Dojo groups.</p>
+                <p className="text-xs text-gray-500 font-medium">WhatsApp-ready report with student names & absentee list.</p>
               </div>
             </div>
 
-            <div className="bg-gray-900 rounded-2xl p-4 text-gray-100 font-mono text-xs whitespace-pre-wrap max-h-72 overflow-y-auto border border-gray-800 shadow-inner">
-              {generateWhatsAppAttendanceReport()}
+            {/* Branch & Batch Switcher inside Modal */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-shrink-0 bg-gray-50 p-2.5 rounded-2xl border border-gray-200/70">
+              <div>
+                <label className="text-[10px] font-black text-gray-600 uppercase tracking-wider block mb-1">📍 Dojo Branch</label>
+                <select
+                  value={reportBranch}
+                  onChange={(e) => {
+                    setReportBranch(e.target.value);
+                    setReportShift('All');
+                  }}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs text-gray-900 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer truncate"
+                >
+                  <option value="All">All Branches (Global)</option>
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-gray-600 uppercase tracking-wider block mb-1">⏰ Batch / Shift</label>
+                <select
+                  value={reportShift}
+                  onChange={(e) => setReportShift(e.target.value)}
+                  className="w-full bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs text-gray-900 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer truncate"
+                >
+                  <option value="All">All Batches</option>
+                  {getDynamicShiftOptions(reportBranch !== 'All' ? reportBranch : null, null, branchesList).map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="pt-2 flex flex-wrap items-center justify-end gap-2 text-xs">
+            {/* Report Format Tabs */}
+            <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl flex-shrink-0 text-xs font-bold">
               <button
                 type="button"
-                onClick={handleCopyReport}
-                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                onClick={() => setReportFormat('full')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition cursor-pointer text-center ${
+                  reportFormat === 'full' ? 'bg-white text-emerald-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
               >
-                {copyFeedback ? <CheckCheck className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-gray-600" />}
-                <span>{copyFeedback ? 'Copied!' : 'Copy Text'}</span>
+                👥 Full (Present & Absent)
               </button>
+              <button
+                type="button"
+                onClick={() => setReportFormat('absentees_only')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition cursor-pointer text-center ${
+                  reportFormat === 'absentees_only' ? 'bg-white text-rose-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                ❌ Absentees Only
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportFormat('rollcall')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition cursor-pointer text-center ${
+                  reportFormat === 'rollcall' ? 'bg-white text-blue-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📋 Roll Call Register
+              </button>
+            </div>
 
-              <button
-                type="button"
-                onClick={handleShareReportWhatsApp}
-                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black rounded-xl shadow-md flex items-center gap-1.5 transition cursor-pointer"
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Share via WhatsApp</span>
-              </button>
+            {/* Formatted Report Preview Box */}
+            <div className="bg-gray-900 rounded-2xl p-4 text-emerald-300 font-mono text-xs whitespace-pre-wrap flex-1 overflow-y-auto border border-gray-800 shadow-inner min-h-[170px] select-all">
+              {generateWhatsAppAttendanceReport(reportBranch, reportShift, reportFormat)}
+            </div>
+
+            {/* Actions Footer */}
+            <div className="pt-1 flex flex-wrap items-center justify-between gap-2 text-xs flex-shrink-0">
+              <span className="text-[11px] text-gray-500 font-medium">
+                Total in report: <strong className="text-gray-800">{students.filter(s => (reportBranch === 'All' || isStudentInBranch(s, reportBranch)) && (reportShift === 'All' || matchesShift(s, reportShift))).length}</strong> Cadets
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyReport(reportBranch, reportShift, reportFormat)}
+                  className="px-3.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  {copyFeedback ? <CheckCheck className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-gray-600" />}
+                  <span>{copyFeedback ? 'Copied!' : 'Copy Text'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleShareReportWhatsApp(reportBranch, reportShift, reportFormat)}
+                  className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black rounded-xl shadow-md flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Share via WhatsApp</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
