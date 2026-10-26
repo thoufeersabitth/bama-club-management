@@ -20,7 +20,7 @@ export const SUPABASE_CONFIG = {
 };
 
 // Automatic one-time cache purge for clean roster deduplication & branch sync
-export const BAMA_DATA_VERSION = 'v4_live_koonolmadu_branch';
+export const BAMA_DATA_VERSION = 'v5_live_attendance_pakka';
 if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   try {
     if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {
