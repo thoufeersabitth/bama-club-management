@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings, Share2, Copy, Loader2, Sparkles, Building2, CheckCheck } from 'lucide-react';
 import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, fetchDayStatusFromBackend, saveDayStatusToBackend, fetchMonthlyDayStatusesFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
-import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
+import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, isShiftCompatibleWithBranch, getBranchKeyFromStr } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AttendanceManagement() {
@@ -340,23 +340,7 @@ export default function AttendanceManagement() {
   const getBranchKey = (val) => {
     if (!val) return '';
     const norm = getStandardBranchName(val, branchesList);
-    const s = String(norm).toLowerCase().trim();
-    if (s === 'all') return 'all';
-
-    if (s.includes('kick')) return 'kickboxing';
-    if (s.includes('chanda') || s.includes('gmup')) return 'chanda';
-    if (s.includes('ansar')) return 'ansar';
-    if (s.includes('kanjiraparaba') || s.includes('gmlp')) return 'kanjiraparaba';
-    if (s.includes('pengad') || s.includes('btmamups') || s.includes('btamup')) return 'pengad';
-    if (s.includes('ganapath')) return 'ganapath';
-    if (s.includes('airport')) return 'airport';
-    if (s.includes('koonolmadu') || s.includes('koonol') || s.includes('dojo-12') || s.includes('4d38ae92')) return 'koonolmadu';
-    if (s.includes('neerad') || (s.includes('amlp') && !s.includes('koonol'))) return 'neerad';
-    if (s.includes('chungam') || s.includes('cgm')) return 'chungam';
-    if (s.includes('feroke') || s.includes('frk')) return 'feroke';
-    if (s.includes('pulikkal') || s.includes('head office') || s.includes('plk')) return 'pulikkal';
-
-    return s;
+    return getBranchKeyFromStr(norm);
   };
 
   // 100% Robust Branch Cadets Matching (Handles all 11 branches, UUID, Name, Code, Shift fallback)
@@ -381,9 +365,15 @@ export default function AttendanceManagement() {
       ''
     );
 
-    const cadetShiftKey = student.shift ? getBranchKey(student.shift.split('(')[0]) : '';
+    // If cadet has an explicit branch set (by name or ID), match ONLY against it!
+    if (cadetNameKey) return targetKey === cadetNameKey;
+    if (cadetIdKey) return targetKey === cadetIdKey;
 
-    return targetKey === cadetNameKey || targetKey === cadetIdKey || targetKey === cadetShiftKey;
+    // Only if cadet has NO branch assigned at all, fall back to shift string
+    const cadetShiftKey = student.shift ? getBranchKey(student.shift.split('(')[0]) : '';
+    if (cadetShiftKey) return targetKey === cadetShiftKey;
+
+    return false;
   };
 
   // Smart Shift / Batch Matcher (Direct match, timing match, keyword match)
@@ -417,7 +407,7 @@ export default function AttendanceManagement() {
     const shiftsSet = new Set();
     const activeBranchFilter = selectedBranch !== 'All' ? selectedBranch : null;
 
-    // 1. Shifts from students in this branch
+    // 1. Shifts from students in this branch (strictly filtered to this branch)
     const branchStudents = activeBranchFilter 
       ? students.filter(s => isStudentInBranch(s, activeBranchFilter))
       : students;
@@ -425,7 +415,9 @@ export default function AttendanceManagement() {
     branchStudents.forEach(s => {
       const sh = String(s.shift || s.dojoShift || s.batch || '').trim();
       if (sh && sh !== 'undefined' && sh !== 'null' && sh !== 'All') {
-        shiftsSet.add(sh);
+        if (isShiftCompatibleWithBranch(sh, activeBranchFilter)) {
+          shiftsSet.add(sh);
+        }
       }
     });
 
@@ -433,7 +425,9 @@ export default function AttendanceManagement() {
     const dynamicOptions = getDynamicShiftOptions(activeBranchFilter, null, branchesList);
     dynamicOptions.forEach(sh => {
       if (sh && sh !== 'undefined' && sh !== 'null' && sh !== 'All') {
-        shiftsSet.add(sh);
+        if (isShiftCompatibleWithBranch(sh, activeBranchFilter)) {
+          shiftsSet.add(sh);
+        }
       }
     });
 

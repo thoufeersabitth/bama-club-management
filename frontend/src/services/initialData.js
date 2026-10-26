@@ -53,6 +53,42 @@ export const SHIFT_OPTIONS = [
   "Custom Shift / Flexible"
 ];
 
+// Helper to resolve standard canonical branch key from any string or branch object
+export const getBranchKeyFromStr = (str) => {
+  if (!str) return '';
+  const s = String(str).toLowerCase().trim();
+  if (s === 'all') return 'all';
+  if (s.includes('kick')) return 'kickboxing';
+  if (s.includes('chanda') || s.includes('gmup')) return 'chanda';
+  if (s.includes('ansar')) return 'ansar';
+  if (s.includes('kanjiraparaba') || s.includes('gmlp')) return 'kanjiraparaba';
+  if (s.includes('pengad') || s.includes('btmamup') || s.includes('btamup')) return 'pengad';
+  if (s.includes('ganapath') || s.includes('feroke')) return 'ganapath';
+  if (s.includes('airport')) return 'airport';
+  if (s.includes('koonolmadu') || s.includes('koonol') || s.includes('dojo-12') || s.includes('4d38ae92')) return 'koonolmadu';
+  if (s.includes('neerad') || (s.includes('amlp') && !s.includes('koonol'))) return 'neerad';
+  if (s.includes('chungam') || s.includes('cgm')) return 'chungam';
+  if (s.includes('pulikkal') || s.includes('head office') || s.includes('plk')) return 'pulikkal';
+  return '';
+};
+
+// Check if a shift/batch strictly belongs to or is compatible with a branch
+export const isShiftCompatibleWithBranch = (shiftStr, branchFilter) => {
+  if (!shiftStr || shiftStr === 'All' || shiftStr === 'ALL') return false;
+  if (!branchFilter || branchFilter === 'All' || branchFilter === 'ALL') return true;
+
+  const targetBranchKey = getBranchKeyFromStr(branchFilter);
+  if (!targetBranchKey || targetBranchKey === 'all') return true;
+
+  const shiftBranchKey = getBranchKeyFromStr(shiftStr);
+  // If the shift string explicitly mentions another known branch:
+  if (shiftBranchKey) {
+    return shiftBranchKey === targetBranchKey;
+  }
+  // Generic timing (e.g. "Morning Batch (6:00 AM - 7:30 AM)") is allowed
+  return true;
+};
+
 // Helper to resolve active training shift schedules dynamically from Branch timings & custom schedules
 export const getDynamicShiftOptions = (branchFilter = null, programFilter = null, branchesOverride = null) => {
   let customShifts = [];
@@ -93,6 +129,7 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
     const targetBranch = findBranchObj(branchFilter);
     const targetName = resolveBranchName(branchFilter).toLowerCase().trim();
     const targetId = targetBranch?.id || '';
+    const targetKey = getBranchKeyFromStr(branchFilter);
 
     const shiftResults = [];
 
@@ -113,7 +150,12 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
       const sBranchVal = s.branch || s.branchName || s.branch_name || s.branch_id;
       const sName = resolveBranchName(sBranchVal).toLowerCase().trim();
       const sId = String(s.branch_id || s.branch || '');
-      return (targetId && sId === targetId) || (targetName && sName === targetName) || (targetName && sName.includes(targetName)) || (sName && targetName.includes(sName));
+      const sKey = getBranchKeyFromStr(sBranchVal || sName);
+
+      if (targetId && sId === targetId) return true;
+      if (targetKey && sKey && targetKey === sKey) return true;
+      if (targetName && sName && (targetName === sName || targetName.includes(sName))) return true;
+      return false;
     });
 
     if (branchShifts.length > 0) {
@@ -137,8 +179,9 @@ export const getDynamicShiftOptions = (branchFilter = null, programFilter = null
       });
     }
 
-    // 3. Return ONLY the branch's actual timing and configured schedules!
-    return Array.from(new Set(shiftResults));
+    // 3. Return ONLY shifts strictly compatible with this branch!
+    const cleanUnique = Array.from(new Set(shiftResults)).filter(sh => isShiftCompatibleWithBranch(sh, branchFilter));
+    return cleanUnique;
   }
 
   // Global All Branches view: collect all shifts from custom schedules AND branch timings
