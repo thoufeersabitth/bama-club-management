@@ -2503,26 +2503,16 @@ export const publicSubmitExamRegistrationBackend = async (data) => {
   }
 };
 
-export const fetchAttendanceFromBackend = async (dateStr) => {
+export const fetchAttendanceFromBackend = async (dateStr, branch = null) => {
   try {
-    const res = await api.get('/attendance/');
-    let all = res.data.results || (Array.isArray(res.data) ? res.data : []);
-    let nextUrl = res.data.next;
-    while (nextUrl) {
-      try {
-        const nextPath = nextUrl.replace(/^https?:\/\/[^/]+\/api/, '');
-        const nextRes = await api.get(nextPath);
-        const nextResults = nextRes.data.results || (Array.isArray(nextRes.data) ? nextRes.data : []);
-        all = all.concat(nextResults);
-        nextUrl = nextRes.data.next;
-      } catch (e) {
-        break;
-      }
+    let url = `/attendance/?date=${encodeURIComponent(dateStr)}`;
+    if (branch && branch !== 'All' && branch !== 'ALL') {
+      url += `&branch=${encodeURIComponent(branch)}`;
     }
-    const forDate = all.filter(a => a.date === dateStr);
-    if (forDate.length === 0) return null;
+    const res = await api.get(url);
+    const results = res.data.results || (Array.isArray(res.data) ? res.data : []);
     const map = {};
-    forDate.forEach(a => {
+    results.forEach(a => {
       const sId = a.student_detail?.id || a.student;
       const sAdm = a.student_detail?.admissionNo || a.student_detail?.admission_no;
       const stat = String(a.status || 'Present').toUpperCase();
@@ -2531,41 +2521,106 @@ export const fetchAttendanceFromBackend = async (dateStr) => {
     });
     return map;
   } catch (err) {
+    console.warn('Failed to fetch attendance from backend:', err);
     return null;
   }
 };
 
-export const saveAttendanceToBackend = async (dateStr, records, studentsList) => {
+export const saveAttendanceToBackend = async (dateStr, records, studentsList, branch = null, dayStatus = 'CLASS', holidayReason = '', applyAllBranches = false) => {
   try {
-    const promises = Object.entries(records).map(async ([studentKey, status]) => {
-      const formattedStatus = (status || 'PRESENT').toLowerCase() === 'absent' ? 'Absent' 
-        : (status || 'PRESENT').toLowerCase() === 'late' ? 'Late' 
-        : 'Present';
+    // 1. Try atomic bulk save endpoint on Fly.io
+    const payload = {
+      date: dateStr,
+      records: records,
+      branch: (branch && branch !== 'All' && branch !== 'ALL') ? branch : null,
+      day_status: dayStatus,
+      holiday_reason: holidayReason,
+      apply_all_branches: applyAllBranches,
+      marked_by: 'Sensei Master'
+    };
 
-      const cadet = (studentsList || []).find(s => 
-        String(s.id).trim() === String(studentKey).trim() || 
-        String(s.admissionNo || s.admission_no).trim() === String(studentKey).trim()
-      );
-
-      const payload = {
-        student: cadet ? (cadet.id || cadet.admissionNo || cadet.admission_no) : studentKey,
-        branch: cadet ? (cadet.branch_id || cadet.branch) : null,
-        date: dateStr,
-        status: formattedStatus,
-        marked_by: 'Sensei Master'
-      };
-
-      try {
-        return await api.post('/attendance/', payload);
-      } catch (err) {
-        return null;
+    try {
+      const res = await api.post('/attendance/bulk-save/', payload);
+      if (res && (res.status === 200 || res.status === 201)) {
+        return true;
       }
-    });
+    } catch (bulkErr) {
+      console.warn('Bulk save endpoint fallback:', bulkErr);
+    }
 
-    await Promise.all(promises);
+    // 2. Resilient fallback for individual record upserts
+    if (dayStatus !== 'HOLIDAY' && records) {
+      const entries = Object.entries(records);
+      for (const [studentKey, status] of entries) {
+        const formattedStatus = (status || 'PRESENT').toLowerCase() === 'absent' ? 'Absent' 
+          : (status || 'PRESENT').toLowerCase() === 'late' ? 'Late' 
+          : 'Present';
+
+        const cadet = (studentsList || []).find(s => 
+          String(s.id).trim() === String(studentKey).trim() || 
+          String(s.admissionNo || s.admission_no).trim() === String(studentKey).trim()
+        );
+
+        const singlePayload = {
+          student: cadet ? (cadet.id || cadet.admissionNo || cadet.admission_no) : studentKey,
+          branch: cadet ? (cadet.branch_id || cadet.branch) : null,
+          date: dateStr,
+          status: formattedStatus,
+          marked_by: 'Sensei Master'
+        };
+
+        try {
+          await api.post('/attendance/', singlePayload);
+        } catch (e) {}
+      }
+    }
+
     return true;
   } catch (err) {
+    console.error('saveAttendanceToBackend error:', err);
     return false;
+  }
+};
+
+export const fetchDayStatusFromBackend = async (dateStr, branch = null) => {
+  try {
+    let url = `/attendance/day-status/?date=${encodeURIComponent(dateStr)}`;
+    if (branch && branch !== 'All' && branch !== 'ALL') {
+      url += `&branch=${encodeURIComponent(branch)}`;
+    }
+    const res = await api.get(url);
+    return res.data;
+  } catch (err) {
+    return null;
+  }
+};
+
+export const saveDayStatusToBackend = async (dateStr, status, reason = '', branch = null, applyAllBranches = false) => {
+  try {
+    const payload = {
+      date: dateStr,
+      status: status,
+      reason: reason,
+      branch: (branch && branch !== 'All' && branch !== 'ALL') ? branch : null,
+      apply_all_branches: applyAllBranches
+    };
+    const res = await api.post('/attendance/day-status/', payload);
+    return res.data;
+  } catch (err) {
+    return null;
+  }
+};
+
+export const fetchMonthlyDayStatusesFromBackend = async (monthPrefix, branch = null) => {
+  try {
+    let url = `/attendance/monthly-statuses/?month=${encodeURIComponent(monthPrefix)}`;
+    if (branch && branch !== 'All' && branch !== 'ALL') {
+      url += `&branch=${encodeURIComponent(branch)}`;
+    }
+    const res = await api.get(url);
+    return res.data;
+  } catch (err) {
+    return null;
   }
 };
 

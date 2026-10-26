@@ -1,6 +1,7 @@
-from rest_framework import serializers, viewsets, permissions
-from .models import AttendanceRecord
+from rest_framework import serializers
+from .models import AttendanceRecord, BranchDayStatus
 from students.serializers import StudentSerializer
+from branches.serializers import BranchSerializer
 
 class AttendanceRecordSerializer(serializers.ModelSerializer):
     student_detail = StudentSerializer(source='student', read_only=True)
@@ -42,21 +43,10 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
 
         return super().to_internal_value(data)
 
-class AttendanceViewSet(viewsets.ModelViewSet):
-    queryset = AttendanceRecord.objects.all().order_by('-date')
-    serializer_class = AttendanceRecordSerializer
-    permission_classes = [permissions.AllowAny]
+class BranchDayStatusSerializer(serializers.ModelSerializer):
+    branch_detail = BranchSerializer(source='branch', read_only=True)
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        date_param = self.request.query_params.get('date', None)
-        branch_id = self.request.query_params.get('branch', None)
-        student_id = self.request.query_params.get('student', None)
+    class Meta:
+        model = BranchDayStatus
+        fields = '__all__'
 
-        if date_param:
-            queryset = queryset.filter(date=date_param)
-        if branch_id:
-            queryset = queryset.filter(branch_id=branch_id)
-        if student_id:
-            queryset = queryset.filter(student_id=student_id)
-        return queryset

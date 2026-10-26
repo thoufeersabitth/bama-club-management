@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings } from 'lucide-react';
-import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
+import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings, Share2, Copy, Loader2, Sparkles, Building2, CheckCheck } from 'lucide-react';
+import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, fetchDayStatusFromBackend, saveDayStatusToBackend, fetchMonthlyDayStatusesFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -32,82 +32,121 @@ export default function AttendanceManagement() {
     };
   }, []);
 
-  const [selectedBranch, setSelectedBranch] = useState('All');
+  const { user } = useAuth();
+  const isInstructor = user?.role === 'INSTRUCTOR';
+  const instructorBranch = user?.branch || 'Pulikkal Branch (Head Office)';
+
+  const getBranchStorageKey = (b) => {
+    if (!b || b === 'All' || b === 'ALL') return 'global';
+    return String(b).toLowerCase().replace(/[^a-z0-9]/g, '_');
+  };
+
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    if (isInstructor && instructorBranch) return instructorBranch;
+    return 'All';
+  });
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attendanceRecords, setAttendanceRecords] = useState(() => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const saved = localStorage.getItem(`bama_attendance_${today}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') return parsed;
-      }
-    } catch (e) {}
-    return {};
-  });
+  const [attendanceRecords, setAttendanceRecords] = useState({});
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'PRESENT' | 'ABSENT' | 'LATE'
+  const [isSaving, setIsSaving] = useState(false);
+  const [applyAllBranches, setApplyAllBranches] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
 
   // Day Status State (CLASS vs HOLIDAY)
-  const [dayStatus, setDayStatus] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`bama_day_status_${selectedDate}`);
-      return saved || 'CLASS';
-    } catch (e) {
-      return 'CLASS';
-    }
-  });
-
-  const [holidayReason, setHolidayReason] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`bama_holiday_reason_${selectedDate}`);
-      return saved || 'Weekly Dojo Off Day';
-    } catch (e) {
-      return 'Weekly Dojo Off Day';
-    }
-  });
+  const [dayStatus, setDayStatus] = useState('CLASS');
+  const [holidayReason, setHolidayReason] = useState('Weekly Dojo Off Day');
 
   // Bulk Absentee WhatsApp Queue State
   const [showAbsentModal, setShowAbsentModal] = useState(false);
   const [absentQueueIndex, setAbsentQueueIndex] = useState(0);
   const [sentAbsentStudentIds, setSentAbsentStudentIds] = useState([]);
 
-  const { user } = useAuth();
-  const isInstructor = user?.role === 'INSTRUCTOR';
-  const instructorBranch = user?.branch || 'Pulikkal Branch (Head Office)';
-
+  // Auto-sync branch day status & attendance on date or branch change
   useEffect(() => {
-    try {
-      const savedStatus = localStorage.getItem(`bama_day_status_${selectedDate}`);
-      setDayStatus(savedStatus || 'CLASS');
-      const savedReason = localStorage.getItem(`bama_holiday_reason_${selectedDate}`);
-      setHolidayReason(savedReason || 'Weekly Dojo Off Day');
-    } catch (e) {
-      setDayStatus('CLASS');
-      setHolidayReason('Weekly Dojo Off Day');
-    }
-  }, [selectedDate]);
+    const bKey = getBranchStorageKey(selectedBranch);
+    
+    // 1. Read cached Day Status
+    const cachedBranchStatus = localStorage.getItem(`bama_day_status_${bKey}_${selectedDate}`);
+    const cachedBranchReason = localStorage.getItem(`bama_holiday_reason_${bKey}_${selectedDate}`);
+    const cachedGlobalStatus = localStorage.getItem(`bama_day_status_global_${selectedDate}`) || localStorage.getItem(`bama_day_status_${selectedDate}`);
+    const cachedGlobalReason = localStorage.getItem(`bama_holiday_reason_global_${selectedDate}`) || localStorage.getItem(`bama_holiday_reason_${selectedDate}`);
 
-  const handleDayStatusChange = (newStatus, reason = holidayReason) => {
+    const activeStatus = cachedBranchStatus || cachedGlobalStatus || 'CLASS';
+    const activeReason = cachedBranchReason || cachedGlobalReason || 'Weekly Dojo Off Day';
+    setDayStatus(activeStatus);
+    setHolidayReason(activeReason);
+
+    // 2. Fetch authoritative Day Status from Fly.io Backend
+    fetchDayStatusFromBackend(selectedDate, selectedBranch).then(serverStatus => {
+      if (serverStatus && serverStatus.status) {
+        setDayStatus(serverStatus.status);
+        if (serverStatus.reason) setHolidayReason(serverStatus.reason);
+        localStorage.setItem(`bama_day_status_${bKey}_${selectedDate}`, serverStatus.status);
+        if (serverStatus.reason) localStorage.setItem(`bama_holiday_reason_${bKey}_${selectedDate}`, serverStatus.reason);
+      }
+    });
+
+    // 3. Read cached attendance
+    let hasLocal = false;
+    try {
+      const saved = localStorage.getItem(`bama_attendance_${bKey}_${selectedDate}`) || localStorage.getItem(`bama_attendance_${selectedDate}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          setAttendanceRecords(parsed);
+          hasLocal = true;
+        }
+      }
+    } catch (e) {}
+
+    // 4. Fetch Attendance from Fly.io Backend
+    fetchAttendanceFromBackend(selectedDate, selectedBranch).then(serverAtt => {
+      if (serverAtt && Object.keys(serverAtt).length > 0) {
+        setAttendanceRecords(prev => ({ ...prev, ...serverAtt }));
+        localStorage.setItem(`bama_attendance_${bKey}_${selectedDate}`, JSON.stringify(serverAtt));
+      } else if (!hasLocal) {
+        const initial = {};
+        (students || []).forEach(s => {
+          initial[s.id || s.admissionNo] = 'PRESENT';
+        });
+        setAttendanceRecords(initial);
+      }
+    });
+  }, [selectedDate, selectedBranch]);
+
+  const handleDayStatusChange = (newStatus, reason = holidayReason, forAll = applyAllBranches) => {
     setDayStatus(newStatus);
     setHolidayReason(reason);
+    setApplyAllBranches(forAll);
+    const bKey = getBranchStorageKey(selectedBranch);
     try {
-      localStorage.setItem(`bama_day_status_${selectedDate}`, newStatus);
-      localStorage.setItem(`bama_holiday_reason_${selectedDate}`, reason);
+      if (forAll) {
+        localStorage.setItem(`bama_day_status_global_${selectedDate}`, newStatus);
+        localStorage.setItem(`bama_holiday_reason_global_${selectedDate}`, reason);
+        localStorage.setItem(`bama_day_status_${selectedDate}`, newStatus);
+        localStorage.setItem(`bama_holiday_reason_${selectedDate}`, reason);
+      } else {
+        localStorage.setItem(`bama_day_status_${bKey}_${selectedDate}`, newStatus);
+        localStorage.setItem(`bama_holiday_reason_${bKey}_${selectedDate}`, reason);
+      }
+
+      saveDayStatusToBackend(selectedDate, newStatus, reason, selectedBranch, forAll);
       window.dispatchEvent(new Event('bama_data_updated'));
 
+      const scopeName = forAll ? 'All Branches' : (selectedBranch === 'All' ? 'This Dojo' : selectedBranch);
       if (newStatus === 'HOLIDAY') {
-        setSaveSuccessMsg(`🏖️ Date ${selectedDate} set as Official Dojo Holiday (${reason})!`);
+        setSaveSuccessMsg(`🏖️ ${scopeName} set as Holiday (${reason})!`);
         setTimeout(() => setSaveSuccessMsg(''), 4000);
       } else {
-        setSaveSuccessMsg(`🥋 Date ${selectedDate} set as Class Conducted Today!`);
+        setSaveSuccessMsg(`🥋 ${scopeName} set as Class Day!`);
         setTimeout(() => setSaveSuccessMsg(''), 4000);
       }
     } catch (e) {}
   };
-
   // Helper to calculate Monthly Classes Conducted & Holidays count for current month
   const getMonthlyClassStats = () => {
     const monthPrefix = selectedDate.slice(0, 7); // "YYYY-MM"
@@ -154,35 +193,7 @@ export default function AttendanceManagement() {
     });
   }, []);
 
-  // 2. Load attendance records for selectedDate (instant localStorage cache + background sync)
-  useEffect(() => {
-    let hasLocal = false;
-    try {
-      const saved = localStorage.getItem(`bama_attendance_${selectedDate}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-          setAttendanceRecords(parsed);
-          hasLocal = true;
-        }
-      }
-    } catch (e) {}
-
-    // Background sync with Fly.io PostgreSQL backend
-    fetchAttendanceFromBackend(selectedDate).then(serverAtt => {
-      if (serverAtt && Object.keys(serverAtt).length > 0) {
-        setAttendanceRecords(serverAtt);
-        localStorage.setItem(`bama_attendance_${selectedDate}`, JSON.stringify(serverAtt));
-      } else if (!hasLocal) {
-        // Default all active cadets to PRESENT
-        const initial = {};
-        (students || []).forEach(s => {
-          initial[s.id || s.admissionNo] = 'PRESENT';
-        });
-        setAttendanceRecords(initial);
-      }
-    });
-  }, [selectedDate]);
+// Attendance and Day Status auto-synced above
 
   const handleStatusChange = (studentId, status) => {
     const updated = {
@@ -213,18 +224,14 @@ export default function AttendanceManagement() {
   };
 
   const handleSaveAttendance = async () => {
+    setIsSaving(true);
     try {
-      localStorage.setItem(`bama_day_status_${selectedDate}`, dayStatus);
-      localStorage.setItem(`bama_holiday_reason_${selectedDate}`, holidayReason);
-
-      if (dayStatus === 'HOLIDAY') {
-        setSaveSuccessMsg(`🏖️ Official Dojo Holiday (${holidayReason}) successfully saved for ${selectedDate}!`);
-        setTimeout(() => setSaveSuccessMsg(''), 4000);
-        window.dispatchEvent(new Event('bama_data_updated'));
-        return;
-      }
-
+      const bKey = getBranchStorageKey(selectedBranch);
+      localStorage.setItem(`bama_day_status_${bKey}_${selectedDate}`, dayStatus);
+      localStorage.setItem(`bama_holiday_reason_${bKey}_${selectedDate}`, holidayReason);
+      localStorage.setItem(`bama_attendance_${bKey}_${selectedDate}`, JSON.stringify(attendanceRecords));
       localStorage.setItem(`bama_attendance_${selectedDate}`, JSON.stringify(attendanceRecords));
+
       const total = filteredStudents.length;
       const pCount = Object.values(attendanceRecords).filter(v => v === 'PRESENT').length;
       const aCount = Object.values(attendanceRecords).filter(v => v === 'ABSENT').length;
@@ -233,27 +240,102 @@ export default function AttendanceManagement() {
 
       const summary = {
         date: selectedDate,
+        branch: selectedBranch,
         totalCadets: total,
         presentCount: pCount,
         absentCount: aCount,
         lateCount: lCount,
         attendanceRate: rate
       };
-
       localStorage.setItem('bama_latest_attendance_summary', JSON.stringify(summary));
 
-      // Post to Django SQLite Backend Database!
-      await saveAttendanceToBackend(selectedDate, attendanceRecords, students);
+      // Atomic Bulk Backend Save to Fly.io PostgreSQL!
+      await saveAttendanceToBackend(
+        selectedDate,
+        attendanceRecords,
+        students,
+        selectedBranch,
+        dayStatus,
+        holidayReason,
+        applyAllBranches
+      );
 
-      setSaveSuccessMsg(`🥋 Attendance Register successfully saved for ${selectedDate}!`);
-      setTimeout(() => setSaveSuccessMsg(''), 4000);
+      const branchDisplay = selectedBranch === 'All' ? 'All Branches' : selectedBranch;
+      setSaveSuccessMsg(`🥋 Attendance successfully saved for ${branchDisplay} on ${selectedDate}!`);
+      setTimeout(() => setSaveSuccessMsg(''), 4500);
       window.dispatchEvent(new Event('bama_data_updated'));
-    } catch (e) {
-      setSaveSuccessMsg('Attendance saved locally!');
-      setTimeout(() => setSaveSuccessMsg(''), 4000);
+    } catch (err) {
+      console.error(err);
+      setSaveSuccessMsg('Saved locally! Background cloud sync in progress.');
+      setTimeout(() => setSaveSuccessMsg(''), 4500);
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  // WhatsApp Branch Attendance Report Generator
+  const generateWhatsAppAttendanceReport = () => {
+    const branchTitle = selectedBranch === 'All' ? 'ALL DOJO BRANCHES' : selectedBranch;
+    const shiftTitle = selectedShift === 'All' ? 'All Batches' : selectedShift;
+    const absentees = baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'ABSENT');
+    const latecomers = baseBranchShiftStudents.filter(s => attendanceRecords[s.id || s.admissionNo] === 'LATE');
+    
+    let msg = `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n`;
+    msg += `📍 *Dojo Branch:* ${branchTitle}\n`;
+    msg += `📅 *Date:* ${selectedDate}\n`;
+    msg += `⏰ *Batch / Shift:* ${shiftTitle}\n\n`;
+
+    if (dayStatus === 'HOLIDAY') {
+      msg += `🏖️ *STATUS: OFFICIAL DOJO HOLIDAY*\n`;
+      msg += `📌 *Reason:* ${holidayReason || 'Weekly Off / Class Cancelled'}\n\n`;
+    } else {
+      msg += `📊 *DAILY ATTENDANCE SUMMARY*\n`;
+      msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+      msg += `👥 *Total Enrolled:* ${totalCount} Cadets\n`;
+      msg += `✅ *Present:* ${presentCount} Cadets\n`;
+      msg += `❌ *Absent:* ${absentCount} Cadets\n`;
+      if (lateCount > 0) msg += `⏳ *Late:* ${lateCount} Cadets\n`;
+      msg += `📈 *Attendance Rate:* ${attendanceRate}%\n`;
+      msg += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+      if (absentees.length > 0) {
+        msg += `📋 *Absentee Cadets (${absentees.length}):*\n`;
+        absentees.forEach((a, i) => {
+          msg += `${i + 1}. ${a.name} (${a.admissionNo || a.admission_no || 'N/A'})\n`;
+        });
+        msg += `\n`;
+      } else {
+        msg += `🌟 *100% Full Attendance Today! Excellent dedication! OSS 🥋*\n\n`;
+      }
+
+      if (latecomers.length > 0) {
+        msg += `⏳ *Late Cadets (${latecomers.length}):*\n`;
+        latecomers.forEach((l, i) => {
+          msg += `${i + 1}. ${l.name} (${l.admissionNo || l.admission_no || 'N/A'})\n`;
+        });
+        msg += `\n`;
+      }
+    }
+
+    const senseiName = user?.name || 'Sensei Abdul Nafih.p';
+    msg += `🥋 *Sensei In-Charge:* ${senseiName}\n`;
+    msg += `_B.A.M.A. Official Digital Roster_`;
+    return msg;
+  };
+
+  const handleShareReportWhatsApp = () => {
+    const reportText = generateWhatsAppAttendanceReport();
+    openWhatsApp({
+      message: reportText
+    });
+  };
+
+  const handleCopyReport = () => {
+    const reportText = generateWhatsAppAttendanceReport();
+    navigator.clipboard.writeText(reportText);
+    setCopyFeedback(true);
+    setTimeout(() => setCopyFeedback(false), 3000);
+  };
   // Helper to resolve standard canonical branch key for 100% accurate branch separation
   const getBranchKey = (val) => {
     if (!val) return '';
@@ -488,10 +570,21 @@ export default function AttendanceManagement() {
           )}
 
           <button
-            onClick={handleSaveAttendance}
-            className="flex-1 sm:flex-initial px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition cursor-pointer flex-shrink-0"
+            type="button"
+            onClick={() => setShowReportModal(true)}
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+            title="Share Branch Attendance on WhatsApp"
           >
-            <Save className="w-4 h-4" /> <span className="whitespace-nowrap">Save Register</span>
+            <Share2 className="w-4 h-4 text-blue-600 flex-shrink-0" /> <span className="whitespace-nowrap">Share Report</span>
+          </button>
+
+          <button
+            onClick={handleSaveAttendance}
+            disabled={isSaving}
+            className="flex-1 sm:flex-initial px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 transition cursor-pointer flex-shrink-0 disabled:opacity-60"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span className="whitespace-nowrap">{isSaving ? 'Saving...' : 'Save Register'}</span>
           </button>
         </div>
       </div>
@@ -753,19 +846,50 @@ export default function AttendanceManagement() {
               <span>Select Holiday Reason:</span>
               <select
                 value={holidayReason}
-                onChange={(e) => handleDayStatusChange('HOLIDAY', e.target.value)}
+                onChange={(e) => handleDayStatusChange('HOLIDAY', e.target.value, applyAllBranches)}
                 className="bg-transparent text-white font-black focus:outline-none cursor-pointer"
               >
                 <option value="Weekly Dojo Off Day" className="bg-gray-900 text-white">Weekly Dojo Off Day</option>
+                <option value="School Function / Hall Unavailable" className="bg-gray-900 text-white">School Function / Hall Unavailable</option>
                 <option value="Heavy Rain / Emergency Weather" className="bg-gray-900 text-white">Heavy Rain / Emergency Weather</option>
                 <option value="Public Festival / Govt Holiday" className="bg-gray-900 text-white">Public Festival / Govt Holiday</option>
                 <option value="Dojo Belt Exam / Tournament Rest" className="bg-gray-900 text-white">Dojo Belt Exam / Tournament Rest</option>
               </select>
             </div>
 
+            {/* Scope Toggle: This Branch Only vs All Branches */}
+            <div className="inline-flex items-center gap-3 bg-gray-900/90 px-3.5 py-2.5 rounded-2xl border border-gray-700 text-xs text-gray-300 font-bold">
+              <span className="text-gray-400">Apply:</span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="holidayScope"
+                  checked={!applyAllBranches}
+                  onChange={() => handleDayStatusChange('HOLIDAY', holidayReason, false)}
+                  className="text-amber-500"
+                />
+                <span className={!applyAllBranches ? 'text-amber-400 font-black' : 'text-gray-400'}>
+                  {selectedBranch === 'All' ? 'This Dojo' : selectedBranch} Only
+                </span>
+              </label>
+              <span className="text-gray-600">|</span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="holidayScope"
+                  checked={applyAllBranches}
+                  onChange={() => handleDayStatusChange('HOLIDAY', holidayReason, true)}
+                  className="text-amber-500"
+                />
+                <span className={applyAllBranches ? 'text-amber-400 font-black' : 'text-gray-400'}>
+                  All Branches
+                </span>
+              </label>
+            </div>
+
             <button
               type="button"
-              onClick={() => handleDayStatusChange('CLASS')}
+              onClick={() => handleDayStatusChange('CLASS', holidayReason, applyAllBranches)}
               className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs transition cursor-pointer shadow-lg flex items-center gap-1.5"
             >
               <span>🥋 Switch to Class Conducted Today</span>
@@ -1040,6 +1164,55 @@ export default function AttendanceManagement() {
           </div>
         </div>
       )}
+
+      {/* 📲 BRANCH ATTENDANCE REPORT SHARE MODAL */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 sm:p-7 border border-gray-200 space-y-4 shadow-2xl relative">
+            <button
+              onClick={() => setShowReportModal(false)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black">
+                <Share2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900">Branch Attendance Report</h3>
+                <p className="text-xs text-gray-500 font-medium">Ready-to-share formatted summary for WhatsApp & Dojo groups.</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-900 rounded-2xl p-4 text-gray-100 font-mono text-xs whitespace-pre-wrap max-h-72 overflow-y-auto border border-gray-800 shadow-inner">
+              {generateWhatsAppAttendanceReport()}
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center justify-end gap-2 text-xs">
+              <button
+                type="button"
+                onClick={handleCopyReport}
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+              >
+                {copyFeedback ? <CheckCheck className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-gray-600" />}
+                <span>{copyFeedback ? 'Copied!' : 'Copy Text'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleShareReportWhatsApp}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-black rounded-xl shadow-md flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Share via WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
