@@ -103,19 +103,33 @@ class StudentSerializer(serializers.ModelSerializer):
                 b_str = branch_val.strip()
                 branch_obj = Branch.objects.filter(name__iexact=b_str).first()
                 
-            # 4. Try fuzzy name lookup
+            # 4. Comprehensive fuzzy lookup for all 12 BAMA branches
             if not branch_obj and isinstance(branch_val, str):
                 b_str = branch_val.strip().lower()
-                if 'kick boxing' in b_str or 'kbp' in b_str:
+                if 'kick boxing' in b_str or 'kick' in b_str or 'kbp' in b_str:
                     branch_obj = Branch.objects.filter(name__icontains='kick boxing').first()
+                elif 'ganapath' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='ganapath').first()
+                elif 'chanda' in b_str or 'gmup' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='chanda').first() or Branch.objects.filter(name__icontains='gmup').first()
+                elif 'ansar' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='ansar').first()
+                elif 'kanjiraparaba' in b_str or 'gmlp' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='kanjiraparaba').first() or Branch.objects.filter(name__icontains='gmlp').first()
+                elif 'pengad' in b_str or 'btamup' in b_str or 'btmamup' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='pengad').first() or Branch.objects.filter(name__icontains='btamup').first()
+                elif 'airport' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='airport').first()
+                elif 'koonol' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='koonol').first()
+                elif 'neerad' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='neerad').first()
                 elif 'chungam' in b_str or b_str == '2' or 'dojo-02' in b_str:
                     branch_obj = Branch.objects.filter(name__icontains='chungam').first()
-                elif 'mongam' in b_str or b_str == '3' or 'dojo-03' in b_str:
-                    branch_obj = Branch.objects.filter(name__icontains='mongam').first()
-                elif 'feroke' in b_str or b_str == '4':
-                    branch_obj = Branch.objects.filter(name__icontains='feroke').first()
-                elif 'pulikkal' in b_str or b_str == '1' or 'dojo-01' in b_str:
-                    branch_obj = Branch.objects.filter(name__icontains='pulikkal', is_head_office=True).first() or Branch.objects.filter(name__icontains='pulikkal').first()
+                elif 'feroke' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='feroke').exclude(name__icontains='ganapath').first()
+                elif 'pulikkal' in b_str or 'head office' in b_str or b_str == '1' or 'dojo-01' in b_str:
+                    branch_obj = Branch.objects.filter(name__icontains='pulikkal').first()
                 else:
                     branch_obj = Branch.objects.filter(name__icontains=b_str).first()
 
@@ -142,11 +156,13 @@ class StudentSerializer(serializers.ModelSerializer):
 
             if branch_obj:
                 data['branch'] = str(branch_obj.id)
-            else:
+            elif not self.instance:
                 head_office = Branch.objects.filter(is_head_office=True).first() or Branch.objects.first()
                 if head_office:
                     data['branch'] = str(head_office.id)
-        else:
+        elif not self.instance:
+            # ONLY on creation when no branch is provided at all, fallback to head office.
+            # On update/PATCH, NEVER overwrite an existing student's branch!
             head_office = Branch.objects.filter(is_head_office=True).first() or Branch.objects.first()
             if head_office:
                 data['branch'] = str(head_office.id)

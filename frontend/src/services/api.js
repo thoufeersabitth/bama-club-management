@@ -37,6 +37,27 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   } catch (e) {}
 }
 
+// Extract authoritative branch name from explicit shift/batch timing text
+export const getBranchNameFromShift = (shiftStr) => {
+  if (!shiftStr || typeof shiftStr !== 'string') return null;
+  const s = shiftStr.toLowerCase().trim();
+  if (!s || s === 'all' || s === 'undefined' || s === 'null') return null;
+
+  if (s.includes('kick')) return 'KICK BOXING PULIKKAL';
+  if (s.includes('ganapath')) return 'GANAPATH V H S S FEROKE';
+  if (s.includes('chanda') || s.includes('gmup')) return 'GMUP SCHOOL CHANDA';
+  if (s.includes('ansar')) return 'ANSARAR SCHOOL';
+  if (s.includes('kanjiraparaba') || s.includes('gmlp')) return 'GMLP SCHOOL KANJIRAPARABA KDY';
+  if (s.includes('pengad') || s.includes('btamup') || s.includes('btmamup')) return 'BTAMUP SCHOOL PENGAD';
+  if (s.includes('airport')) return 'AIRPORT KARATE';
+  if (s.includes('koonol')) return 'AMLP SCHOOL KOONOLMADU';
+  if (s.includes('neerad')) return 'AMLP SCHOOL NEERAD';
+  if (s.includes('chungam')) return 'Chungam Branch';
+  if (s.includes('feroke') && !s.includes('ganapath')) return 'Feroke Branch';
+  if (s.includes('pulikkal') || s.includes('head office')) return 'Pulikkal Branch (Head Office)';
+  return null;
+};
+
 /**
  * Authoritative Canonical Branch Resolver for all 11 BAMA Dojo Branches
  * Resolves UUID, code, name, shift string, or object with 100% accuracy.
@@ -549,8 +570,9 @@ export const getStoredStudents = () => {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const cleaned = filterOutDummyCadets(parsed).map(st => {
-            const rawBranch = st.branch_name || st.branchName || st.dojo_branch || st.dojoBranch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || st.branch_id || (st.shift ? String(st.shift).split('(')[0] : '');
-            const normBranch = getStandardBranchName(rawBranch);
+            const shiftBranch = getBranchNameFromShift(st.shift);
+            const rawBranch = st.branch_name || st.branchName || st.dojo_branch || st.dojoBranch || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || st.branch_id || '';
+            const normBranch = shiftBranch || getStandardBranchName(rawBranch);
             const branchId = st.branch_id || st.branchId || (typeof st.branch === 'object' ? st.branch?.id : st.branch) || normBranch;
 
             const adm = st.admissionNo || st.admission_no || st.registration_no || '';
@@ -898,8 +920,9 @@ export const fetchStudents = async (params = {}) => {
       });
 
       const normalizedServer = filteredServer.map(s => {
-        const sRawBranch = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_id || (s.shift ? String(s.shift).split('(')[0] : '');
-        const sBranchName = getStandardBranchName(sRawBranch);
+        const shiftBranch = getBranchNameFromShift(s.shift);
+        const sRawBranch = s.branch_detail?.name || s.branch_name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_id || '';
+        const sBranchName = shiftBranch || getStandardBranchName(sRawBranch);
         const sBranchId = s.branch_id || s.branch_detail?.id || (typeof s.branch === 'object' ? s.branch?.id : s.branch);
 
         const adm = s.admissionNo || s.admission_no || '';
@@ -1105,17 +1128,34 @@ export const updateStudent = async (id, data) => {
       (data.admissionNo && (String(s.admissionNo).trim() === String(data.admissionNo).trim() || String(s.admission_no).trim() === String(data.admissionNo).trim()));
   };
 
-  const updatedFeeAmount = data.fee_amount !== undefined ? Math.max(0, parseInt(data.fee_amount) || 0) : (data.feeAmount !== undefined ? Math.max(0, parseInt(data.feeAmount) || 0) : 500);
-  const updatedAdmissionFee = data.admission_fee !== undefined ? Math.max(0, parseInt(data.admission_fee) || 0) : (data.admissionFee !== undefined ? Math.max(0, parseInt(data.admissionFee) || 0) : 1000);
+  const existing = currentList.find(s => isMatch(s)) || {};
 
-  const explicitProg = resolveDiscipline(data);
+  // Safe branch resolution: Never let branch become undefined or fall back to a random default!
+  const shiftBranch = getBranchNameFromShift(data.shift || existing.shift);
+  const rawBranchInput = data.branch_name || data.branchName || data.dojo_branch || (typeof data.branch === 'object' ? data.branch?.name : (typeof data.branch === 'string' && !data.branch.includes('-') ? data.branch : null));
+  const existingBranch = existing.branch_name || existing.branchName || existing.dojo_branch || (typeof existing.branch === 'object' ? existing.branch?.name : (typeof existing.branch === 'string' && !existing.branch.includes('-') ? existing.branch : null));
+  const resolvedBranchName = rawBranchInput ? getStandardBranchName(rawBranchInput) : (existingBranch ? getStandardBranchName(existingBranch) : shiftBranch);
+
+  const rawBranchId = data.branch_id || data.branchId || (typeof data.branch === 'object' ? data.branch?.id : (typeof data.branch === 'string' && data.branch.includes('-') ? data.branch : null));
+  const existingBranchId = existing.branch_id || existing.branchId || (typeof existing.branch === 'object' ? existing.branch?.id : (typeof existing.branch === 'string' && existing.branch.includes('-') ? existing.branch : null));
+  const resolvedBranchId = rawBranchId || existingBranchId || resolvedBranchName;
+
+  const updatedFeeAmount = data.fee_amount !== undefined ? Math.max(0, parseInt(data.fee_amount) || 0) : (data.feeAmount !== undefined ? Math.max(0, parseInt(data.feeAmount) || 0) : (existing.feeAmount || 500));
+  const updatedAdmissionFee = data.admission_fee !== undefined ? Math.max(0, parseInt(data.admission_fee) || 0) : (data.admissionFee !== undefined ? Math.max(0, parseInt(data.admissionFee) || 0) : (existing.admissionFee || 1000));
+
+  const explicitProg = resolveDiscipline(data) || resolveDiscipline(existing);
   const isKarateProg = explicitProg.toLowerCase().includes('karate');
-  const validBelt = isKarateProg ? (data.currentBelt || data.current_belt || 'White Belt') : explicitProg;
-  const baseNotes = String(data.medicalNotes || data.medical_notes || '').replace(/\[PROGRAM:[^\]]+\]/g, '').trim();
+  const validBelt = isKarateProg ? (data.currentBelt || data.current_belt || existing.currentBelt || existing.current_belt || 'White Belt') : explicitProg;
+  const baseNotes = String(data.medicalNotes || data.medical_notes || existing.medicalNotes || existing.medical_notes || '').replace(/\[PROGRAM:[^\]]+\]/g, '').trim();
   const taggedNotes = baseNotes ? `${baseNotes} [PROGRAM:${explicitProg}]` : `[PROGRAM:${explicitProg}]`;
 
   const payload = {
     ...data,
+    branch: resolvedBranchId,
+    branch_id: resolvedBranchId,
+    branch_name: resolvedBranchName,
+    branchName: resolvedBranchName,
+    dojo_branch: resolvedBranchName,
     current_belt: validBelt,
     currentBelt: validBelt,
     program: explicitProg,
@@ -1127,9 +1167,9 @@ export const updateStudent = async (id, data) => {
     feeAmount: updatedFeeAmount,
     admission_fee: updatedAdmissionFee,
     admissionFee: updatedAdmissionFee,
-    blood_group: data.bloodGroup || data.blood_group || 'O+',
-    bloodGroup: data.bloodGroup || data.blood_group || 'O+',
-    gender: data.gender || 'Male'
+    blood_group: data.bloodGroup || data.blood_group || existing.bloodGroup || existing.blood_group || 'O+',
+    bloodGroup: data.bloodGroup || data.blood_group || existing.bloodGroup || existing.blood_group || 'O+',
+    gender: data.gender || existing.gender || 'Male'
   };
 
   // Automatically compress & upload photo to Supabase CDN if base64
@@ -1139,12 +1179,13 @@ export const updateStudent = async (id, data) => {
 
   // Optimistically construct final updated object & persist immediately to local storage
   const finalUpdated = {
+    ...existing,
     ...payload,
-    branch: payload.branch_name || payload.branch,
-    branch_name: payload.branch_name || payload.branch,
-    branch_id: payload.branch_id,
-    dojo_branch: payload.branch_name || payload.branch,
-    branchName: payload.branch_name || payload.branch
+    branch: resolvedBranchName,
+    branch_name: resolvedBranchName,
+    branch_id: resolvedBranchId,
+    dojo_branch: resolvedBranchName,
+    branchName: resolvedBranchName
   };
 
   const updatedRoster = currentList.map(s => (isMatch(s) ? { ...s, ...finalUpdated } : s));
@@ -1153,7 +1194,7 @@ export const updateStudent = async (id, data) => {
   window.dispatchEvent(new Event('bama_data_updated'));
 
   // Sync with backend using resilient timeout so UI is never blocked
-  const identifiers = [targetIdStr, data.admissionNo, data.admission_no].filter(Boolean);
+  const identifiers = [targetIdStr, data.admissionNo, data.admission_no, existing.id, existing.admissionNo, existing.admission_no].filter(Boolean);
   let serverData = null;
   for (const ident of identifiers) {
     try {
@@ -1169,7 +1210,16 @@ export const updateStudent = async (id, data) => {
         try {
           serverData = await res.json();
           if (serverData && serverData.id) {
-            const syncedRoster = getStoredStudents().map(s => (isMatch(s) ? { ...s, ...serverData } : s));
+            const normServerBranch = getStandardBranchName(serverData.branch_detail?.name || serverData.branch_name || (typeof serverData.branch === 'object' ? serverData.branch?.name : serverData.branch) || resolvedBranchName);
+            const safeServerData = {
+              ...serverData,
+              branch: normServerBranch,
+              branch_name: normServerBranch,
+              dojo_branch: normServerBranch,
+              branchName: normServerBranch,
+              branch_id: serverData.branch_id || serverData.branch_detail?.id || resolvedBranchId
+            };
+            const syncedRoster = getStoredStudents().map(s => (isMatch(s) ? { ...s, ...safeServerData } : s));
             saveStoredStudents(syncedRoster);
           }
         } catch (e) {}
