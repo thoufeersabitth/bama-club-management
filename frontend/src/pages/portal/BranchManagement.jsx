@@ -1218,13 +1218,23 @@ export default function BranchManagement() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="pt-4 border-t border-gray-100 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                <div className="pt-4 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => openEdit(b)}
                       className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
                     >
                       <Edit className="w-3.5 h-3.5" /> Edit Dojo
+                    </button>
+                    <button
+                      onClick={() => {
+                        setScheduleBranchFilter(b.name);
+                        setActiveTab('SCHEDULES');
+                      }}
+                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
+                      title="View & Edit Batches / Schedules for this Branch"
+                    >
+                      <Clock className="w-3.5 h-3.5 text-amber-600" /> Batches / Shifts
                     </button>
                     {!b.isHeadOffice && (
                       <button
