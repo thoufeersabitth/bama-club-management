@@ -234,6 +234,11 @@ export default function StudentManagement() {
   }, []);
 
   // Automatic WhatsApp Welcome Dispatch State
+  // Sensei Online Cadet Admission & Fee Verification Approval State
+  const [approvingInquiry, setApprovingInquiry] = useState(null);
+  const [approvalData, setApprovalData] = useState(null);
+  const [approvedSuccessData, setApprovedSuccessData] = useState(null);
+
   const [autoWhatsAppWelcome, setAutoWhatsAppWelcome] = useState(true);
   const [welcomeDispatchModal, setWelcomeDispatchModal] = useState(null);
 
@@ -457,11 +462,15 @@ export default function StudentManagement() {
     };
   }, [user, activeBranch]);
 
-  // Sync selectedBranch if URL search parameter 'branch' changes
+  // Sync selectedBranch or open inquiries if URL search parameter changes
   useEffect(() => {
     const bParam = searchParams.get('branch');
     if (bParam && bParam !== selectedBranch) {
       setSelectedBranch(bParam);
+    }
+    const tParam = searchParams.get('tab');
+    if (tParam === 'inquiries') {
+      setShowInquiriesModal(true);
     }
   }, [searchParams]);
 
@@ -558,6 +567,202 @@ export default function StudentManagement() {
     };
     img.src = editPhotoState.rawSrc;
   }, [editPhotoState]);
+
+  // Start Sensei Approval for an Online Admission or Web Lead
+  const handleStartApproval = (inquiry) => {
+    const bFees = getBranchFeeSettings(inquiry.branch, branchesList);
+    const isSchool = (inquiry.branch || '').toLowerCase().includes('school') || (inquiry.branch || '').toLowerCase().includes('amlp') || (inquiry.branch || '').toLowerCase().includes('gmlp') || (inquiry.branch || '').toLowerCase().includes('ansar');
+    const admFee = bFees.admissionFee || 1000;
+    const monFee = isSchool ? (bFees.schoolBatchFee || 500) : (bFees.monthlyFee || 500);
+
+    const year = new Date().getFullYear();
+    const nextSeq = String(students.length + 1).padStart(3, '0');
+    const defaultAdmNo = inquiry.suggested_admission_no || ('BAMA-' + year + '-' + nextSeq);
+
+    setApprovalData({
+      inquiryId: inquiry.id,
+      cadetName: inquiry.name || '',
+      guardianName: inquiry.guardian_name || inquiry.guardianName || '',
+      relationship: inquiry.relationship || 'Father',
+      phone: inquiry.phone || '',
+      whatsapp: inquiry.whatsapp || inquiry.phone || '',
+      gender: inquiry.gender || 'Male',
+      dob: inquiry.dob || '2016-01-01',
+      age: inquiry.age || 10,
+      bloodGroup: inquiry.blood_group || inquiry.bloodGroup || 'O+',
+      address: inquiry.address || '',
+      branch: inquiry.branch || 'Pulikkal Branch (Head Office)',
+      shift: inquiry.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
+      program: inquiry.program || 'Karate (Shotokan)',
+      photo: inquiry.photo || '',
+      admissionNo: defaultAdmNo,
+      // Sensei Cash Decisions
+      admissionFee: admFee,
+      admissionFeePaid: true,
+      admissionFeePaidAmount: admFee,
+      monthlyFee: monFee,
+      monthlyFeePaid: true,
+      monthlyFeePaidAmount: monFee,
+      paymentMode: 'Cash',
+      joiningDate: new Date().toISOString().split('T')[0],
+      portalPassword: inquiry.password || ''
+    });
+
+    setApprovingInquiry(inquiry);
+  };
+
+  // Confirm Sensei Approval & Admit Cadet
+  const handleConfirmApproval = async () => {
+    if (!approvalData || !approvalData.cadetName || !approvalData.cadetName.trim()) {
+      alert('Cadet Name is required!');
+      return;
+    }
+
+    const admFee = Math.max(0, parseInt(approvalData.admissionFee) || 0);
+    const admFeePaid = approvalData.admissionFeePaid ? Math.max(0, parseInt(approvalData.admissionFeePaidAmount) || 0) : 0;
+    const monFee = Math.max(0, parseInt(approvalData.monthlyFee) || 0);
+    const monFeePaid = approvalData.monthlyFeePaid ? Math.max(0, parseInt(approvalData.monthlyFeePaidAmount) || 0) : 0;
+
+    const totalDue = admFee + monFee;
+    const totalCollected = admFeePaid + monFeePaid;
+    const pendingDue = Math.max(0, totalDue - totalCollected);
+    const feeStatus = pendingDue === 0 ? 'Paid' : totalCollected > 0 ? 'Partial' : 'Pending';
+    const isAdmPaid = admFee === 0 || admFeePaid >= admFee;
+
+    const rawBranchInput = approvalData.branch || 'Pulikkal Branch (Head Office)';
+    const matchedB = branchesList.find(b => 
+      String(b.id) === String(approvalData.branch) ||
+      String(b.name).toLowerCase() === String(rawBranchInput).toLowerCase()
+    );
+    const branchTargetName = matchedB ? matchedB.name : rawBranchInput;
+    const branchTargetId = matchedB ? matchedB.id : branchTargetName;
+
+    const isSchool = branchTargetName.toLowerCase().includes('school') || branchTargetName.toLowerCase().includes('amlp') || branchTargetName.toLowerCase().includes('gmlp') || branchTargetName.toLowerCase().includes('ansar');
+    const feeFreq = isSchool ? 'QUARTERLY' : 'MONTHLY';
+    const coveredMonths = monFeePaid >= monFee ? getCoveredMonthsFromDate(approvalData.joiningDate, feeFreq) : [];
+
+    const approvedCadet = {
+      name: approvalData.cadetName.trim(),
+      guardianName: approvalData.guardianName.trim() || 'Parent',
+      guardian_name: approvalData.guardianName.trim() || 'Parent',
+      relationship: approvalData.relationship || 'Father',
+      phone: approvalData.phone.replace(/[^0-9]/g, ''),
+      whatsapp: (approvalData.whatsapp || approvalData.phone).replace(/[^0-9]/g, ''),
+      gender: approvalData.gender,
+      dob: approvalData.dob,
+      age: parseInt(approvalData.age) || 10,
+      bloodGroup: approvalData.bloodGroup,
+      blood_group: approvalData.bloodGroup,
+      address: approvalData.address,
+      branch: branchTargetId,
+      branch_id: branchTargetId,
+      branch_name: branchTargetName,
+      branchName: branchTargetName,
+      dojo_branch: branchTargetName,
+      shift: approvalData.shift,
+      program: approvalData.program,
+      course: approvalData.program,
+      discipline: approvalData.program,
+      currentBelt: approvalData.program.toLowerCase().includes('karate') ? 'White Belt' : approvalData.program,
+      current_belt: approvalData.program.toLowerCase().includes('karate') ? 'White Belt' : approvalData.program,
+      photo: approvalData.photo || '/assets/prog_adults.jpg',
+      admissionNo: approvalData.admissionNo,
+      admission_no: approvalData.admissionNo,
+      admissionFee: admFee,
+      admission_fee: admFee,
+      admissionFeePaidAmount: admFeePaid,
+      admission_fee_paid_amount: admFeePaid,
+      admissionFeePaid: isAdmPaid,
+      admission_fee_paid: isAdmPaid,
+      feeAmount: monFee,
+      fee_amount: monFee,
+      initialPaidAmount: monFeePaid,
+      initial_paid_amount: monFeePaid,
+      feeFrequency: feeFreq,
+      fee_frequency: feeFreq,
+      feeCycleMonths: feeFreq === 'QUARTERLY' ? 3 : 1,
+      paid_months: coveredMonths,
+      paidMonths: coveredMonths,
+      feeStatus: feeStatus,
+      fee_status: feeStatus,
+      pendingAmount: pendingDue,
+      pending_amount: pendingDue,
+      totalCollectedNow: totalCollected,
+      paymentMode: approvalData.paymentMode,
+      joiningDate: approvalData.joiningDate,
+      attendanceRate: 100,
+      status: 'Active',
+      source: 'ONLINE_ADMISSION_APPROVED'
+    };
+
+    try {
+      const saved = await createStudent(approvedCadet);
+      const finalSaved = { ...approvedCadet, ...(saved || {}) };
+      const updatedList = [finalSaved, ...students.filter(s => s.id !== finalSaved.id && s.admissionNo !== finalSaved.admissionNo)];
+      setStudents(updatedList);
+      saveStoredStudents(updatedList);
+
+      // Update Inquiry Status to ADMITTED
+      const updatedInquiries = inquiriesList.map(inq => {
+        if (inq.id === approvalData.inquiryId) {
+          return { ...inq, status: 'ADMITTED', admittedCadetNo: approvalData.admissionNo };
+        }
+        return inq;
+      });
+      setInquiriesList(updatedInquiries);
+      localStorage.setItem('bama_admission_inquiries', JSON.stringify(updatedInquiries));
+
+      // Save password to credentials store if provided
+      if (approvalData.portalPassword) {
+        try {
+          const creds = JSON.parse(localStorage.getItem('bama_student_credentials') || '{}');
+          const key = finalSaved.id || finalSaved.admissionNo || approvedCadet.phone;
+          creds[key] = { password: approvalData.portalPassword, updated_at: new Date().toISOString() };
+          creds[approvedCadet.phone] = { password: approvalData.portalPassword, updated_at: new Date().toISOString() };
+          localStorage.setItem('bama_student_credentials', JSON.stringify(creds));
+        } catch (e) {}
+      }
+
+      // Record fee in offline fees if any collected
+      if (totalCollected > 0) {
+        try {
+          const existingFees = JSON.parse(localStorage.getItem('bama_offline_fees_v1') || '[]');
+          const feeRec = {
+            id: 'FEE-' + Date.now(),
+            receipt_no: 'REC-' + Math.floor(1000 + Math.random() * 9000),
+            student: finalSaved.id,
+            student_id: finalSaved.id,
+            student_name: approvedCadet.name,
+            student_admission_no: approvedCadet.admissionNo,
+            branch: branchTargetName,
+            amount: totalCollected,
+            paid_amount: totalCollected,
+            payment_mode: approvalData.paymentMode,
+            payment_date: approvalData.joiningDate,
+            notes: 'Online Admission Approved: Admission Fee ' + admFeePaid + ' + Monthly Fee ' + monFeePaid,
+            fee_type: 'ADMISSION_AND_TUITION',
+            created_at: new Date().toISOString()
+          };
+          localStorage.setItem('bama_offline_fees_v1', JSON.stringify([feeRec, ...existingFees]));
+          window.dispatchEvent(new Event('bama_data_updated'));
+        } catch (e) {}
+      }
+
+      setApprovedSuccessData({
+        cadet: finalSaved,
+        totalDue,
+        totalCollected,
+        pendingDue,
+        feeStatus,
+        admFeePaid,
+        monFeePaid,
+        paymentMode: approvalData.paymentMode
+      });
+      setApprovingInquiry(null);
+    } catch (err) {
+      alert('Error confirming cadet admission. Please try again.');
+    }
+  };
 
   // Submit New Cadet Admission
   const handleSubmit = async (e) => {
@@ -5135,106 +5340,133 @@ export default function StudentManagement() {
                   No public admission inquiries submitted yet.
                 </div>
               ) : (
-                inquiriesList.map((inquiry) => (
-                  <div
-                    key={inquiry.id}
-                    className="p-4 bg-gray-50/90 hover:bg-amber-50/40 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3 transition"
-                  >
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-sm text-gray-900">{inquiry.name}</span>
-                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
-                          inquiry.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
-                          inquiry.status === 'ADMITTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {inquiry.status}
+                inquiriesList.map((inquiry) => {
+                  const isOnline = inquiry.type === 'ONLINE_ADMISSION' || !!inquiry.gender || !!inquiry.dob || !!inquiry.shift;
+                  const bFees = getBranchFeeSettings(inquiry.branch, branchesList);
+                  const isSchool = (inquiry.branch || '').toLowerCase().includes('school');
+                  const dispMonthly = isSchool ? (bFees.schoolBatchFee || 500) : (bFees.monthlyFee || 500);
+
+                  return (
+                    <div
+                      key={inquiry.id}
+                      className="p-4 bg-gray-50/90 hover:bg-amber-50/40 rounded-2xl border border-gray-200/90 shadow-2xs space-y-3 transition"
+                    >
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-gray-200/60 pb-2">
+                        <div className="flex items-center gap-2.5">
+                          {inquiry.photo ? (
+                            <img src={inquiry.photo} alt={inquiry.name} className="w-9 h-9 rounded-xl object-cover border border-amber-500/40 shadow-xs" />
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 text-white font-black flex items-center justify-center text-xs shadow-xs">
+                              {inquiry.name ? inquiry.name.charAt(0).toUpperCase() : 'C'}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-sm text-gray-900">{inquiry.name}</span>
+                              <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                                inquiry.status === 'PENDING' ? 'bg-amber-100 text-amber-800' :
+                                inquiry.status === 'ADMITTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {inquiry.status === 'PENDING' ? 'Pending Approval' : inquiry.status}
+                              </span>
+                            </div>
+                            {isOnline && (
+                              <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-amber-500" /> Online Admission Application
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-mono font-bold">{inquiry.date} {inquiry.time || ''}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-bold uppercase block">Phone / Mobile (User ID):</span>
+                          <strong className="text-gray-900 font-mono font-bold">{inquiry.phone}</strong>
+                          {inquiry.guardian_name && (
+                            <span className="text-[10px] text-gray-500 block">Parent: {inquiry.guardian_name} ({inquiry.relationship || 'Guardian'})</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-bold uppercase block">Selected Dojo Branch:</span>
+                          <strong className="text-amber-800 font-bold">{inquiry.branch}</strong>
+                          {inquiry.shift && (
+                            <span className="text-[10px] text-gray-600 block truncate font-medium">Batch: {inquiry.shift}</span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-gray-400 font-bold uppercase block">Program & Cadet Info:</span>
+                          <strong className="text-red-700 font-bold">{inquiry.program || 'Karate (Shotokan)'}</strong>
+                          {inquiry.dob && (
+                            <span className="text-[10px] text-gray-500 block">DOB: {inquiry.dob} ({inquiry.age || 10} yrs) • {inquiry.gender || 'Male'} • {inquiry.blood_group || 'O+'}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Fee Structure Summary for this Branch */}
+                      <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="text-[11px] font-bold text-amber-900">
+                          Official Branch Fees: Admission: <strong>₹{bFees.admissionFee || 1000}</strong> • Monthly: <strong>₹{dispMonthly}</strong>
+                        </span>
+                        <span className="text-[10px] text-amber-700 font-medium italic">
+                          ℹ️ Fee to be confirmed by Sensei below
                         </span>
                       </div>
-                      <span className="text-[10px] text-gray-400 font-mono font-bold">{inquiry.date} {inquiry.time || ''}</span>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Phone / WhatsApp:</span>
-                        <strong className="text-gray-900 font-mono font-bold">{inquiry.phone}</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Selected Dojo Branch:</span>
-                        <strong className="text-amber-800 font-bold">{inquiry.branch}</strong>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-gray-400 font-bold uppercase block">Interested Program:</span>
-                        <strong className="text-red-700 font-bold">{inquiry.program}</strong>
-                      </div>
-                    </div>
+                      {inquiry.message && (
+                        <div className="bg-white p-2 rounded-xl border border-gray-200/70 text-xs text-gray-600 italic">
+                          💬 "{inquiry.message}"
+                        </div>
+                      )}
 
-                    <div className="bg-white p-2.5 rounded-xl border border-gray-200/70 text-xs text-gray-700 italic">
-                      💬 "{inquiry.message}"
-                    </div>
+                      {/* Action Bar */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <div className="flex items-center gap-2">
+                          {inquiry.status === 'PENDING' ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleStartApproval(inquiry);
+                              }}
+                              className="px-3.5 py-1.5 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition transform hover:-translate-y-0.5 cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-yellow-200" />
+                              <span>🥋 Review & Approve Cadet Admission</span>
+                            </button>
+                          ) : (
+                            <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Admitted ({inquiry.admittedCadetNo || 'Active'})
+                            </span>
+                          )}
 
-                    {/* Action Bar */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openWhatsApp({ 
-                            phone: inquiry.phone, 
-                            message: `Hello ${inquiry.name}, thank you for inquiring about B.A.M.A Karate Academy for ${inquiry.program} at ${inquiry.branch}. When would you like to visit for a trial class?` 
-                          })}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Sensei Chat
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => openWhatsApp({ 
+                              phone: inquiry.phone, 
+                              message: 'Hello ' + (inquiry.guardian_name || inquiry.name) + ', greeting from Sensei Shafi, B.A.M.A Karate Academy. Regarding your online cadet admission application for ' + inquiry.name + ' at ' + inquiry.branch + '...' 
+                            })}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Parent
+                          </button>
+                        </div>
 
                         <button
                           type="button"
                           onClick={() => {
-                            const currentGlobal = getGlobalFeeSettings();
-                            setFormData({
-                              name: inquiry.name,
-                              photo: '',
-                              guardianName: '',
-                              occupation: '',
-                              phone: inquiry.phone,
-                              whatsapp: inquiry.phone,
-                              dob: '',
-                              age: 12,
-                              currentBelt: 'White Belt',
-                              branch: inquiry.branch,
-                              shift: 'Evening Batch (5:00 PM - 7:00 PM)',
-                              joiningDate: new Date().toISOString().split('T')[0],
-                              admissionFee: currentGlobal.defaultAdmissionFee || 1000,
-                              admissionFeePaidAmount: currentGlobal.defaultAdmissionFee || 1000,
-                              feeAmount: currentGlobal.defaultMonthlyFee || 500,
-                              initialPaidAmount: currentGlobal.defaultMonthlyFee || 500,
-                              feeStatus: 'Paid',
-                              gender: 'Male',
-                              bloodGroup: 'O+',
-                              address: ''
-                            });
-                            setShowInquiriesModal(false);
-                            setShowAddModal(true);
+                            const updated = inquiriesList.filter(i => i.id !== inquiry.id);
+                            setInquiriesList(updated);
+                            localStorage.setItem('bama_admission_inquiries', JSON.stringify(updated));
                           }}
-                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-2xs transition cursor-pointer"
+                          className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" /> 🥋 Convert to Registered Cadet
+                          <Trash2 className="w-3.5 h-3.5" /> Delete Lead
                         </button>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = inquiriesList.filter(i => i.id !== inquiry.id);
-                          setInquiriesList(updated);
-                          localStorage.setItem('bama_admission_inquiries', JSON.stringify(updated));
-                        }}
-                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete Lead
-                      </button>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -5251,7 +5483,399 @@ export default function StudentManagement() {
         </div>
       )}
 
+      {/* MODAL 7: SENSEI CADET ADMISSION & FEE VERIFICATION APPROVAL MODAL */}
+      {approvingInquiry && approvalData && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setApprovingInquiry(null)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 cursor-pointer p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
+            {/* Modal Header */}
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white flex items-center justify-center shadow-md">
+                <CheckCircle2 className="w-6 h-6 text-yellow-200" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-gray-900 leading-tight">
+                  Sensei Admission & Fee Approval
+                </h3>
+                <p className="text-xs text-gray-500 font-medium">
+                  Verify cadet details and set whether Admission Fee and Monthly Fee were received in Cash / GPay before activating.
+                </p>
+              </div>
+            </div>
+
+            {/* Cadet Summary Banner */}
+            <div className="p-4 bg-gray-50 border border-gray-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {approvalData.photo ? (
+                  <img
+                    src={approvalData.photo}
+                    alt={approvalData.cadetName}
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-500/40 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-xl shadow-sm">
+                    {approvalData.cadetName ? approvalData.cadetName.charAt(0).toUpperCase() : 'C'}
+                  </div>
+                )}
+                <div>
+                  <h4 className="text-base font-black text-gray-900">{approvalData.cadetName}</h4>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {approvalData.gender} • Age: {approvalData.age} • Blood Group: {approvalData.bloodGroup}
+                  </p>
+                  <p className="text-xs text-amber-700 font-bold">
+                    🏬 {approvalData.branch}
+                  </p>
+                  <p className="text-[11px] text-gray-600">
+                    ⏰ {approvalData.shift}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right text-xs space-y-1 bg-white p-3 rounded-xl border border-gray-200/80 w-full sm:w-auto">
+                <span className="text-[10px] text-gray-400 font-bold uppercase block">Parent / Guardian:</span>
+                <strong className="text-gray-900 block">{approvalData.guardianName} ({approvalData.relationship})</strong>
+                <span className="text-blue-600 font-mono font-bold block">📞 {approvalData.phone}</span>
+              </div>
+            </div>
+
+            {/* Admission Number & Joining Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700">Official Admission No *</label>
+                <input
+                  type="text"
+                  required
+                  value={approvalData.admissionNo}
+                  onChange={(e) => setApprovalData({ ...approvalData, admissionNo: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-mono font-bold focus:border-red-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-700">Official Joining Date *</label>
+                <input
+                  type="date"
+                  required
+                  value={approvalData.joiningDate}
+                  onChange={(e) => setApprovalData({ ...approvalData, joiningDate: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3.5 py-2.5 text-xs text-gray-900 font-bold focus:border-red-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* SENSEI FEE VERIFICATION SECTION (കാശ് തന്നോ ഇല്ലേ എന്ന് സെറ്റ് ചെയ്യുക) */}
+            <div className="p-4 bg-amber-50/60 border-2 border-amber-400/60 rounded-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-amber-200/80 pb-2">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-amber-600" />
+                  <h4 className="text-xs font-black uppercase text-amber-900 tracking-wider">
+                    Sensei Fee Collection & Verification (കാശ് തന്നോ ഇല്ലേ?)
+                  </h4>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-200 text-amber-900 rounded-md">
+                  Sensei Verification
+                </span>
+              </div>
+
+              {/* 1. Admission Fee Decision */}
+              <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2.5 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div>
+                    <span className="text-xs font-black text-gray-900 block">
+                      🏷️ One-Time Admission Fee (Official: ₹{approvalData.admissionFee})
+                    </span>
+                    <span className="text-[11px] text-gray-500">Did the cadet pay the admission fee in cash / UPI?</span>
+                  </div>
+
+                  {/* Yes / No Toggle Buttons */}
+                  <div className="inline-flex rounded-xl p-1 bg-gray-100 border border-gray-200 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setApprovalData(prev => ({
+                        ...prev,
+                        admissionFeePaid: true,
+                        admissionFeePaidAmount: prev.admissionFee
+                      }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
+                        approvalData.admissionFeePaid
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5" /> കാശ് തന്നു (Paid)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalData(prev => ({
+                        ...prev,
+                        admissionFeePaid: false,
+                        admissionFeePaidAmount: 0
+                      }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
+                        !approvalData.admissionFeePaid
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" /> കാശ് തന്നിട്ടില്ല (Due)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="text-[11px] text-gray-600 font-bold">Collected Amount:</span>
+                  <div className="relative w-36">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-gray-400">₹</span>
+                    <input
+                      type="number"
+                      value={approvalData.admissionFeePaidAmount}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        setApprovalData(prev => ({
+                          ...prev,
+                          admissionFeePaidAmount: val,
+                          admissionFeePaid: val > 0
+                        }));
+                      }}
+                      className="w-full pl-6 pr-3 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-xs font-bold font-mono focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <span className="text-[11px] text-gray-500 italic">
+                    {approvalData.admissionFeePaidAmount >= approvalData.admissionFee ? 'Full Admission Cleared' : approvalData.admissionFeePaidAmount > 0 ? 'Partial Admission Fee' : 'Pending'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 2. Monthly Training Fee Decision */}
+              <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2.5 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <div>
+                    <span className="text-xs font-black text-gray-900 block">
+                      🥋 First Month Training Fee (Official: ₹{approvalData.monthlyFee})
+                    </span>
+                    <span className="text-[11px] text-gray-500">Did the cadet pay the first month fee?</span>
+                  </div>
+
+                  {/* Yes / No Toggle Buttons */}
+                  <div className="inline-flex rounded-xl p-1 bg-gray-100 border border-gray-200 self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setApprovalData(prev => ({
+                        ...prev,
+                        monthlyFeePaid: true,
+                        monthlyFeePaidAmount: prev.monthlyFee
+                      }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
+                        approvalData.monthlyFeePaid
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5" /> കാശ് തന്നു (Paid)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setApprovalData(prev => ({
+                        ...prev,
+                        monthlyFeePaid: false,
+                        monthlyFeePaidAmount: 0
+                      }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition cursor-pointer ${
+                        !approvalData.monthlyFeePaid
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" /> കാശ് തന്നിട്ടില്ല (Due)
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <span className="text-[11px] text-gray-600 font-bold">Collected Amount:</span>
+                  <div className="relative w-36">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-gray-400">₹</span>
+                    <input
+                      type="number"
+                      value={approvalData.monthlyFeePaidAmount}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        setApprovalData(prev => ({
+                          ...prev,
+                          monthlyFeePaidAmount: val,
+                          monthlyFeePaid: val > 0
+                        }));
+                      }}
+                      className="w-full pl-6 pr-3 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-xs font-bold font-mono focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                  <span className="text-[11px] text-gray-500 italic">
+                    {approvalData.monthlyFeePaidAmount >= approvalData.monthlyFee ? 'First Month Covered' : approvalData.monthlyFeePaidAmount > 0 ? 'Partial Fee' : 'Pending'}
+                  </span>
+                </div>
+              </div>
+
+              {/* 3. Payment Mode Selection */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-amber-200/60">
+                <span className="text-xs font-bold text-gray-700">Payment Collection Method:</span>
+                <div className="flex items-center gap-2">
+                  {['Cash', 'GPay / UPI', 'Bank Transfer'].map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setApprovalData({ ...approvalData, paymentMode: mode })}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        approvalData.paymentMode === mode
+                          ? 'bg-gray-900 text-white border-gray-900 shadow-xs'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {mode === 'Cash' ? '💵 Cash' : mode.includes('UPI') ? '📱 UPI / GPay' : '🏦 Bank'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Real-time Dues Calculation Banner */}
+              {(() => {
+                const totalReq = (parseInt(approvalData.admissionFee) || 0) + (parseInt(approvalData.monthlyFee) || 0);
+                const totalCol = (parseInt(approvalData.admissionFeePaidAmount) || 0) + (parseInt(approvalData.monthlyFeePaidAmount) || 0);
+                const bal = Math.max(0, totalReq - totalCol);
+                const st = bal === 0 ? 'Paid' : totalCol > 0 ? 'Partial' : 'Pending';
+
+                return (
+                  <div className="p-3 bg-white rounded-xl border border-amber-300 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                    <div>
+                      <span className="text-gray-500">Total Required:</span>
+                      <strong className="text-gray-900 ml-1">₹{totalReq}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Collected by Sensei:</span>
+                      <strong className="text-emerald-700 ml-1">₹{totalCol}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Balance Due:</span>
+                      <strong className="text-red-700 ml-1">₹{bal}</strong>
+                    </div>
+                    <div>
+                      <span className={`px-2.5 py-1 rounded-md text-[11px] font-black uppercase ${
+                        st === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
+                        st === 'Partial' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                      }`}>
+                        Ledger Status: {st}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setApprovingInquiry(null)}
+                className="px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmApproval}
+                className="px-7 py-2.5 rounded-xl bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs shadow-lg flex items-center gap-2 transform hover:-translate-y-0.5 transition cursor-pointer"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Confirm Admission & Activate Cadet</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: SENSEI APPROVAL SUCCESS & WHATSAPP CONFIRMATION */}
+      {approvedSuccessData && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 border border-emerald-500/40 text-center space-y-5 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-300 flex items-center justify-center mx-auto shadow-md">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-xl font-black text-gray-900">Cadet Successfully Admitted!</h3>
+              <p className="text-xs text-emerald-700 font-medium">
+                {approvedSuccessData.cadet.name} is now an Active Cadet in {approvedSuccessData.cadet.branch_name}.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-left text-xs font-mono space-y-2">
+              <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                <span className="text-gray-500">Admission No:</span>
+                <strong className="text-red-700">{approvedSuccessData.cadet.admissionNo}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                <span className="text-gray-500">Cadet Name:</span>
+                <strong className="text-gray-900">{approvedSuccessData.cadet.name}</strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                <span className="text-gray-500">Cash Collected:</span>
+                <strong className="text-emerald-700">₹{approvedSuccessData.totalCollected} ({approvedSuccessData.paymentMode})</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Fee Status:</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                  approvedSuccessData.feeStatus === 'Paid' ? 'bg-emerald-100 text-emerald-800' :
+                  approvedSuccessData.feeStatus === 'Partial' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                }`}>
+                  {approvedSuccessData.feeStatus}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const c = approvedSuccessData.cadet;
+                  const cleanP = (c.phone || '').replace(/[^0-9]/g, '');
+                  const waPhone = cleanP.length === 10 ? '91' + cleanP : cleanP;
+                  const text = 
+                    '🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A)* 🥋\n\n' +
+                    'Dear Parent (' + (c.guardianName || 'Parent') + '),\n\n' +
+                    'We are pleased to inform you that the cadet admission for *' + c.name + '* has been APPROVED by Sensei!\n\n' +
+                    '📋 *Official Admission Details:*\n' +
+                    '• Admission No: *' + c.admissionNo + '*\n' +
+                    '• Dojo Branch: *' + c.branch_name + '*\n' +
+                    '• Batch Timing: *' + (c.shift || 'Regular Batch') + '*\n' +
+                    '• Admission Fee: *₹' + c.admissionFee + '* (' + (approvedSuccessData.admFeePaid >= c.admissionFee ? 'PAID' : 'DUE PENDING') + ')\n' +
+                    '• Monthly Fee: *₹' + c.feeAmount + '* (' + (approvedSuccessData.monFeePaid >= c.feeAmount ? 'PAID' : 'DUE PENDING') + ')\n' +
+                    '• Amount Collected Now: *₹' + approvedSuccessData.totalCollected + '*\n\n' +
+                    '🥋 OSS! Welcome to the B.A.M.A Dojo family. We look forward to seeing the cadet on the tatami.';
+                  
+                  openWhatsApp({ phone: waPhone, message: text });
+                }}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Send WhatsApp Welcome & Receipt to Parent</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setApprovedSuccessData(null)}
+                className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: Promote Cadet Belt Rank & Issue Certificate */}
       {renderPromoteModal()}
