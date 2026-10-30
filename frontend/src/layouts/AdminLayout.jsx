@@ -89,6 +89,8 @@ export default function AdminLayout({ children }) {
     { label: 'System Settings', path: '/portal/settings', icon: Settings, moduleKey: 'settings' },
   ];
 
+  const userRole = user?.role || 'SUPER_ADMIN';
+
   // All 11 essential academy management modules are guaranteed visible to Sensei & Management
   const allowedMenuItems = menuItems;
 
@@ -386,7 +388,7 @@ export default function AdminLayout({ children }) {
               <div className="hidden sm:block text-left">
                 <p className="text-xs font-black text-gray-900 leading-tight">{user?.name || 'Sensei Abdul Rahman'}</p>
                 <span className="text-[9px] font-black text-red-600 uppercase tracking-wider block">
-                  {userRole.replace('_', ' ')}
+                  {(user?.role || userRole || 'SUPER_ADMIN').replace('_', ' ')}
                 </span>
               </div>
             </div>
