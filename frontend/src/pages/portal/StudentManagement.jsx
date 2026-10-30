@@ -5,7 +5,7 @@ import {
   X, Check, Shield, Award, MapPin, Phone, Mail, FileText,
   Calendar, CreditCard, MessageSquare, UserCheck, Upload, Camera, Image as ImageIcon,
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
-  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2
+  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, FileSpreadsheet
 } from 'lucide-react';
 import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
@@ -1234,6 +1234,173 @@ export default function StudentManagement() {
   const indexOfLastStudent = Math.min(currentPage * itemsPerPage, filteredStudents.length);
   const indexOfFirstStudent = (currentPage - 1) * itemsPerPage;
   const currentPaginatedStudents = filteredStudents.slice(indexOfFirstStudent, indexOfLastStudent);
+
+  // Export Branch / Filtered Cadets List as Excel / CSV
+  const handleExportCadetsCSV = () => {
+    if (!filteredStudents || filteredStudents.length === 0) {
+      alert("ഡൗൺലോഡ് ചെയ്യാൻ കുട്ടികൾ ആരുമില്ല (No cadets found to download).");
+      return;
+    }
+
+    const branchLabel = selectedBranch && selectedBranch !== 'ALL' 
+      ? String(selectedBranch).replace(/[^a-zA-Z0-9_-]/g, '_') 
+      : (activeBranch && activeBranch !== 'ALL' ? String(activeBranch).replace(/[^a-zA-Z0-9_-]/g, '_') : 'All_Branches');
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `BAMA_${branchLabel}_Cadets_${dateStr}.csv`;
+
+    const headers = [
+      'Sl No',
+      'Admission No',
+      'Cadet Name',
+      'Belt Rank',
+      'Course / Discipline',
+      'Shift / Batch',
+      'Branch Dojo',
+      'Gender',
+      'Age',
+      'Phone',
+      'WhatsApp',
+      'Parent / Guardian',
+      'Blood Group',
+      'Fee Status',
+      'Last Paid Month',
+      'Join Date'
+    ];
+
+    const rows = filteredStudents.map((s, idx) => {
+      const bObj = s.branch_detail || (typeof s.branch === 'object' ? s.branch : null);
+      const bName = s.branch_name || s.branchName || bObj?.name || (typeof s.branch === 'string' ? s.branch : '');
+      return [
+        idx + 1,
+        s.admissionNo || s.admission_no || s.admissionNumber || s.admission_number || '',
+        s.name || s.student_name || '',
+        s.currentBelt || s.current_belt || '',
+        resolveStudentProgram(s),
+        s.shift || '',
+        bName,
+        s.gender || '',
+        s.age || '',
+        s.phone || '',
+        s.whatsapp || s.phone || '',
+        s.guardianName || s.guardian_name || '',
+        s.bloodGroup || s.blood_group || '',
+        s.feeStatus || s.fee_status || '',
+        s.last_fee_month || s.lastFeeMonth || '',
+        s.dateOfJoining || s.date_of_joining || ''
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [
+      headers.map(h => `"${h}"`).join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Quick Printable PDF Cadets Roster
+  const handlePrintCadetsList = () => {
+    if (!filteredStudents || filteredStudents.length === 0) {
+      alert("പ്രിന്റ് ചെയ്യാൻ കുട്ടികൾ ആരുമില്ല (No cadets found to print).");
+      return;
+    }
+
+    const branchLabel = selectedBranch && selectedBranch !== 'ALL' 
+      ? selectedBranch 
+      : (activeBranch && activeBranch !== 'ALL' ? activeBranch : 'All Branches (Central Academy)');
+    const dateStr = new Date().toLocaleDateString('en-GB');
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      alert('പോപ്പ്-അപ്പ് അനുവദിക്കുക (Please allow browser popups to print).');
+      return;
+    }
+
+    const rowsHtml = filteredStudents.map((s, idx) => {
+      const adm = s.admissionNo || s.admission_no || s.admissionNumber || '-';
+      const name = s.name || s.student_name || '';
+      const belt = s.currentBelt || s.current_belt || '-';
+      const shift = s.shift || '-';
+      const phone = s.phone || '-';
+      const guardian = s.guardianName || s.guardian_name || '-';
+      const blood = s.bloodGroup || s.blood_group || '-';
+      const fee = s.feeStatus || s.fee_status || 'Pending';
+      return `
+        <tr>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold;">${idx + 1}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace; font-weight:bold;">${adm}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold;">${name}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd;">${belt}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd;">${shift}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace;">${phone}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd;">${guardian}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd;">${blood}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold; color: ${fee === 'Paid' ? '#059669' : '#dc2626'};">${fee}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>BAMA Cadets Roster - ${branchLabel}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #111; margin: 20px; }
+          .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #b91c1c; padding-bottom: 10px; }
+          h1 { margin: 0; font-size: 18px; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.5px; }
+          h2 { margin: 4px 0 0; font-size: 13px; color: #374151; }
+          p { margin: 4px 0 0; color: #6b7280; font-size: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+          th { background-color: #f3f4f6; color: #1f2937; padding: 7px 8px; font-size: 10px; text-transform: uppercase; border: 1px solid #ddd; }
+          tr:nth-child(even) { background-color: #fbfbfb; }
+          @media print {
+            body { margin: 8mm; }
+            button { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Brave Academy of Martial Arts (B.A.M.A)</h1>
+          <h2>Branch Cadets Roster: ${branchLabel}</h2>
+          <p>Total Enrolled: ${filteredStudents.length} Cadets • Generated: ${dateStr}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35px;">#</th>
+              <th style="width: 80px;">Adm No</th>
+              <th>Cadet Name</th>
+              <th style="width: 90px;">Belt</th>
+              <th>Shift / Batch</th>
+              <th style="width: 95px;">Phone</th>
+              <th>Guardian</th>
+              <th style="width: 45px;">Blood</th>
+              <th style="width: 65px;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+    }, 500);
+  };
 
   const renderPromoteModal = () => {
     return (
@@ -2577,6 +2744,28 @@ export default function StudentManagement() {
             <Plus className="w-4 h-4" /> <span className="whitespace-nowrap">New Cadet Admission</span>
           </button>
 
+          {/* Download Branch / Filtered Students Excel/CSV */}
+          <button
+            type="button"
+            title="തിരഞ്ഞെടുത്ത ബ്രാഞ്ചിലെ കുട്ടികളുടെ ലിസ്റ്റ് Excel / CSV ആയി ഡൗൺലോഡ് ചെയ്യുക"
+            onClick={handleExportCadetsCSV}
+            className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+            <span>Download CSV</span>
+          </button>
+
+          {/* Print / Save PDF Branch Roster */}
+          <button
+            type="button"
+            title="ബ്രാഞ്ച് സ്റ്റുഡന്റ് ലിസ്റ്റ് പ്രിന്റ് ചെയ്യുക / PDF ആയി സേവ് ചെയ്യുക"
+            onClick={handlePrintCadetsList}
+            className="px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
+          >
+            <Printer className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+            <span>Print List</span>
+          </button>
+
           {/* 1-Click Backup Export & Restore Sync Buttons */}
           <button
             type="button"
@@ -2585,10 +2774,10 @@ export default function StudentManagement() {
               const count = exportCadetsBackupJSON();
               alert(`✅ ബാക്കപ്പ് ഫയൽ ഡൗൺലോഡ് ആയി!\n\nആകെ ${count} കുട്ടികളുടെ വിവരങ്ങൾ സേവ് ചെയ്തിട്ടുണ്ട്.\nഈ ഫയൽ പെൻഡ്രൈവ് വഴിയോ വാട്സാപ്പ് വഴിയോ സെൻസിയുടെ ലാപ്ടോപ്പിലേക്ക് അയച്ചു കൊടുക്കുക.`);
             }}
-            className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
+            className="px-3 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-            <span>Export Backup</span>
+            <Download className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
+            <span>Backup</span>
           </button>
 
 

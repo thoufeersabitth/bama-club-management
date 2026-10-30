@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, Plus, MapPin, Phone, Mail, Clock, Shield, Check, X, Search,
   UserCheck, Users, ExternalLink, MessageSquare, Edit, Trash2, Award, Calendar,
-  Sparkles, Eye, Camera, Upload, Image as ImageIcon, RefreshCw, Loader2
+  Sparkles, Eye, Camera, Upload, Image as ImageIcon, RefreshCw, Loader2,
+  Download, Printer, FileSpreadsheet
 } from 'lucide-react';
 import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
@@ -838,6 +839,151 @@ export default function BranchManagement() {
     setRosterSearch('');
   };
 
+  const downloadBranchCadetsCSV = (branchObjOrName, customCadetsList = null, customTitle = '') => {
+    const bName = typeof branchObjOrName === 'object' ? branchObjOrName.name : branchObjOrName;
+    const cadets = customCadetsList || getBranchCadets(branchObjOrName);
+
+    if (!cadets || cadets.length === 0) {
+      alert(`ഡൗൺലോഡ് ചെയ്യാൻ ഈ ബ്രാഞ്ചിൽ കുട്ടികൾ ആരുമില്ല (${bName || 'Branch'}).`);
+      return;
+    }
+
+    const branchLabel = String(customTitle || bName).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `BAMA_${branchLabel}_Cadets_${dateStr}.csv`;
+
+    const headers = [
+      'Sl No',
+      'Admission No',
+      'Cadet Name',
+      'Belt Rank',
+      'Discipline / Course',
+      'Shift / Batch',
+      'Branch Dojo',
+      'Gender',
+      'Age',
+      'Phone',
+      'Parent / Guardian',
+      'Blood Group',
+      'Fee Status'
+    ];
+
+    const rows = cadets.map((s, idx) => [
+      idx + 1,
+      s.admissionNumber || s.admission_number || s.admissionNo || s.admission_no || '',
+      s.name || s.student_name || '',
+      s.currentBelt || s.current_belt || '',
+      s.program || s.course || 'Karate (Shotokan)',
+      s.shift || '',
+      bName || '',
+      s.gender || '',
+      s.age || '',
+      s.phone || '',
+      s.guardianName || s.guardian_name || '',
+      s.bloodGroup || s.blood_group || '',
+      s.feeStatus || s.fee_status || ''
+    ]);
+
+    const csvContent = "\uFEFF" + [
+      headers.map(h => `"${h}"`).join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const printBranchCadetsList = (title, subtitle, cadets) => {
+    if (!cadets || cadets.length === 0) {
+      alert("പ്രിന്റ് ചെയ്യാൻ കുട്ടികൾ ആരുമില്ല.");
+      return;
+    }
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      alert('പോപ്പ്-അപ്പ് അനുവദിക്കുക (Please allow browser popups to print).');
+      return;
+    }
+
+    const rowsHtml = cadets.map((s, idx) => {
+      const adm = s.admissionNumber || s.admission_number || s.admissionNo || s.admission_no || '-';
+      const name = s.name || s.student_name || '';
+      const belt = s.currentBelt || s.current_belt || '-';
+      const shift = s.shift || '-';
+      const phone = s.phone || '-';
+      const fee = s.feeStatus || s.fee_status || 'Pending';
+      return `
+        <tr>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold;">${idx + 1}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace; font-weight:bold;">${adm}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold;">${name}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd;">${belt}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd;">${shift}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace;">${phone}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold; color: ${fee === 'Paid' ? '#059669' : '#dc2626'};">${fee}</td>
+        </tr>
+      `;
+    }).join('');
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>BAMA Cadets - ${title}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #111; margin: 20px; }
+          .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #b91c1c; padding-bottom: 10px; }
+          h1 { margin: 0; font-size: 18px; color: #b91c1c; text-transform: uppercase; letter-spacing: 0.5px; }
+          h2 { margin: 4px 0 0; font-size: 13px; color: #374151; }
+          p { margin: 4px 0 0; color: #6b7280; font-size: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+          th { background-color: #f3f4f6; color: #1f2937; padding: 7px 8px; font-size: 10px; text-transform: uppercase; border: 1px solid #ddd; }
+          tr:nth-child(even) { background-color: #fbfbfb; }
+          @media print {
+            body { margin: 8mm; }
+            button { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Brave Academy of Martial Arts (B.A.M.A)</h1>
+          <h2>${title}</h2>
+          <p>${subtitle} | Printed: ${new Date().toLocaleDateString('en-GB')}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 35px;">#</th>
+              <th style="width: 80px;">Adm No</th>
+              <th>Cadet Name</th>
+              <th style="width: 90px;">Belt</th>
+              <th>Shift / Batch</th>
+              <th style="width: 100px;">Phone</th>
+              <th style="width: 70px;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+    }, 500);
+  };
+
   return (
     <div className="space-y-6">
       {/* Executive Light White Header Banner */}
@@ -1133,11 +1279,19 @@ export default function BranchManagement() {
                       <button
                         type="button"
                         onClick={() => openBranchCadetsRoster(b)}
-                        className="text-xs font-black text-red-700 bg-white px-3 py-1 rounded-xl border border-red-200 shadow-xs hover:bg-red-600 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+                        className="text-xs font-black text-red-700 bg-white px-2.5 py-1 rounded-xl border border-red-200 shadow-xs hover:bg-red-600 hover:text-white transition flex items-center gap-1.5 cursor-pointer"
                         title="Quick view enrolled cadets in this branch"
                       >
                         <span>{cadetCount} Cadets</span>
                         <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => downloadBranchCadetsCSV(b)}
+                        className="p-1 bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl transition cursor-pointer"
+                        title="Download Student List (Excel / CSV) for this branch"
+                      >
+                        <Download className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
@@ -2019,17 +2173,37 @@ export default function BranchManagement() {
                   className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-3 py-1.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 transition font-medium"
                 />
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setRosterModal({ ...rosterModal, isOpen: false });
-                  navigate(`/portal/students?branch=${encodeURIComponent(rosterModal.branchName)}`);
-                }}
-                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
-              >
-                <span>Open in Full Cadet Directory</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => downloadBranchCadetsCSV(rosterModal.branchName, rosterModal.cadets, rosterModal.title)}
+                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  title="Download Excel / CSV for this list"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Download CSV</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => printBranchCadetsList(rosterModal.title, rosterModal.subtitle, rosterModal.cadets)}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-300 font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  title="Print / Save PDF for this list"
+                >
+                  <Printer className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Print</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRosterModal({ ...rosterModal, isOpen: false });
+                    navigate(`/portal/students?branch=${encodeURIComponent(rosterModal.branchName)}`);
+                  }}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                >
+                  <span>Full Directory</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Cadets List */}
