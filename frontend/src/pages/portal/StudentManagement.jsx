@@ -1251,38 +1251,45 @@ export default function StudentManagement() {
     const headers = [
       'Sl No',
       'Admission No',
-      'Cadet Name',
+      'Student Name',
+      'Father / Guardian Name',
+      'Relationship',
+      'Mobile Number',
+      'WhatsApp Number',
       'Belt Rank',
-      'Course / Discipline',
-      'Shift / Batch',
+      'Training Shift / Batch',
+      'Discipline / Course',
       'Branch Dojo',
       'Gender',
       'Age',
-      'Phone',
-      'WhatsApp',
-      'Parent / Guardian',
       'Blood Group',
       'Fee Status',
       'Last Paid Month',
-      'Join Date'
+      'Admission Date'
     ];
 
     const rows = filteredStudents.map((s, idx) => {
       const bObj = s.branch_detail || (typeof s.branch === 'object' ? s.branch : null);
       const bName = s.branch_name || s.branchName || bObj?.name || (typeof s.branch === 'string' ? s.branch : '');
+      const fatherName = s.guardianName || s.guardian_name || s.fatherName || s.father_name || s.parent_name || '';
+      const relationship = s.relationship || (fatherName ? 'Father' : '');
+      const mobileNum = s.phone || s.mobile || s.phoneNumber || s.phone_number || s.contact || '';
+      const whatsappNum = s.whatsapp || mobileNum || '';
+
       return [
         idx + 1,
         s.admissionNo || s.admission_no || s.admissionNumber || s.admission_number || '',
         s.name || s.student_name || '',
+        fatherName,
+        relationship,
+        mobileNum,
+        whatsappNum,
         s.currentBelt || s.current_belt || '',
-        resolveStudentProgram(s),
         s.shift || '',
+        resolveStudentProgram(s),
         bName,
         s.gender || '',
         s.age || '',
-        s.phone || '',
-        s.whatsapp || s.phone || '',
-        s.guardianName || s.guardian_name || '',
         s.bloodGroup || s.blood_group || '',
         s.feeStatus || s.fee_status || '',
         s.last_fee_month || s.lastFeeMonth || '',
@@ -1327,22 +1334,20 @@ export default function StudentManagement() {
     const rowsHtml = filteredStudents.map((s, idx) => {
       const adm = s.admissionNo || s.admission_no || s.admissionNumber || '-';
       const name = s.name || s.student_name || '';
+      const father = s.guardianName || s.guardian_name || s.fatherName || s.father_name || '-';
+      const phone = s.phone || s.mobile || '-';
       const belt = s.currentBelt || s.current_belt || '-';
       const shift = s.shift || '-';
-      const phone = s.phone || '-';
-      const guardian = s.guardianName || s.guardian_name || '-';
-      const blood = s.bloodGroup || s.blood_group || '-';
       const fee = s.feeStatus || s.fee_status || 'Pending';
       return `
         <tr>
           <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold;">${idx + 1}</td>
           <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace; font-weight:bold;">${adm}</td>
-          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold;">${name}</td>
-          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd;">${belt}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 11.5px;">${name}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: 600; color: #1f2937;">${father}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace; font-weight:bold; color: #0284c7;">${phone}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight: 600;">${belt}</td>
           <td style="padding: 6px 8px; border: 1px solid #ddd;">${shift}</td>
-          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace;">${phone}</td>
-          <td style="padding: 6px 8px; border: 1px solid #ddd;">${guardian}</td>
-          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd;">${blood}</td>
           <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold; color: ${fee === 'Paid' ? '#059669' : '#dc2626'};">${fee}</td>
         </tr>
       `;
@@ -1379,12 +1384,11 @@ export default function StudentManagement() {
             <tr>
               <th style="width: 35px;">#</th>
               <th style="width: 80px;">Adm No</th>
-              <th>Cadet Name</th>
+              <th>Student Name</th>
+              <th>Father / Guardian Name</th>
+              <th style="width: 105px;">Mobile Number</th>
               <th style="width: 90px;">Belt</th>
               <th>Shift / Batch</th>
-              <th style="width: 95px;">Phone</th>
-              <th>Guardian</th>
-              <th style="width: 45px;">Blood</th>
               <th style="width: 65px;">Status</th>
             </tr>
           </thead>

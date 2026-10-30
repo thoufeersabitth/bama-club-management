@@ -855,34 +855,42 @@ export default function BranchManagement() {
     const headers = [
       'Sl No',
       'Admission No',
-      'Cadet Name',
+      'Student Name',
+      'Father / Guardian Name',
+      'Mobile Number',
+      'WhatsApp Number',
       'Belt Rank',
+      'Training Shift / Batch',
       'Discipline / Course',
-      'Shift / Batch',
       'Branch Dojo',
       'Gender',
       'Age',
-      'Phone',
-      'Parent / Guardian',
       'Blood Group',
       'Fee Status'
     ];
 
-    const rows = cadets.map((s, idx) => [
-      idx + 1,
-      s.admissionNumber || s.admission_number || s.admissionNo || s.admission_no || '',
-      s.name || s.student_name || '',
-      s.currentBelt || s.current_belt || '',
-      s.program || s.course || 'Karate (Shotokan)',
-      s.shift || '',
-      bName || '',
-      s.gender || '',
-      s.age || '',
-      s.phone || '',
-      s.guardianName || s.guardian_name || '',
-      s.bloodGroup || s.blood_group || '',
-      s.feeStatus || s.fee_status || ''
-    ]);
+    const rows = cadets.map((s, idx) => {
+      const fatherName = s.guardianName || s.guardian_name || s.fatherName || s.father_name || s.parent_name || '';
+      const mobileNum = s.phone || s.mobile || s.phoneNumber || s.phone_number || s.contact || '';
+      const whatsappNum = s.whatsapp || mobileNum || '';
+
+      return [
+        idx + 1,
+        s.admissionNumber || s.admission_number || s.admissionNo || s.admission_no || '',
+        s.name || s.student_name || '',
+        fatherName,
+        mobileNum,
+        whatsappNum,
+        s.currentBelt || s.current_belt || '',
+        s.shift || '',
+        s.program || s.course || 'Karate (Shotokan)',
+        bName || '',
+        s.gender || '',
+        s.age || '',
+        s.bloodGroup || s.blood_group || '',
+        s.feeStatus || s.fee_status || ''
+      ];
+    });
 
     const csvContent = "\uFEFF" + [
       headers.map(h => `"${h}"`).join(','),
@@ -915,18 +923,20 @@ export default function BranchManagement() {
     const rowsHtml = cadets.map((s, idx) => {
       const adm = s.admissionNumber || s.admission_number || s.admissionNo || s.admission_no || '-';
       const name = s.name || s.student_name || '';
+      const father = s.guardianName || s.guardian_name || s.fatherName || s.father_name || '-';
+      const phone = s.phone || s.mobile || '-';
       const belt = s.currentBelt || s.current_belt || '-';
       const shift = s.shift || '-';
-      const phone = s.phone || '-';
       const fee = s.feeStatus || s.fee_status || 'Pending';
       return `
         <tr>
           <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold;">${idx + 1}</td>
           <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace; font-weight:bold;">${adm}</td>
-          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold;">${name}</td>
-          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd;">${belt}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 11.5px;">${name}</td>
+          <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: 600; color: #1f2937;">${father}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace; font-weight:bold; color: #0284c7;">${phone}</td>
+          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight: 600;">${belt}</td>
           <td style="padding: 6px 8px; border: 1px solid #ddd;">${shift}</td>
-          <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-family: monospace;">${phone}</td>
           <td style="text-align:center; padding: 6px 8px; border: 1px solid #ddd; font-weight:bold; color: ${fee === 'Paid' ? '#059669' : '#dc2626'};">${fee}</td>
         </tr>
       `;
@@ -963,11 +973,12 @@ export default function BranchManagement() {
             <tr>
               <th style="width: 35px;">#</th>
               <th style="width: 80px;">Adm No</th>
-              <th>Cadet Name</th>
+              <th>Student Name</th>
+              <th>Father / Guardian Name</th>
+              <th style="width: 105px;">Mobile Number</th>
               <th style="width: 90px;">Belt</th>
               <th>Shift / Batch</th>
-              <th style="width: 100px;">Phone</th>
-              <th style="width: 70px;">Status</th>
+              <th style="width: 65px;">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -2247,6 +2258,22 @@ export default function BranchManagement() {
                             </h4>
                             <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-gray-500 font-medium">
                               <span className="font-mono bg-gray-100 px-1 rounded">{cadet.admissionNumber || cadet.admission_number || 'N/A'}</span>
+                              {(cadet.guardian_name || cadet.guardianName || cadet.father_name || cadet.fatherName) && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-gray-800 font-bold">
+                                    👨 {cadet.guardian_name || cadet.guardianName || cadet.father_name || cadet.fatherName}
+                                  </span>
+                                </>
+                              )}
+                              {(cadet.phone || cadet.mobile) && (
+                                <>
+                                  <span>•</span>
+                                  <span className="font-mono text-blue-700 font-bold">
+                                    📞 {cadet.phone || cadet.mobile}
+                                  </span>
+                                </>
+                              )}
                               <span>•</span>
                               <span className="text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
                                 {cadet.currentBelt || cadet.current_belt || 'White Belt'}
