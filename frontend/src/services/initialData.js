@@ -63,13 +63,16 @@ export const getBranchKeyFromStr = (str) => {
   if (s.includes('ansar')) return 'ansar';
   if (s.includes('kanjiraparaba') || s.includes('gmlp')) return 'kanjiraparaba';
   if (s.includes('pengad') || s.includes('btmamup') || s.includes('btamup')) return 'pengad';
-  if (s.includes('ganapath') || s.includes('feroke')) return 'ganapath';
+  if (s.includes('ganapath')) return 'ganapath';
+  if (s.includes('feroke') && !s.includes('ganapath')) return 'feroke';
   if (s.includes('airport')) return 'airport';
   if (s.includes('koonolmadu') || s.includes('koonol') || s.includes('dojo-12') || s.includes('4d38ae92')) return 'koonolmadu';
   if (s.includes('neerad') || (s.includes('amlp') && !s.includes('koonol'))) return 'neerad';
   if (s.includes('chungam') || s.includes('cgm')) return 'chungam';
+  if (s.includes('morayur')) return 'morayur';
+  if (s.includes('mongam')) return 'mongam';
   if (s.includes('pulikkal') || s.includes('head office') || s.includes('plk')) return 'pulikkal';
-  return '';
+  return s.replace(/[^a-z0-9]/g, '');
 };
 
 // Check if a shift/batch strictly belongs to or is compatible with a branch

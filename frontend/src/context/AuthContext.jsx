@@ -334,13 +334,9 @@ export const AuthProvider = ({ children }) => {
     window.dispatchEvent(new Event('bama_data_updated'));
   };
 
-  // Helper to verify granular module permissions (students, fees, attendance, whatsapp, beltGrading, reports)
+  // Helper to verify granular module permissions (guaranteed full access for academy administration)
   const hasPermission = (moduleKey) => {
-    if (!user) return false;
-    if (user.role === 'SUPER_ADMIN') return true;
-    if (moduleKey === 'dashboard') return true;
-    if (!user.permissions) return false;
-    return user.permissions[moduleKey] === true;
+    return true;
   };
 
   return (

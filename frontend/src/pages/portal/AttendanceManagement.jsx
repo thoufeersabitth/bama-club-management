@@ -32,9 +32,7 @@ export default function AttendanceManagement() {
     };
   }, []);
 
-  const { user } = useAuth();
-  const isInstructor = user?.role === 'INSTRUCTOR';
-  const instructorBranch = user?.branch || 'Pulikkal Branch (Head Office)';
+  const { user, activeBranch, setActiveBranch } = useAuth();
 
   const getBranchStorageKey = (b) => {
     if (!b || b === 'All' || b === 'ALL') return 'global';
@@ -42,9 +40,17 @@ export default function AttendanceManagement() {
   };
 
   const [selectedBranch, setSelectedBranch] = useState(() => {
-    if (isInstructor && instructorBranch) return instructorBranch;
-    return 'All';
+    if (activeBranch && activeBranch !== 'ALL' && activeBranch !== 'All') return activeBranch;
+    return 'Pulikkal Branch (Head Office)';
   });
+
+  // Sync selectedBranch if activeBranch in top header changes
+  useEffect(() => {
+    if (activeBranch && activeBranch !== 'ALL' && activeBranch !== 'All' && activeBranch !== selectedBranch) {
+      setSelectedBranch(activeBranch);
+      setSelectedShift('All');
+    }
+  }, [activeBranch]);
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceRecords, setAttendanceRecords] = useState({});
@@ -421,32 +427,72 @@ export default function AttendanceManagement() {
   // 100% Robust Branch Cadets Matching (Handles all 11 branches, UUID, Name, Code, Shift fallback)
   const isStudentInBranch = (student, branchFilter) => {
     if (!branchFilter || branchFilter === 'All' || branchFilter === 'ALL') return true;
+    if (!student) return false;
 
-    const targetKey = getBranchKey(branchFilter);
-    if (targetKey === 'all') return true;
+    const bFilterLow = String(branchFilter).toLowerCase().trim();
 
-    const cadetNameKey = getBranchKey(
-      student.branch_name ||
-      student.branch_detail?.name ||
-      student.branchName ||
-      (typeof student.branch === 'object' ? student.branch?.name : student.branch) ||
-      ''
+    // Find target branch object from branchesList
+    const targetBranchObj = (branchesList || []).find(b => 
+      String(b.id || '').toLowerCase().trim() === bFilterLow ||
+      String(b.code || '').toLowerCase().trim() === bFilterLow ||
+      String(b.name || '').toLowerCase().trim() === bFilterLow
     );
 
-    const cadetIdKey = getBranchKey(
-      student.branch_id ||
-      student.branch_detail?.id ||
-      (typeof student.branch === 'object' ? student.branch?.id : student.branch) ||
-      ''
-    );
+    const targetId = targetBranchObj ? String(targetBranchObj.id || '').toLowerCase().trim() : '';
+    const targetCode = targetBranchObj ? String(targetBranchObj.code || '').toLowerCase().trim() : '';
+    const targetName = targetBranchObj ? String(targetBranchObj.name || '').toLowerCase().trim() : bFilterLow;
 
-    // If cadet has an explicit branch set (by name or ID), match ONLY against it!
-    if (cadetNameKey) return targetKey === cadetNameKey;
-    if (cadetIdKey) return targetKey === cadetIdKey;
+    const sId = String(student.branch_id || (typeof student.branch === 'object' ? student.branch?.id : '') || student.branch_detail?.id || '').toLowerCase().trim();
+    const sCode = String(student.branch_code || student.branch_detail?.code || '').toLowerCase().trim();
+    const sName = String(student.branch_name || student.branchName || (typeof student.branch === 'object' ? student.branch?.name : student.branch) || student.branch_detail?.name || '').toLowerCase().trim();
 
-    // Only if cadet has NO branch assigned at all, fall back to shift string
-    const cadetShiftKey = student.shift ? getBranchKey(student.shift.split('(')[0]) : '';
-    if (cadetShiftKey) return targetKey === cadetShiftKey;
+    // 1. Direct ID match
+    if (targetId && sId && targetId === sId) return true;
+
+    // 2. Direct Code match
+    if (targetCode && sCode && targetCode === sCode) return true;
+
+    // 3. Exact Name match
+    if (targetName && sName && (targetName === sName || targetName.includes(sName) || sName.includes(targetName))) {
+      // Disambiguate specific branch keywords
+      if (targetName.includes('koonol') && !sName.includes('koonol')) return false;
+      if (targetName.includes('neerad') && !sName.includes('neerad')) return false;
+      if (targetName.includes('pulikkal') && !sName.includes('pulikkal')) return false;
+      if (targetName.includes('chungam') && !sName.includes('chungam')) return false;
+      if (targetName.includes('feroke') && !sName.includes('feroke')) return false;
+      return true;
+    }
+
+    // 4. Canonical keyword match
+    const getCanonical = (str) => {
+      const s = String(str || '').toLowerCase();
+      if (s.includes('kick')) return 'kickboxing';
+      if (s.includes('chanda') || s.includes('gmup')) return 'chanda';
+      if (s.includes('ansar')) return 'ansar';
+      if (s.includes('kanjiraparaba') || s.includes('gmlp')) return 'kanjiraparaba';
+      if (s.includes('pengad') || s.includes('btmamup') || s.includes('btamup')) return 'pengad';
+      if (s.includes('ganapath')) return 'ganapath';
+      if (s.includes('feroke') && !s.includes('ganapath')) return 'feroke';
+      if (s.includes('airport')) return 'airport';
+      if (s.includes('koonol')) return 'koonolmadu';
+      if (s.includes('neerad')) return 'neerad';
+      if (s.includes('chungam')) return 'chungam';
+      if (s.includes('morayur')) return 'morayur';
+      if (s.includes('mongam')) return 'mongam';
+      if (s.includes('pulikkal') || s.includes('head office')) return 'pulikkal';
+      return s.replace(/[^a-z0-9]/g, '');
+    };
+
+    const tCanon = getCanonical(targetName || bFilterLow);
+    const sCanon = getCanonical(sName || sId);
+
+    if (tCanon && sCanon && tCanon === sCanon) return true;
+
+    // 5. Shift fallback only if student has NO branch assigned at all
+    if (!sName && !sId && student.shift) {
+      const shiftCanon = getCanonical(student.shift);
+      if (tCanon && shiftCanon && tCanon === shiftCanon) return true;
+    }
 
     return false;
   };
@@ -810,32 +856,88 @@ export default function AttendanceManagement() {
             />
           </div>
 
-          {!isInstructor && (
+          {/* Branch Selector Dropdown */}
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
+            <Building2 className="w-4 h-4 text-amber-600 flex-shrink-0" />
             <select
               value={selectedBranch}
               onChange={(e) => {
-                setSelectedBranch(e.target.value);
+                const val = e.target.value;
+                setSelectedBranch(val);
                 setSelectedShift('All');
+                if (setActiveBranch) setActiveBranch(val === 'All' ? 'ALL' : val);
               }}
-              className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate"
+              className="bg-transparent text-gray-900 font-black focus:outline-none cursor-pointer text-xs max-w-[200px] truncate"
             >
-              <option value="All">All Branches</option>
+              <option value="All">🌐 All Branches (Overview)</option>
               {branchesList.map(b => (
-                <option key={b.id || b.name} value={b.name}>{b.name}</option>
+                <option key={b.id || b.name} value={b.name}>🏬 {b.name}</option>
               ))}
             </select>
-          )}
+          </div>
 
+          {/* Shift Batch Selector Dropdown */}
           <select
             value={selectedShift}
             onChange={(e) => setSelectedShift(e.target.value)}
-            className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate"
+            className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate max-w-[200px]"
           >
             <option value="All">All Batches</option>
             {availableShifts.map((s, idx) => (
               <option key={idx} value={s}>{s}</option>
             ))}
           </select>
+        </div>
+
+        {/* 📱 Quick Touch Branch Filter Bar - Ultra-fast Tap Switcher for Mobile & Desktop */}
+        <div className="pt-2 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <span className="text-[11px] font-black text-gray-500 uppercase flex-shrink-0 mr-1 flex items-center gap-1">
+            <Building2 className="w-3.5 h-3.5 text-red-600" /> Dojo:
+          </span>
+          <button
+            type="button"
+            onClick={() => { setSelectedBranch('All'); setSelectedShift('All'); if (setActiveBranch) setActiveBranch('ALL'); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+              selectedBranch === 'All'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+            }`}
+          >
+            🌐 All Branches
+          </button>
+          {branchesList.map(b => {
+            const isSel = selectedBranch === b.name;
+            return (
+              <button
+                key={b.id || b.name}
+                type="button"
+                onClick={() => {
+                  setSelectedBranch(b.name);
+                  setSelectedShift('All');
+                  if (setActiveBranch) setActiveBranch(b.name);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+                  isSel
+                    ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-xs'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                {b.name}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active Branch Confirmation Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-900">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Active Dojo: <strong>{selectedBranch === 'All' ? 'All Dojo Branches' : selectedBranch}</strong></span>
+            {selectedShift !== 'All' && <span className="text-gray-500">• Batch: <strong>{selectedShift}</strong></span>}
+          </div>
+          <span className="text-[11px] text-amber-700 font-mono">
+            👥 {filteredStudents.length} Cadets Enrolled
+          </span>
         </div>
 
         {/* Quick Batch Actions & Filter Chips */}

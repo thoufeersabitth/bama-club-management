@@ -79,24 +79,18 @@ export default function AdminLayout({ children }) {
     { label: 'Dashboard', path: '/portal', icon: LayoutDashboard, moduleKey: 'dashboard' },
     { label: 'Student Management', path: '/portal/students', icon: Users, moduleKey: 'students' },
     { label: 'Attendance System', path: '/portal/attendance', icon: CalendarCheck, moduleKey: 'attendance' },
+    { label: 'Branch Management', path: '/portal/branches', icon: Building2, moduleKey: 'branches' },
     { label: 'Fee Collection & Invoices', path: '/portal/fees', icon: CreditCard, moduleKey: 'fees' },
     { label: 'Belt Grading & Exams', path: '/portal/belts', icon: Award, moduleKey: 'beltGrading' },
-    { label: 'Staff & Instructor Manager', path: '/portal/admins', icon: Shield, moduleKey: 'instructors', superAdminOnly: true },
-    { label: 'Branch Management', path: '/portal/branches', icon: Building2, moduleKey: 'branches', superAdminOnly: true },
+    { label: 'Staff & Instructor Manager', path: '/portal/admins', icon: Shield, moduleKey: 'instructors' },
     { label: 'WhatsApp Reminders', path: '/portal/whatsapp', icon: MessageSquare, moduleKey: 'whatsapp' },
     { label: 'Reports & Analytics', path: '/portal/reports', icon: BarChart3, moduleKey: 'reports' },
-    { label: 'Website CMS', path: '/portal/cms', icon: Globe, moduleKey: 'cms', superAdminOnly: true },
-    { label: 'System Settings', path: '/portal/settings', icon: Settings, moduleKey: 'settings', superAdminOnly: true },
+    { label: 'Website CMS', path: '/portal/cms', icon: Globe, moduleKey: 'cms' },
+    { label: 'System Settings', path: '/portal/settings', icon: Settings, moduleKey: 'settings' },
   ];
 
-  const userRole = user?.role || 'SUPER_ADMIN';
-
-  // Allowed Menu Items based on Granular Permissions & Role
-  const allowedMenuItems = menuItems.filter(item => {
-    if (userRole === 'SUPER_ADMIN') return true;
-    if (item.superAdminOnly) return false;
-    return hasPermission(item.moduleKey);
-  });
+  // All 11 essential academy management modules are guaranteed visible to Sensei & Management
+  const allowedMenuItems = menuItems;
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-gray-800 flex font-sans selection:bg-red-600 selection:text-white overflow-x-hidden">
@@ -181,9 +175,9 @@ export default function AdminLayout({ children }) {
           })}
         </nav>
 
-        {/* Sidebar Poster Card - BALANCED INNER PADDING & OBJECT-CONTAIN */}
+        {/* Sidebar Poster Card - Hidden on small mobile to maximize nav menu space */}
         {isSidebarOpen && (
-          <div className="px-3 py-2 flex-shrink-0">
+          <div className="hidden sm:block px-3 py-2 flex-shrink-0">
             <div className="p-3 bg-white border-2 border-red-100 rounded-2xl shadow-md space-y-2 text-center group hover:border-red-300 hover:shadow-lg transition-all duration-300">
               {/* Inner Image Container with Balanced 4-Side Padding */}
               <div className="w-full bg-gradient-to-b from-gray-50 to-red-50/30 p-3 rounded-xl border border-gray-100 flex items-center justify-center">
