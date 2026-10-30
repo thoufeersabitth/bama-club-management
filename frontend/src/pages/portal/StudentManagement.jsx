@@ -5,9 +5,9 @@ import {
   X, Check, Shield, Award, MapPin, Phone, Mail, FileText,
   Calendar, CreditCard, MessageSquare, UserCheck, Upload, Camera, Image as ImageIcon,
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
-  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, FileSpreadsheet
+  DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, FileSpreadsheet, Building2
 } from 'lucide-react';
-import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName } from '../../services/api';
+import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName, updateBranchFeeSettings, getBranchFeeSettings } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
@@ -169,6 +169,30 @@ export default function StudentManagement() {
   const [studentActiveReceipt, setStudentActiveReceipt] = useState(null);
   const [globalFeeSettings, setGlobalFeeSettings] = useState(getGlobalFeeSettings());
   const [showGlobalFeeModal, setShowGlobalFeeModal] = useState(false);
+  const [selectedFeeBranch, setSelectedFeeBranch] = useState('ALL');
+  const [branchFeeData, setBranchFeeData] = useState(() => {
+    const g = getGlobalFeeSettings();
+    return {
+      admissionFee: g.defaultAdmissionFee ?? 1000,
+      monthlyFee: g.defaultMonthlyFee ?? 500,
+      schoolBatchFee: g.defaultSchoolBatchFee ?? 500
+    };
+  });
+
+  const handleFeeBranchChange = (branchVal) => {
+    setSelectedFeeBranch(branchVal);
+    if (branchVal === 'ALL') {
+      const g = getGlobalFeeSettings();
+      setBranchFeeData({
+        admissionFee: g.defaultAdmissionFee ?? 1000,
+        monthlyFee: g.defaultMonthlyFee ?? 500,
+        schoolBatchFee: g.defaultSchoolBatchFee ?? 500
+      });
+    } else {
+      const bFees = getBranchFeeSettings(branchVal, branchesList);
+      setBranchFeeData(bFees);
+    }
+  };
   const [showInquiriesModal, setShowInquiriesModal] = useState(false);
   const [inquiriesList, setInquiriesList] = useState(() => {
     try {
@@ -721,23 +745,109 @@ export default function StudentManagement() {
     }
   };
 
-  // Save Global Fee Defaults and Update Roster Across Backend & Frontend (Automatic Batch Sync)
+  // Save Branch-Specific OR Global Fee Defaults and Update Roster Across Backend & Frontend
   const handleSaveGlobalFeeSettings = async () => {
-    saveGlobalFeeSettings(globalFeeSettings);
-    await saveFeeSettingsBackend(globalFeeSettings);
+    if (selectedFeeBranch && selectedFeeBranch !== 'ALL') {
+      const matchedBranch = branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch);
+      const branchId = matchedBranch?.id || selectedFeeBranch;
+      const branchName = matchedBranch?.name || selectedFeeBranch;
 
-    const newMonthly = parseInt(globalFeeSettings.defaultMonthlyFee) || 500;
-    const newSchoolBatch = parseInt(globalFeeSettings.defaultSchoolBatchFee) || 1200;
-    const rawAdm = parseInt(globalFeeSettings.defaultAdmissionFee);
-    const newAdmission = isNaN(rawAdm) ? 1000 : rawAdm;
+      const newAdm = parseInt(branchFeeData.admissionFee) >= 0 ? parseInt(branchFeeData.admissionFee) : 1000;
+      const newMonthly = parseInt(branchFeeData.monthlyFee) || 500;
+      const newSchool = parseInt(branchFeeData.schoolBatchFee) || 500;
+
+      await updateBranchFeeSettings(branchId, {
+        monthly_fee: newMonthly,
+        admission_fee: newAdm,
+        school_batch_fee: newSchool
+      });
+
+      setBranchesList(prev => prev.map(b => {
+        if (b.id === branchId || b.name === branchName) {
+          return {
+            ...b,
+            monthly_fee: newMonthly,
+            monthlyFee: newMonthly,
+            admission_fee: newAdm,
+            admissionFee: newAdm,
+            school_batch_fee: newSchool,
+            schoolBatchFee: newSchool
+          };
+        }
+        return b;
+      }));
+
+      if (globalFeeSettings.updateExistingStudents) {
+        const currentStudents = students.length > 0 ? students : getStoredStudents();
+        const branchKey = getBranchKeyFromStr(branchName);
+
+        const updatedRoster = currentStudents.map(s => {
+          const sBranch = s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || '';
+          const sKey = getBranchKeyFromStr(sBranch);
+          const isThisBranch = (branchKey && sKey && branchKey === sKey) || sBranch.toLowerCase().includes(branchName.toLowerCase());
+
+          if (!isThisBranch) return s;
+
+          const isSchool = s.billingPlan === 'SCHOOL_BATCH' || s.billing_plan === 'SCHOOL_BATCH' || s.feeFrequency === 'QUARTERLY';
+          const applicableRate = isSchool ? newSchool : newMonthly;
+          const currentPaid = parseInt(s.initialPaidAmount || s.initial_paid_amount || 0);
+          const newPending = Math.max(0, applicableRate - currentPaid);
+          const newFeeStatus = newPending === 0 ? 'Paid' : currentPaid > 0 ? 'Partial' : 'Pending';
+
+          const updatedObj = {
+            ...s,
+            feeAmount: applicableRate,
+            fee_amount: applicableRate,
+            monthlyFee: applicableRate,
+            monthly_fee: applicableRate,
+            admissionFee: newAdm,
+            admission_fee: newAdm,
+            pendingAmount: newPending,
+            pending_amount: newPending,
+            feeStatus: newFeeStatus,
+            fee_status: newFeeStatus
+          };
+
+          if (s.id) {
+            updateStudent(s.id, {
+              fee_amount: applicableRate,
+              feeAmount: applicableRate,
+              admission_fee: newAdm,
+              admissionFee: newAdm
+            }).catch(() => {});
+          }
+          return updatedObj;
+        });
+
+        setStudents(updatedRoster);
+        saveStoredStudents(updatedRoster);
+      }
+
+      window.dispatchEvent(new Event('bama_fee_settings_updated'));
+      window.dispatchEvent(new Event('bama_data_updated'));
+      setShowGlobalFeeModal(false);
+      alert('Fee settings saved for ' + branchName + ':\n\nAdmission Fee: Rs.' + newAdm + '\nMonthly Fee: Rs.' + newMonthly + '\nSchool Term Fee: Rs.' + newSchool);
+      return;
+    }
+
+    // Global Fallback Save
+    const updatedGlobal = {
+      ...globalFeeSettings,
+      defaultAdmissionFee: parseInt(branchFeeData.admissionFee) >= 0 ? parseInt(branchFeeData.admissionFee) : 1000,
+      defaultMonthlyFee: parseInt(branchFeeData.monthlyFee) || 500,
+      defaultSchoolBatchFee: parseInt(branchFeeData.schoolBatchFee) || 500
+    };
+    saveGlobalFeeSettings(updatedGlobal);
+    await saveFeeSettingsBackend(updatedGlobal);
+    setGlobalFeeSettings(updatedGlobal);
+
+    const newMonthly = updatedGlobal.defaultMonthlyFee;
+    const newSchoolBatch = updatedGlobal.defaultSchoolBatchFee;
+    const newAdmission = updatedGlobal.defaultAdmissionFee;
     const shouldUpdateExisting = globalFeeSettings.updateExistingStudents ?? true;
 
     if (shouldUpdateExisting) {
       const currentStudents = students.length > 0 ? students : getStoredStudents();
-
-      // AUTOMATIC SMART SYNC: 
-      // Regular students automatically get the Regular Monthly rate
-      // School batch students automatically get the School Batch rate
       const updatedRoster = currentStudents.map(s => {
         const isSchool = (
           s.feeFrequency === 'QUARTERLY' || 
@@ -759,10 +869,6 @@ export default function StudentManagement() {
           monthly_fee: applicableRate,
           admissionFee: newAdmission,
           admission_fee: newAdmission,
-          admissionFeePaid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
-          admission_fee_paid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
-          admissionFeePaidAmount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
-          admission_fee_paid_amount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
           pendingAmount: newPending,
           pending_amount: newPending,
           feeStatus: newFeeStatus,
@@ -774,15 +880,7 @@ export default function StudentManagement() {
             fee_amount: applicableRate,
             feeAmount: applicableRate,
             admission_fee: newAdmission,
-            admissionFee: newAdmission,
-            admission_fee_paid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
-            admissionFeePaid: newAdmission === 0 ? true : (s.admissionFeePaid ?? s.admission_fee_paid ?? false),
-            admission_fee_paid_amount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
-            admissionFeePaidAmount: newAdmission === 0 ? 0 : (s.admissionFeePaidAmount ?? s.admission_fee_paid_amount ?? 0),
-            pending_amount: newPending,
-            pendingAmount: newPending,
-            fee_status: newFeeStatus,
-            feeStatus: newFeeStatus
+            admissionFee: newAdmission
           }).catch(() => {});
         }
 
@@ -797,7 +895,7 @@ export default function StudentManagement() {
     window.dispatchEvent(new Event('bama_data_updated'));
 
     setShowGlobalFeeModal(false);
-    alert(`✅ Global Academy Fees successfully updated & synced!\n\n📅 Effective From: ${globalFeeSettings.effectiveMonth || 'September 2026'}\n🥋 Regular Dojo: ₹${newMonthly} / Month\n🏫 School Batch: ₹${newSchoolBatch} / 3 Months\n🎁 Admission Fee: ₹${newAdmission}\n${shouldUpdateExisting ? '👥 Applied to active cadets' : '🌟 Reserved for future new admissions'}`);
+    alert('Global Academy Fees successfully updated & synced!\n\nEffective From: ' + (globalFeeSettings.effectiveMonth || 'September 2026') + '\nRegular Dojo: Rs.' + newMonthly + ' / Month\nSchool Batch: Rs.' + newSchoolBatch + ' / 3 Months\nAdmission Fee: Rs.' + newAdmission);
   };
 
   const STANDARD_BELT_RANKS = [
@@ -2673,7 +2771,7 @@ export default function StudentManagement() {
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               {!isInstructor && (
                 <button
-                  onClick={() => setShowGlobalFeeModal(true)}
+                  onClick={() => { handleFeeBranchChange(selectedBranch !== 'ALL' ? selectedBranch : 'ALL'); setShowGlobalFeeModal(true); }}
                   className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
                 >
                   <Settings className="w-4 h-4 text-amber-600 flex-shrink-0" /> <span className="whitespace-nowrap">Fee Settings</span>
@@ -2713,9 +2811,11 @@ export default function StudentManagement() {
               const initialShifts = getDynamicShiftOptions(defaultBranchName, 'Karate (Shotokan)', branchesList);
               const defaultShift = initialShifts.length > 0 ? initialShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
 
-              const feeInfo = await getApplicableFees(defaultBranchId);
-              const finalAdmFee = feeInfo.admissionFee || currentGlobal.defaultAdmissionFee || 1000;
-              const finalMonthlyFee = feeInfo.monthlyFee || currentGlobal.defaultMonthlyFee || 500;
+              const branchFees = getBranchFeeSettings(defaultBranchName, branchesList);
+              const isSchool = defaultBranchName.toLowerCase().includes('school') || defaultBranchName.toLowerCase().includes('amlp') || defaultBranchName.toLowerCase().includes('gmlp') || defaultBranchName.toLowerCase().includes('ansar');
+              const bPlan = isSchool ? 'SCHOOL_BATCH' : 'REGULAR';
+              const finalAdmFee = branchFees.admissionFee ?? 1000;
+              const finalMonthlyFee = bPlan === 'SCHOOL_BATCH' ? (branchFees.schoolBatchFee || 500) : (branchFees.monthlyFee || 500);
 
               setFormData({
                 name: '',
@@ -3628,17 +3728,23 @@ export default function StudentManagement() {
                     const branchShifts = getDynamicShiftOptions(bName, formData.program, branchesList);
                     const defaultShift = branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
                     
-                    const feeInfo = await getApplicableFees(bId);
+                    const feeInfo = getBranchFeeSettings(bName, branchesList);
+                    const isSchool = bName.toLowerCase().includes('school') || bName.toLowerCase().includes('amlp') || bName.toLowerCase().includes('gmlp') || bName.toLowerCase().includes('ansar');
+                    const bPlan = isSchool ? 'SCHOOL_BATCH' : 'REGULAR';
+                    const activeFee = bPlan === 'SCHOOL_BATCH' ? (feeInfo.schoolBatchFee || 500) : (feeInfo.monthlyFee || 500);
+
                     setFormData(prev => ({
                       ...prev,
                       branch: bName,
                       branch_id: bId,
                       branch_name: bName,
                       shift: defaultShift,
+                      billingPlan: bPlan,
+                      billing_plan: bPlan,
                       admissionFee: feeInfo.admissionFee,
                       admissionFeePaidAmount: feeInfo.admissionFee,
-                      feeAmount: feeInfo.monthlyFee,
-                      initialPaidAmount: feeInfo.monthlyFee
+                      feeAmount: activeFee,
+                      initialPaidAmount: activeFee
                     }));
                   }}
                   className="w-full bg-gray-50 border-2 border-red-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 disabled:opacity-50 cursor-pointer transition"
@@ -4780,12 +4886,12 @@ export default function StudentManagement() {
       {/* Global Academy Fee & Tariff Configuration Modal (Super Admin Only) */}
       {showGlobalFeeModal && !isInstructor && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[150] flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-200 overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-200 overflow-hidden max-h-[92vh] flex flex-col animate-in fade-in zoom-in duration-200">
             <div className="bg-gradient-to-r from-gray-900 via-gray-900 to-red-950 p-4 text-white flex items-center justify-between flex-shrink-0">
               <div>
                 <span className="text-[9px] font-black tracking-widest text-red-400 uppercase">Academy Administration</span>
                 <h2 className="text-sm sm:text-base font-black flex items-center gap-1.5 mt-0.5">
-                  <Settings className="w-4 h-4 text-red-500" /> Global Fee & Tariff Settings
+                  <Settings className="w-4 h-4 text-red-500" /> Branch & Academy Fee Settings
                 </h2>
               </div>
               <button
@@ -4798,19 +4904,50 @@ export default function StudentManagement() {
 
             <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto flex-1 text-xs">
               <p className="text-[11px] text-gray-500 font-medium">
-                Configure default fee rates for the entire academy. Updates default rates across future admissions, invoices, and active cadets.
+                Configure separate admission and training fees for each branch, or set academy-wide defaults.
               </p>
 
-              {/* Global Default Admission Fee */}
+              {/* Branch Selector: Choose which branch to configure */}
+              <div className="p-3 bg-red-50/80 border border-red-200 rounded-xl space-y-1.5 shadow-xs">
+                <label className="text-red-950 font-black text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-red-600" /> Select Branch Dojo to Configure *
+                  </span>
+                  {selectedFeeBranch !== 'ALL' && (
+                    <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded-full uppercase">
+                      Branch Specific
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={selectedFeeBranch}
+                  onChange={(e) => handleFeeBranchChange(e.target.value)}
+                  className="w-full bg-white border-2 border-red-300 rounded-lg px-3 py-2 text-gray-900 font-bold text-xs focus:outline-none focus:border-red-600 cursor-pointer shadow-sm"
+                >
+                  <option value="ALL">🌐 All Branches (Academy Default Fallback)</option>
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.id || b.name}>
+                      🏬 {b.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-600 font-medium pt-0.5">
+                  {selectedFeeBranch === 'ALL' 
+                    ? 'Academy-wide default rates. Used as fallback for branches without custom rates.' 
+                    : `Configure separate admission & monthly training fees specifically for ${branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch}.`}
+                </p>
+              </div>
+
+              {/* One-Time Admission Fee */}
               <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2 shadow-xs">
                 <label className="text-amber-950 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1"><Award className="w-3.5 h-3.5 text-amber-600" /> Default One-Time Admission Fee (₹)</span>
-                  <span className="text-amber-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultAdmissionFee}</span>
+                  <span className="flex items-center gap-1"><Award className="w-3.5 h-3.5 text-amber-600" /> One-Time Admission Fee (₹)</span>
+                  <span className="text-amber-800 font-mono text-sm font-black">₹{branchFeeData.admissionFee}</span>
                 </label>
                 <input
                   type="number"
-                  value={globalFeeSettings.defaultAdmissionFee}
-                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultAdmissionFee: parseInt(e.target.value) || 0 })}
+                  value={branchFeeData.admissionFee}
+                  onChange={(e) => setBranchFeeData({ ...branchFeeData, admissionFee: parseInt(e.target.value) || 0 })}
                   className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-amber-500"
                 />
                 <div className="flex flex-wrap gap-1 pt-0.5">
@@ -4818,9 +4955,9 @@ export default function StudentManagement() {
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => setGlobalFeeSettings({ ...globalFeeSettings, defaultAdmissionFee: amt })}
+                      onClick={() => setBranchFeeData({ ...branchFeeData, admissionFee: amt })}
                       className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
-                        globalFeeSettings.defaultAdmissionFee === amt
+                        branchFeeData.admissionFee === amt
                           ? 'bg-amber-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
@@ -4831,16 +4968,16 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Global Default Monthly Cadet Fee (Regular Dojo) */}
+              {/* Monthly Cadet Fee (Regular Dojo) */}
               <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2 shadow-xs">
                 <label className="text-emerald-950 font-black text-xs flex items-center justify-between">
                   <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Regular Dojo Monthly Fee (₹ / Month)</span>
-                  <span className="text-emerald-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultMonthlyFee || 500} / Month</span>
+                  <span className="text-emerald-800 font-mono text-sm font-black">₹{branchFeeData.monthlyFee || 500} / Month</span>
                 </label>
                 <input
                   type="number"
-                  value={globalFeeSettings.defaultMonthlyFee || 500}
-                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultMonthlyFee: parseInt(e.target.value) || 0 })}
+                  value={branchFeeData.monthlyFee || 500}
+                  onChange={(e) => setBranchFeeData({ ...branchFeeData, monthlyFee: parseInt(e.target.value) || 0 })}
                   className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-emerald-500"
                 />
                 <div className="flex flex-wrap gap-1 pt-0.5">
@@ -4848,9 +4985,9 @@ export default function StudentManagement() {
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => setGlobalFeeSettings({ ...globalFeeSettings, defaultMonthlyFee: amt })}
+                      onClick={() => setBranchFeeData({ ...branchFeeData, monthlyFee: amt })}
                       className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
-                        (globalFeeSettings.defaultMonthlyFee || 500) === amt
+                        (branchFeeData.monthlyFee || 500) === amt
                           ? 'bg-emerald-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
@@ -4865,12 +5002,12 @@ export default function StudentManagement() {
               <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 shadow-xs">
                 <label className="text-blue-950 font-black text-xs flex items-center justify-between">
                   <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-blue-600" /> School Batch Term Fee (₹ / 3 Months)</span>
-                  <span className="text-blue-800 font-mono text-sm font-black">₹{globalFeeSettings.defaultSchoolBatchFee || 500} / 3 Mos</span>
+                  <span className="text-blue-800 font-mono text-sm font-black">₹{branchFeeData.schoolBatchFee || 500} / 3 Mos</span>
                 </label>
                 <input
                   type="number"
-                  value={globalFeeSettings.defaultSchoolBatchFee || 500}
-                  onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, defaultSchoolBatchFee: parseInt(e.target.value) || 0 })}
+                  value={branchFeeData.schoolBatchFee || 500}
+                  onChange={(e) => setBranchFeeData({ ...branchFeeData, schoolBatchFee: parseInt(e.target.value) || 0 })}
                   className="w-full bg-white border border-blue-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-blue-500"
                 />
                 <div className="flex flex-wrap gap-1 pt-0.5">
@@ -4878,9 +5015,9 @@ export default function StudentManagement() {
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => setGlobalFeeSettings({ ...globalFeeSettings, defaultSchoolBatchFee: amt })}
+                      onClick={() => setBranchFeeData({ ...branchFeeData, schoolBatchFee: amt })}
                       className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
-                        (globalFeeSettings.defaultSchoolBatchFee || 500) === amt
+                        (branchFeeData.schoolBatchFee || 500) === amt
                           ? 'bg-blue-600 text-white shadow'
                           : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
                       }`}
@@ -4892,10 +5029,10 @@ export default function StudentManagement() {
               </div>
 
               {/* Effective Month & Scope Configuration */}
-              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2.5 shadow-xs">
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                  <label className="text-blue-950 font-black text-xs flex items-center gap-1 uppercase tracking-wider">
-                    <Calendar className="w-3.5 h-3.5 text-blue-600" /> Effective Month *
+                  <label className="text-gray-800 font-black text-xs flex items-center gap-1 uppercase tracking-wider">
+                    <Calendar className="w-3.5 h-3.5 text-gray-600" /> Effective Month *
                   </label>
 
                   <select
@@ -4904,7 +5041,7 @@ export default function StudentManagement() {
                       const [m, y] = e.target.value.split(' ');
                       setGlobalFeeSettings({ ...globalFeeSettings, effectiveMonth: m, effectiveYear: parseInt(y) || 2026 });
                     }}
-                    className="bg-white border border-blue-300 rounded-lg px-2.5 py-1 text-xs text-blue-950 font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-xs"
+                    className="bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-red-500 cursor-pointer shadow-xs"
                   >
                     <option value="September 2026">September 2026 (Recommended)</option>
                     <option value="October 2026">October 2026</option>
@@ -4915,16 +5052,16 @@ export default function StudentManagement() {
                 </div>
 
                 {/* Tick box to confirm applying from this month */}
-                <div className="flex items-center gap-2 pt-1 border-t border-blue-200/70">
+                <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
                   <input
                     type="checkbox"
                     id="updateExistingCadetsCheckbox"
                     checked={globalFeeSettings.updateExistingStudents ?? true}
                     onChange={(e) => setGlobalFeeSettings({ ...globalFeeSettings, updateExistingStudents: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer accent-blue-600"
+                    className="w-4 h-4 text-red-600 rounded focus:ring-red-500 cursor-pointer accent-red-600"
                   />
-                  <label htmlFor="updateExistingCadetsCheckbox" className="text-[11px] text-blue-950 font-bold cursor-pointer select-none">
-                    Apply updated fee rates to all active cadets starting from {globalFeeSettings.effectiveMonth || 'September'} {globalFeeSettings.effectiveYear || 2026} onwards
+                  <label htmlFor="updateExistingCadetsCheckbox" className="text-[11px] text-gray-800 font-bold cursor-pointer select-none">
+                    Apply updated fee rates to active cadets of {selectedFeeBranch === 'ALL' ? 'all branches' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || 'this branch')} onwards
                   </label>
                 </div>
               </div>
@@ -4943,7 +5080,7 @@ export default function StudentManagement() {
                 onClick={handleSaveGlobalFeeSettings}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs transition shadow-md cursor-pointer flex items-center gap-1.5"
               >
-                <CheckCircle2 className="w-4 h-4" /> Save Global Settings & Sync Roster
+                <CheckCircle2 className="w-4 h-4" /> Save {selectedFeeBranch !== 'ALL' ? 'Branch' : 'Academy'} Fee Settings
               </button>
             </div>
           </div>

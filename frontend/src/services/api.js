@@ -513,6 +513,99 @@ export const saveFeeSettingsBackend = async (settings) => {
   } catch (err) {}
 };
 
+export const updateBranchFeeSettings = async (branchId, feeData) => {
+  try {
+    const payload = {};
+    if (feeData.monthly_fee !== undefined) payload.monthly_fee = feeData.monthly_fee;
+    if (feeData.admission_fee !== undefined) payload.admission_fee = feeData.admission_fee;
+    if (feeData.school_batch_fee !== undefined) payload.school_batch_fee = feeData.school_batch_fee;
+
+    // 1. Update backend if branchId is a valid UUID
+    try {
+      await api.patch('/branches/' + branchId + '/', payload);
+    } catch (err) {}
+
+    // 2. Update local custom branches
+    try {
+      const stored = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+      if (stored) {
+        const branches = JSON.parse(stored);
+        if (Array.isArray(branches)) {
+          const updated = branches.map(b => {
+            if (b.id === branchId || b.name === branchId || b.code === branchId) {
+              return { ...b, ...payload, monthlyFee: payload.monthly_fee, admissionFee: payload.admission_fee };
+            }
+            return b;
+          });
+          localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
+        }
+      }
+    } catch (e) {}
+
+    // 3. Save to dedicated branch fees map
+    try {
+      const storedMap = localStorage.getItem('bama_branch_fees_map');
+      const map = storedMap ? JSON.parse(storedMap) : {};
+      map[branchId] = { ...(map[branchId] || {}), ...feeData };
+      localStorage.setItem('bama_branch_fees_map', JSON.stringify(map));
+    } catch (e) {}
+
+    window.dispatchEvent(new Event('bama_branches_updated'));
+    window.dispatchEvent(new Event('bama_fee_settings_updated'));
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
+  const global = getGlobalFeeSettings();
+  if (!branchIdOrName || branchIdOrName === 'ALL') {
+    return {
+      admissionFee: global.defaultAdmissionFee ?? 1000,
+      monthlyFee: global.defaultMonthlyFee ?? 500,
+      schoolBatchFee: global.defaultSchoolBatchFee ?? 500
+    };
+  }
+
+  let matched = Array.isArray(branchesList) 
+    ? branchesList.find(b => b.id === branchIdOrName || b.name === branchIdOrName || b.code === branchIdOrName) 
+    : null;
+
+  if (!matched) {
+    try {
+      const stored = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+      if (stored) {
+        const branches = JSON.parse(stored);
+        if (Array.isArray(branches)) {
+          matched = branches.find(b => b.id === branchIdOrName || b.name === branchIdOrName || b.code === branchIdOrName);
+        }
+      }
+    } catch (e) {}
+  }
+
+  let mappedFee = {};
+  try {
+    const storedMap = localStorage.getItem('bama_branch_fees_map');
+    if (storedMap) {
+      const map = JSON.parse(storedMap);
+      if (map[branchIdOrName] || (matched && map[matched.id]) || (matched && map[matched.name])) {
+        mappedFee = map[branchIdOrName] || (matched && map[matched.id]) || (matched && map[matched.name]) || {};
+      }
+    }
+  } catch (e) {}
+
+  const rawAdm = mappedFee.admission_fee ?? mappedFee.admissionFee ?? matched?.admission_fee ?? matched?.admissionFee;
+  const rawMonthly = mappedFee.monthly_fee ?? mappedFee.monthlyFee ?? matched?.monthly_fee ?? matched?.monthlyFee;
+  const rawSchool = mappedFee.school_batch_fee ?? mappedFee.schoolBatchFee ?? matched?.school_batch_fee ?? matched?.schoolBatchFee;
+
+  return {
+    admissionFee: (rawAdm !== undefined && rawAdm !== null && !isNaN(parseInt(rawAdm))) ? parseInt(rawAdm) : (global.defaultAdmissionFee ?? 1000),
+    monthlyFee: (rawMonthly !== undefined && rawMonthly !== null && !isNaN(parseInt(rawMonthly))) ? parseInt(rawMonthly) : (global.defaultMonthlyFee ?? 500),
+    schoolBatchFee: (rawSchool !== undefined && rawSchool !== null && !isNaN(parseInt(rawSchool))) ? parseInt(rawSchool) : (global.defaultSchoolBatchFee ?? 500)
+  };
+};
+
 // Universal intelligent resolver for student course / discipline
 export const resolveDiscipline = (st) => {
   if (!st) return 'Karate (Shotokan)';
@@ -708,13 +801,6 @@ export const getApplicableFees = async (branchId = null, month = 'August', year 
     if (res.data) {
       const serverMonthly = parseFloat(res.data.applicable_monthly_fee) || 500;
       const serverAdmission = parseFloat(res.data.applicable_admission_fee) || 1000;
-
-      const current = getGlobalFeeSettings();
-      saveGlobalFeeSettings({
-        ...current,
-        defaultAdmissionFee: serverAdmission,
-        defaultMonthlyFee: serverMonthly
-      });
 
       return { monthlyFee: serverMonthly, admissionFee: serverAdmission };
     }

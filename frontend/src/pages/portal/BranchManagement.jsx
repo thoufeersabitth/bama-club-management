@@ -96,7 +96,9 @@ export default function BranchManagement() {
     facilities: '🥋 Tatami Safety Mats, 🥊 Punching Heavy Bags, ❄️ AC Dojo Hall',
     mapUrl: '',
     image: '/assets/prog_adults.jpg',
-    isHeadOffice: false
+    isHeadOffice: false,
+    monthly_fee: 500,
+    admission_fee: 1000
   });
 
   // Shift Form Data
@@ -587,7 +589,9 @@ export default function BranchManagement() {
       facilities: Array.isArray(b.facilities) ? b.facilities.join(', ') : (b.facilities || ''),
       mapUrl: b.mapUrl || '',
       image: b.image || b.img || b.photo || '/assets/prog_adults.jpg',
-      isHeadOffice: !!b.isHeadOffice
+      isHeadOffice: !!b.isHeadOffice,
+      monthly_fee: b.monthly_fee ?? b.monthlyFee ?? 500,
+      admission_fee: b.admission_fee ?? b.admissionFee ?? 1000
     });
     setShowAddModal(true);
   };
@@ -1279,6 +1283,12 @@ export default function BranchManagement() {
                       <Shield className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
                       <span>Chief Instructor: {b.branch_head || 'Sensei Abdul Rahman (5th Dan)'}</span>
                     </p>
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-gray-700 bg-emerald-50/80 border border-emerald-200 px-2.5 py-1 rounded-xl mt-2">
+                      <CreditCard className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                      <span>Fee: <strong className="text-emerald-800">₹{b.monthly_fee || b.monthlyFee || 500}</strong>/mo</span>
+                      <span>•</span>
+                      <span>Adm: <strong className="text-amber-800">₹{b.admission_fee ?? b.admissionFee ?? 1000}</strong></span>
+                    </div>
                   </div>
 
                   {/* Enrolled Cadets Pill */}
@@ -1788,6 +1798,46 @@ export default function BranchManagement() {
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2 text-gray-900 focus:bg-white focus:outline-none focus:border-red-500 font-medium shadow-xs resize-none"
                 />
+              </div>
+
+              {/* Branch Fee Structure */}
+              <div className="space-y-2.5 bg-gradient-to-br from-emerald-50/70 to-teal-50/40 p-3.5 rounded-2xl border-2 border-emerald-300 shadow-xs">
+                <label className="text-emerald-950 font-black text-xs flex items-center justify-between uppercase tracking-wider">
+                  <span className="flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-emerald-600" /> Branch Dojo Fee Structure *
+                  </span>
+                  <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-full">
+                    Separate Branch Fee
+                  </span>
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1 text-[11px]">
+                      One-Time Admission Fee (₹)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 1000 or 0 for Free"
+                      value={formData.admission_fee ?? 1000}
+                      onChange={(e) => setFormData({ ...formData, admission_fee: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-gray-900 font-black font-mono focus:outline-none focus:border-emerald-600 shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-1 text-[11px]">
+                      Monthly Training Fee (₹ / Month)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 500"
+                      value={formData.monthly_fee ?? 500}
+                      onChange={(e) => setFormData({ ...formData, monthly_fee: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-gray-900 font-black font-mono focus:outline-none focus:border-emerald-600 shadow-xs"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Training Batch Shift Timings - Interactive Multi-Shift Batch Builder */}
