@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare, AlertCircle, Users, Save, CheckCircle2, Zap, ExternalLink, Settings, Share2, Copy, Loader2, Sparkles, Building2, CheckCheck } from 'lucide-react';
 import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, fetchDayStatusFromBackend, saveDayStatusToBackend, fetchMonthlyDayStatusesFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
-import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, isShiftCompatibleWithBranch, getBranchKeyFromStr } from '../../services/initialData';
+import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, isShiftCompatibleWithBranch, getBranchKeyFromStr, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AttendanceManagement() {
@@ -492,32 +492,6 @@ export default function AttendanceManagement() {
     if (!sName && !sId && student.shift) {
       const shiftCanon = getCanonical(student.shift);
       if (tCanon && shiftCanon && tCanon === shiftCanon) return true;
-    }
-
-    return false;
-  };
-
-  // Smart Shift / Batch Matcher (Direct match, timing match, keyword match)
-  const matchesShift = (student, targetShift) => {
-    if (!targetShift || targetShift === 'All' || targetShift === 'ALL') return true;
-
-    const sShift = String(student.shift || student.dojoShift || student.batch || '').trim().toLowerCase();
-    const tShift = String(targetShift).trim().toLowerCase();
-
-    if (!sShift) return false;
-    if (sShift === tShift) return true;
-    if (sShift.includes(tShift) || tShift.includes(sShift)) return true;
-
-    // Extract time parts like "4:00 PM - 5:00 PM"
-    const extractTime = (str) => {
-      const match = str.match(/\d{1,2}:\d{2}\s*(?:AM|PM)/gi);
-      return match ? match.join(' - ') : '';
-    };
-
-    const sTime = extractTime(sShift);
-    const tTime = extractTime(tShift);
-    if (sTime && tTime && (sTime.includes(tTime) || tTime.includes(sTime))) {
-      return true;
     }
 
     return false;

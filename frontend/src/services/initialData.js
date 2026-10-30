@@ -92,6 +92,54 @@ export const isShiftCompatibleWithBranch = (shiftStr, branchFilter) => {
   return true;
 };
 
+// Precise Shift / Batch Matcher (Strictly matches exact batch schedule and days, preventing generic mixing)
+export const matchesShift = (studentShift, targetShift) => {
+  if (!targetShift || targetShift === 'All' || targetShift === 'ALL') return true;
+
+  const s = String(typeof studentShift === 'object' ? (studentShift?.shift || '') : studentShift || '').trim().toLowerCase();
+  const t = String(typeof targetShift === 'object' ? (targetShift?.shift || '') : targetShift || '').trim().toLowerCase();
+
+  if (!s) return false;
+
+  // 1. Direct exact match
+  if (s === t) return true;
+
+  // 2. If student shift contains full target shift
+  if (s.includes(t)) return true;
+
+  // 3. Day keywords check
+  const daysList = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  const tDays = daysList.filter(d => t.includes(d));
+  const sDays = daysList.filter(d => s.includes(d));
+
+  if (tDays.length > 0) {
+    if (sDays.length === 0) return false;
+    const shareDay = tDays.some(d => sDays.includes(d));
+    if (!shareDay) return false;
+  }
+
+  // 4. Time range check (e.g. 6:00 PM - 7:00 PM)
+  const extractTime = (str) => {
+    const match = str.match(/\d{1,2}:\d{2}\s*(?:AM|PM)\s*[-–—]\s*\d{1,2}:\d{2}\s*(?:AM|PM)/i);
+    return match ? match[0].replace(/\s+/g, ' ').toLowerCase() : '';
+  };
+
+  const tTime = extractTime(t);
+  const sTime = extractTime(s);
+
+  if (tTime && sTime) {
+    if (tTime !== sTime) return false;
+  } else if (tTime && !sTime) {
+    return false;
+  }
+
+  if (tDays.length > 0 || tTime) {
+    return true;
+  }
+
+  return s.includes(t);
+};
+
 // Helper to resolve active training shift schedules dynamically from Branch timings & custom schedules
 export const getDynamicShiftOptions = (branchFilter = null, programFilter = null, branchesOverride = null) => {
   let customShifts = [];

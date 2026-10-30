@@ -8,7 +8,7 @@ import {
   DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, FileSpreadsheet, Building2
 } from 'lucide-react';
 import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName, updateBranchFeeSettings, getBranchFeeSettings } from '../../services/api';
-import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO } from '../../services/initialData';
+import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
 
@@ -1498,7 +1498,7 @@ export default function StudentManagement() {
     }
 
     const cadetShift = s.shift || 'Evening Batch (5:00 PM - 7:00 PM)';
-    const matchesShift = selectedShift === 'ALL' || cadetShift.toLowerCase().includes(selectedShift.toLowerCase());
+    const matchesShiftFilter = matchesShift(cadetShift, selectedShift);
 
     const cadetCat = s.category || (s.age <= 13 ? 'Kids' : s.age <= 17 ? 'Teens' : 'Adults');
     const matchesCategory = selectedCategory === 'ALL' || cadetCat.toLowerCase() === selectedCategory.toLowerCase();
@@ -1529,7 +1529,7 @@ export default function StudentManagement() {
     if (selectedTab === 'Inactive') matchesTab = isInactive;
     if (selectedTab === 'AdmissionFeePending') matchesTab = isAdmissionFeePending;
 
-    return matchesSearch && matchesBelt && matchesBranch && matchesProgram && matchesShift && matchesCategory && matchesPlan && matchesTab;
+    return matchesSearch && matchesBelt && matchesBranch && matchesProgram && matchesShiftFilter && matchesCategory && matchesPlan && matchesTab;
   });
 
   // Pagination Calculations (10 per page)
