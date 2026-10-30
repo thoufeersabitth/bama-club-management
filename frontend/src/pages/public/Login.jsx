@@ -109,7 +109,13 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-8 pt-4 border-t border-white/10 text-center">
+        <div className="mt-8 pt-4 border-t border-white/10 text-center space-y-3">
+          <Link
+            to="/student-portal"
+            className="w-full py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-amber-400/30 rounded-xl text-amber-300 font-black text-xs flex items-center justify-center gap-2 transition"
+          >
+            <span>🥋 Student & Parent Portal Login →</span>
+          </Link>
           <p className="text-[11px] text-gray-400 font-medium">
             🔒 Protected Enterprise Portal | Authorized Senseis & Staff Only
           </p>

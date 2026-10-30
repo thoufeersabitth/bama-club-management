@@ -2778,6 +2778,24 @@ export default function StudentManagement() {
                 </button>
               )}
 
+          {/* Share Online Admission Link Button */}
+          <button
+            type="button"
+            title="രക്ഷിതാക്കൾക്ക് അയക്കാൻ ഓൺലൈൻ അഡ്മിഷൻ ഫോം ലിങ്ക് കോപ്പി ചെയ്യുക"
+            onClick={() => {
+              const url = window.location.origin + '/register';
+              if (navigator.clipboard) {
+                navigator.clipboard.writeText(url);
+              }
+              const msg = '🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\nപുതിയ ബാച്ചുകളിലേക്കുള്ള ഓൺലൈൻ അഡ്മിഷൻ ആരംഭിച്ചിരിക്കുന്നു! താഴെ കാണുന്ന ഒഫീഷ്യൽ ലിങ്ക് വഴി അഡ്മിഷൻ ഫോം പൂരിപ്പിക്കാവുന്നതാണ്:\n\n👉 ' + url;
+              openWhatsApp({ phone: '', message: msg });
+            }}
+            className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+            <span>Share Admission Form</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setShowInquiriesModal(true)}

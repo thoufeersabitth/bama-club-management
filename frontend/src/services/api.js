@@ -3239,3 +3239,116 @@ export const syncAllCadetsToCloud = async (onProgress) => {
 export default api;
 
 
+
+// Student & Parent Portal Authentication & Password Management
+export const getStudentPortalAuth = async (phone, selectedStudentId = null) => {
+  const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+  if (!cleanPhone) return { success: false, message: 'Invalid phone number' };
+
+  try {
+    const students = await fetchStudents();
+    const matches = (students || []).filter(s => {
+      const sP = String(s.phone || s.mobile || s.whatsapp || '').replace(/[^0-9]/g, '');
+      return sP.includes(cleanPhone) || cleanPhone.includes(sP);
+    });
+
+    if (!matches || matches.length === 0) {
+      return { success: false, notFound: true, message: 'No student found registered with this mobile number.' };
+    }
+
+    if (matches.length > 1 && !selectedStudentId) {
+      return { success: true, multiple: true, students: matches };
+    }
+
+    const targetStudent = selectedStudentId 
+      ? matches.find(s => s.id === selectedStudentId) || matches[0] 
+      : matches[0];
+
+    // Read stored credentials map from backend CMS config or localStorage
+    let credsMap = {};
+    try {
+      const stored = localStorage.getItem('bama_student_credentials');
+      if (stored) credsMap = JSON.parse(stored);
+    } catch (e) {}
+
+    const cadetCred = credsMap[targetStudent.id] || targetStudent.portal_password || null;
+    const hasPassword = !!(cadetCred && cadetCred.password);
+
+    return {
+      success: true,
+      multiple: false,
+      student: targetStudent,
+      hasPassword: hasPassword,
+      dob: targetStudent.dob || targetStudent.dateOfBirth || null
+    };
+  } catch (err) {
+    return { success: false, message: 'Server error while checking student account.' };
+  }
+};
+
+export const verifyDOBAndSetPassword = async (studentId, dobInput, newPassword) => {
+  try {
+    const students = await fetchStudents();
+    const st = (students || []).find(s => s.id === studentId);
+    if (!st) return { success: false, message: 'Cadet not found.' };
+
+    const cleanInputDOB = String(dobInput || '').trim();
+    const stDOB = String(st.dob || st.dateOfBirth || '').trim();
+
+    // Verify DOB matches
+    if (stDOB && cleanInputDOB) {
+      const d1 = new Date(stDOB).toISOString().split('T')[0];
+      const d2 = new Date(cleanInputDOB).toISOString().split('T')[0];
+      if (d1 !== d2) {
+        return { success: false, message: 'Date of Birth does not match our records.' };
+      }
+    }
+
+    // Save Password
+    let credsMap = {};
+    try {
+      const stored = localStorage.getItem('bama_student_credentials');
+      if (stored) credsMap = JSON.parse(stored);
+    } catch (e) {}
+
+    credsMap[studentId] = {
+      password: newPassword,
+      updated_at: new Date().toISOString()
+    };
+    localStorage.setItem('bama_student_credentials', JSON.stringify(credsMap));
+
+    // Sync to backend cms-config
+    try {
+      await api.post('/cms-config/', { student_credentials: credsMap });
+    } catch (e) {}
+
+    return { success: true, student: st };
+  } catch (err) {
+    return { success: false, message: 'Error updating password.' };
+  }
+};
+
+export const verifyStudentPasswordLogin = async (studentId, passwordInput) => {
+  try {
+    let credsMap = {};
+    try {
+      const stored = localStorage.getItem('bama_student_credentials');
+      if (stored) credsMap = JSON.parse(stored);
+    } catch (e) {}
+
+    const cred = credsMap[studentId];
+    if (!cred || !cred.password) {
+      return { success: false, needsSetup: true, message: 'Password not set yet. Please enter Date of Birth to set password.' };
+    }
+
+    if (String(cred.password).trim() !== String(passwordInput).trim()) {
+      return { success: false, message: 'Incorrect Password. Please try again or use Date of Birth.' };
+    }
+
+    const students = await fetchStudents();
+    const st = (students || []).find(s => s.id === studentId);
+    return { success: true, student: st };
+  } catch (err) {
+    return { success: false, message: 'Login error.' };
+  }
+};

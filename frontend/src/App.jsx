@@ -14,6 +14,8 @@ import Gallery from './pages/public/Gallery';
 import Contact from './pages/public/Contact';
 import Login from './pages/public/Login';
 import GradingRegistration from './pages/public/GradingRegistration';
+import AdmissionRegistration from './pages/public/AdmissionRegistration';
+import StudentPortalLogin from './pages/public/StudentPortalLogin';
 
 // Portal Pages
 import DashboardPortal from './pages/portal/DashboardPortal';
@@ -121,6 +123,10 @@ export default function App() {
         <Route path="/gallery" element={<PublicLayout><Gallery /></PublicLayout>} />
         <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
         <Route path="/login" element={<PublicLayout><Login /></PublicLayout>} />
+        <Route path="/student-portal" element={<PublicLayout><StudentPortalLogin /></PublicLayout>} />
+        <Route path="/cadet-login" element={<PublicLayout><StudentPortalLogin /></PublicLayout>} />
+        <Route path="/admission" element={<PublicLayout><AdmissionRegistration /></PublicLayout>} />
+        <Route path="/register" element={<PublicLayout><AdmissionRegistration /></PublicLayout>} />
         <Route path="/grading-registration" element={<PublicLayout><GradingRegistration /></PublicLayout>} />
 
         {/* Office Portal Routes */}
