@@ -92,6 +92,52 @@ export const isShiftCompatibleWithBranch = (shiftStr, branchFilter) => {
   return true;
 };
 
+// Robust Branch Matcher (Matches student by direct ID, code, name or canonical key)
+export const isStudentInBranch = (student, branchFilter, branchesList = []) => {
+  if (!branchFilter || branchFilter === 'All' || branchFilter === 'ALL') return true;
+  if (!student) return false;
+
+  const bFilterLow = String(branchFilter).toLowerCase().trim();
+
+  // Find target branch object from branchesList
+  const targetBranchObj = (branchesList || []).find(b => 
+    String(b.id || '').toLowerCase().trim() === bFilterLow ||
+    String(b.code || '').toLowerCase().trim() === bFilterLow ||
+    String(b.name || '').toLowerCase().trim() === bFilterLow
+  );
+
+  const targetId = targetBranchObj ? String(targetBranchObj.id || '').toLowerCase().trim() : '';
+  const targetCode = targetBranchObj ? String(targetBranchObj.code || '').toLowerCase().trim() : '';
+  const targetName = targetBranchObj ? String(targetBranchObj.name || '').toLowerCase().trim() : bFilterLow;
+
+  const sId = String(student.branch_id || (typeof student.branch === 'object' ? student.branch?.id : '') || student.branch_detail?.id || '').toLowerCase().trim();
+  const sCode = String(student.branch_code || student.branch_detail?.code || '').toLowerCase().trim();
+  const sName = String(student.branch_name || student.branchName || (typeof student.branch === 'object' ? student.branch?.name : student.branch) || student.branch_detail?.name || '').toLowerCase().trim();
+
+  // 1. Direct ID match
+  if (targetId && sId && targetId === sId) return true;
+
+  // 2. Direct Code match
+  if (targetCode && sCode && targetCode === sCode) return true;
+
+  // 3. Exact Name match
+  if (targetName && sName && (targetName === sName || targetName.includes(sName) || sName.includes(targetName))) {
+    if (targetName.includes('koonol') && !sName.includes('koonol')) return false;
+    if (targetName.includes('neerad') && !sName.includes('neerad')) return false;
+    if (targetName.includes('pulikkal') && !sName.includes('pulikkal')) return false;
+    if (targetName.includes('chungam') && !sName.includes('chungam')) return false;
+    if (targetName.includes('feroke') && !sName.includes('feroke')) return false;
+    return true;
+  }
+
+  // 4. Canonical key match
+  const tKey = getBranchKeyFromStr(targetName || branchFilter);
+  const sKey = getBranchKeyFromStr(sName || sId || sCode);
+  if (tKey && sKey && tKey === sKey) return true;
+
+  return false;
+};
+
 // Precise Shift / Batch Matcher (Strictly matches exact batch schedule and days, preventing generic mixing)
 export const matchesShift = (studentShift, targetShift) => {
   if (!targetShift || targetShift === 'All' || targetShift === 'ALL') return true;

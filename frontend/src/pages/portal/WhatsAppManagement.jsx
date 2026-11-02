@@ -1,11 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award, Settings, Smartphone, Trash2 } from 'lucide-react';
-import { WHATSAPP_TEMPLATES } from '../../services/initialData';
-import { fetchStudents, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
+import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award, Settings, Smartphone, Trash2, Building2, Filter } from 'lucide-react';
+import { WHATSAPP_TEMPLATES, INITIAL_BRANCHES, isStudentInBranch } from '../../services/initialData';
+import { fetchStudents, fetchBranches, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 export default function WhatsAppManagement() {
-  const { user } = useAuth();
+  const { user, activeBranch } = useAuth();
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    if (activeBranch && activeBranch !== 'ALL' && activeBranch !== 'All') return activeBranch;
+    return 'ALL';
+  });
+  const [branchesList, setBranchesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bama_custom_branches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_BRANCHES;
+  });
+
+  useEffect(() => {
+    fetchBranches().then(data => {
+      if (data && data.length > 0) setBranchesList(data);
+    });
+  }, []);
+
+  const handleBranchChange = (branchVal) => {
+    setSelectedBranch(branchVal);
+    if (branchVal === 'ALL') {
+      setSelectedStudentIds(students.map(s => s.id));
+    } else {
+      const branchCadets = students.filter(s => isStudentInBranch(s, branchVal, branchesList));
+      setSelectedStudentIds(branchCadets.map(s => s.id));
+    }
+  };
   const [students, setStudents] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(WHATSAPP_TEMPLATES[0]);
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
@@ -76,40 +106,50 @@ export default function WhatsAppManagement() {
 
   const firstSelectedStudent = students.find(s => selectedStudentIds.includes(s.id)) || students[0] || {};
 
-  // Update preview when template or selected student changes
+  // Update preview when template, selected student, or branch changes
   useEffect(() => {
-    if (!selectedTemplate || !firstSelectedStudent) return;
+    if (!selectedTemplate) return;
     let body = selectedTemplate.body;
-    body = body.replace('{STUDENT_NAME}', firstSelectedStudent.name || 'Cadet');
-    body = body.replace('{GUARDIAN_NAME}', firstSelectedStudent.guardianName || firstSelectedStudent.guardian_name || 'Parent');
-    body = body.replace('{AMOUNT}', firstSelectedStudent.feeAmount || '1500');
-    body = body.replace('{BRANCH_NAME}', firstSelectedStudent.branch?.name || firstSelectedStudent.branch || 'BAMA Dojo');
-    body = body.replace('{DATE}', new Date().toLocaleDateString());
+    const std = firstSelectedStudent || {};
+    const branchToUse = selectedBranch !== 'ALL' ? selectedBranch : (std.branch?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch) || 'BAMA Dojo');
+
+    body = body.replace('{STUDENT_NAME}', std.name || 'Cadet');
+    body = body.replace('{GUARDIAN_NAME}', std.guardianName || std.guardian_name || 'Parent');
+    body = body.replace('{AMOUNT}', std.feeAmount || '1500');
+    body = body.replace('{BRANCH_NAME}', branchToUse);
+    body = body.replace('{DATE}', new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
     body = body.replace('{RECEIPT_NO}', 'REC-2026-042');
-    body = body.replace('{EXAM_DATE}', '25th August 2026');
-    body = body.replace('{VENUE}', firstSelectedStudent.branch?.name || firstSelectedStudent.branch || 'Head Dojo');
+    body = body.replace('{EXAM_DATE}', 'Upcoming Sunday');
+    body = body.replace('{VENUE}', branchToUse);
     body = body.replace('{FEE}', '800');
     body = body.replace('{EVENT_TITLE}', 'Quarterly Belt Exam & Camp');
     body = body.replace('{TIME}', '8:00 AM');
     body = body.replace('{NEXT_BELT}', 'Yellow Belt');
     body = body.replace('{DUE_DATE}', '10th of this month');
+    body = body.replace('{REASON}', 'scheduled maintenance / public holiday');
+    body = body.replace('{RESUME_DATE}', 'next regular training class');
     
     setCustomMessage(body);
-  }, [selectedTemplate, firstSelectedStudent]);
+  }, [selectedTemplate, firstSelectedStudent, selectedBranch]);
 
-  // Filtered Cadets for Multi-Select Box
+  // Filtered Cadets for Multi-Select Box with Full Dojo Branch Isolation
   const isInstructor = user?.role === 'INSTRUCTOR';
 
   const filteredCadets = students.filter(s => {
-    const query = cadetSearch.toLowerCase();
-    const branchName = typeof s.branch === 'object' ? (s.branch?.name || '') : (s.branch || '');
+    // 1. Dojo Branch Filter
+    if (selectedBranch !== 'ALL' && !isStudentInBranch(s, selectedBranch, branchesList)) {
+      return false;
+    }
 
-    if (isInstructor) {
+    if (isInstructor && selectedBranch === 'ALL') {
       const instructorBranch = user?.branch || 'Chungam Branch';
-      if (!branchName.toLowerCase().includes(instructorBranch.toLowerCase())) {
+      if (!isStudentInBranch(s, instructorBranch, branchesList)) {
         return false;
       }
     }
+
+    const query = cadetSearch.toLowerCase().trim();
+    if (!query) return true;
 
     return (s.name || '').toLowerCase().includes(query) ||
            (s.guardianName || s.guardian_name || '').toLowerCase().includes(query) ||
@@ -145,12 +185,23 @@ export default function WhatsAppManagement() {
   };
 
   const sendIndividualWhatsApp = (std, channelOverride) => {
+    const branchToUse = selectedBranch !== 'ALL' ? selectedBranch : (std.branch?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch) || 'BAMA Dojo');
     let body = selectedTemplate.body;
     body = body.replace('{STUDENT_NAME}', std.name || 'Cadet');
     body = body.replace('{GUARDIAN_NAME}', std.guardianName || std.guardian_name || 'Parent');
     body = body.replace('{AMOUNT}', std.feeAmount || '1500');
-    body = body.replace('{BRANCH_NAME}', std.branch?.name || std.branch || 'BAMA Dojo');
-    body = body.replace('{DATE}', new Date().toLocaleDateString());
+    body = body.replace('{BRANCH_NAME}', branchToUse);
+    body = body.replace('{DATE}', new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
+    body = body.replace('{RECEIPT_NO}', 'REC-2026-042');
+    body = body.replace('{EXAM_DATE}', 'Upcoming Sunday');
+    body = body.replace('{VENUE}', branchToUse);
+    body = body.replace('{FEE}', '800');
+    body = body.replace('{EVENT_TITLE}', 'Quarterly Belt Exam & Camp');
+    body = body.replace('{TIME}', '8:00 AM');
+    body = body.replace('{NEXT_BELT}', 'Yellow Belt');
+    body = body.replace('{DUE_DATE}', '10th of this month');
+    body = body.replace('{REASON}', 'scheduled maintenance / public holiday');
+    body = body.replace('{RESUME_DATE}', 'next regular training class');
 
     setSentStudentIds(prev => Array.from(new Set([...prev, std.id])));
     openWhatsApp({
@@ -253,8 +304,12 @@ export default function WhatsAppManagement() {
             <Users className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">TOTAL CONTACTS</span>
-            <strong className="text-xl font-black text-blue-600 leading-none block mt-0.5">{students.length} Cadets</strong>
+            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+              {selectedBranch !== 'ALL' ? 'BRANCH CADETS' : 'TOTAL CONTACTS'}
+            </span>
+            <strong className="text-xl font-black text-blue-600 leading-none block mt-0.5">
+              {selectedBranch !== 'ALL' ? `${filteredCadets.length} Cadets` : `${students.length} Cadets`}
+            </strong>
           </div>
         </div>
 
@@ -299,10 +354,48 @@ export default function WhatsAppManagement() {
 
           {/* 2. Multi-Select Cadet / Parent List */}
           <div className="bg-white rounded-3xl p-6 border border-gray-200/90 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between w-full">
               <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
                 <UserCheck className="w-4 h-4 text-emerald-600" /> 2. Select Cadets / Parents ({selectedStudentIds.length} Selected)
               </h3>
+              {selectedBranch !== 'ALL' && (
+                <span className="text-[10px] font-black text-red-600 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded-full uppercase shadow-xs">
+                  {selectedBranch}
+                </span>
+              )}
+            </div>
+
+            {/* Branch Selector Filter Dropdown */}
+            <div className="p-3 bg-red-50/70 border border-red-200 rounded-2xl space-y-1.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-black text-red-950 flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-red-600" /> Select Dojo Branch / School:
+                </label>
+                {selectedBranch !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => handleBranchChange('ALL')}
+                    className="text-[10px] text-red-600 hover:text-red-800 font-bold hover:underline cursor-pointer"
+                  >
+                    Reset to All Branches
+                  </button>
+                )}
+              </div>
+              <select
+                value={selectedBranch}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                className="w-full bg-white border-2 border-red-300 rounded-xl px-3 py-2 text-xs text-gray-900 font-bold focus:outline-none focus:border-red-600 cursor-pointer shadow-sm transition"
+              >
+                <option value="ALL">🏫 All Dojo Branches & Schools ({students.length} Cadets)</option>
+                {branchesList.map(b => {
+                  const bCount = students.filter(s => isStudentInBranch(s, b.name, branchesList)).length;
+                  return (
+                    <option key={b.id || b.name} value={b.name}>
+                      🥋 {b.name} ({bCount} Cadets)
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             {/* Cadet Search Bar */}
@@ -354,7 +447,14 @@ export default function WhatsAppManagement() {
                       />
                       <div>
                         <div className="text-gray-900 font-black">{s.name}</div>
-                        <div className="text-[10px] text-gray-500 font-medium">Parent: {s.guardianName || s.guardian_name} ({s.phone})</div>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="text-[9px] bg-red-50 text-red-700 font-bold px-1.5 py-0.2 rounded border border-red-200">
+                            {s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || 'Pulikkal'}
+                          </span>
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            Parent: {s.guardianName || s.guardian_name} ({s.phone})
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <span className="text-[10px] font-mono font-bold text-amber-800 px-2 py-0.5 bg-white rounded border border-gray-200 shadow-xs">
