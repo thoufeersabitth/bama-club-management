@@ -5,7 +5,7 @@ import {
   Camera, Upload, Sparkles, Clock, AlertCircle, Loader2, ArrowRight,
   Info, Check, Lock
 } from 'lucide-react';
-import { fetchBranches, getBranchFeeSettings, createStudent } from '../../services/api';
+import { fetchBranches, getBranchFeeSettings, saveAdmissionInquiryBackend } from '../../services/api';
 import { INITIAL_BRANCHES, PROGRAM_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
 
 export default function AdmissionRegistration() {
@@ -161,58 +161,22 @@ export default function AdmissionRegistration() {
         console.warn('Local storage inquiry sync error:', e);
       }
 
-      // 2. Also register payload in backend API
-      const payload = {
-        name: formData.name,
-        photo: formData.photo || '/assets/prog_adults.jpg',
-        gender: formData.gender,
-        dob: formData.dob || '2016-01-01',
-        age: parseInt(formData.age) || calculateAge(formData.dob),
-        blood_group: formData.blood_group,
-        guardian_name: formData.guardian_name,
-        relationship: formData.relationship,
-        phone: formData.phone,
-        whatsapp: formData.whatsapp || formData.phone,
-        address: formData.address,
-        branch_name: formData.branch,
-        branch: formData.branch,
-        program: formData.program,
-        shift: formData.shift,
-        billing_plan: bPlan,
-        admission_fee: feeInfo.admissionFee || 1000,
-        fee_amount: monthlyOrSchool,
-        initial_paid_amount: 0,
-        pending_amount: monthlyOrSchool,
-        fee_status: 'Pending',
-        current_belt: 'White Belt',
-        status: 'Pending Approval',
-        source: 'ONLINE_ADMISSION',
-        portal_password: formData.password || null
-      };
-
-      let result = null;
+      // 2. Sync to Backend Fly.io PostgreSQL cms-config so all admin devices receive the pending application
       try {
-        result = await createStudent(payload);
-      } catch (apiErr) {
-        console.warn('Backend student creation deferred:', apiErr);
-      }
-
-      // Save credentials map locally so student portal can recognize password
-      if (formData.password) {
-        try {
-          const stored = localStorage.getItem('bama_student_credentials');
-          const map = stored ? JSON.parse(stored) : {};
-          const credKey = result?.id || formData.phone;
-          map[credKey] = { password: formData.password, updated_at: new Date().toISOString() };
-          map[formData.phone] = { password: formData.password, updated_at: new Date().toISOString() };
-          localStorage.setItem('bama_student_credentials', JSON.stringify(map));
-        } catch (e) {}
+        await saveAdmissionInquiryBackend(newInquiry);
+      } catch (backendErr) {
+        console.warn('Backend admission inquiry sync deferred:', backendErr);
       }
 
       setSubmittedCadet({
-        ...payload,
+        name: formData.name,
+        branch: formData.branch,
+        shift: formData.shift,
+        phone: formData.phone,
+        guardian_name: formData.guardian_name,
         application_id: applicationId,
-        admission_no: result?.admission_no || result?.admissionNo || tempAdmNo
+        admission_no: tempAdmNo,
+        status: 'PENDING_APPROVAL'
       });
     } catch (err) {
       setErrorMsg('Error submitting admission form. Please try again.');
@@ -580,39 +544,18 @@ export default function AdmissionRegistration() {
               </div>
             </div>
 
-            {/* Section 5: Student Portal Password */}
-            <div className="space-y-3 pt-3 bg-red-950/20 border border-red-500/30 p-4 rounded-2xl">
-              <h3 className="text-xs font-black text-red-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Lock className="w-4 h-4 text-red-500" /> 4. Create Student Portal Password
+            {/* Section 4: Student Portal Access Info */}
+            <div className="space-y-3 pt-3 bg-gradient-to-r from-amber-500/10 via-red-500/10 to-transparent border border-amber-500/30 p-4 rounded-2xl">
+              <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-amber-400" /> 4. Student & Parent Portal Access
               </h3>
-              <p className="text-[11px] text-gray-400">
-                You can use this password along with your Mobile Number to access your Cadet ID Card & Dojo Ledger once admitted.
+              <p className="text-[11px] text-gray-300">
+                Once Sensei approves admission, you can access your digital Cadet ID Card, attendance, and fee receipts directly using your <strong>Registered Phone Number</strong> and <strong>Cadet's Date of Birth</strong>.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-gray-300 font-bold block">Password *</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Create secret password..."
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-black/60 border border-white/20 rounded-xl px-3.5 py-2.5 text-white font-bold focus:border-red-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-gray-300 font-bold block">Confirm Password *</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Re-enter password..."
-                    value={formData.confirm_password}
-                    onChange={(e) => setFormData({ ...formData, confirm_password: e.target.value })}
-                    className="w-full bg-black/60 border border-white/20 rounded-xl px-3.5 py-2.5 text-white font-bold focus:border-red-500 focus:outline-none"
-                  />
-                </div>
+              <div className="p-3 bg-black/40 border border-white/10 rounded-xl flex items-center gap-2 text-xs text-emerald-400">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                <span>Instant Login Credentials: Registered Mobile ({formData.phone || 'Enter above'}) + Cadet DOB ({formData.dob || 'Selected above'})</span>
               </div>
             </div>
 

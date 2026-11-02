@@ -7,7 +7,7 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, FileSpreadsheet, Building2
 } from 'lucide-react';
-import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName, updateBranchFeeSettings, getBranchFeeSettings } from '../../services/api';
+import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName, updateBranchFeeSettings, getBranchFeeSettings, fetchAdmissionInquiriesBackend, saveAdmissionInquiriesListBackend } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
@@ -222,6 +222,31 @@ export default function StudentManagement() {
     fetchFeeSettings().then(res => {
       if (res?.settings) {
         setGlobalFeeSettings(res.settings);
+      }
+    });
+
+    fetchAdmissionInquiriesBackend().then(backendInqs => {
+      if (Array.isArray(backendInqs) && backendInqs.length > 0) {
+        setInquiriesList(prev => {
+          const map = new Map();
+          (prev || []).forEach(i => map.set(i.id || i.phone, i));
+          backendInqs.forEach(i => {
+            const k = i.id || i.phone;
+            if (!map.has(k)) {
+              map.set(k, i);
+            } else {
+              const existing = map.get(k);
+              if (existing.status === 'PENDING' && i.status === 'ADMITTED') {
+                map.set(k, i);
+              }
+            }
+          });
+          const merged = Array.from(map.values()).filter(i => i.id !== 'INQ-101' && i.id !== 'INQ-102');
+          try {
+            localStorage.setItem('bama_admission_inquiries', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
       }
     });
 
@@ -711,6 +736,7 @@ export default function StudentManagement() {
       });
       setInquiriesList(updatedInquiries);
       localStorage.setItem('bama_admission_inquiries', JSON.stringify(updatedInquiries));
+      saveAdmissionInquiriesListBackend(updatedInquiries).catch(() => {});
 
       // Save password to credentials store if provided
       if (approvalData.portalPassword) {
@@ -5468,6 +5494,7 @@ export default function StudentManagement() {
                             const updated = inquiriesList.filter(i => i.id !== inquiry.id);
                             setInquiriesList(updated);
                             localStorage.setItem('bama_admission_inquiries', JSON.stringify(updated));
+                            saveAdmissionInquiriesListBackend(updated).catch(() => {});
                           }}
                           className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition cursor-pointer"
                         >

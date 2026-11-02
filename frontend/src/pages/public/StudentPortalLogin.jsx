@@ -2,28 +2,43 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Shield, User, Lock, Calendar, Phone, ArrowRight, AlertCircle,
-  Loader2, CheckCircle2, Users, KeyRound, QrCode, FileText, Download
+  Loader2, CheckCircle2, Users, KeyRound, QrCode, FileText, Download,
+  Check, Sparkles, Building2
 } from 'lucide-react';
 import {
   getStudentPortalAuth,
-  verifyDOBAndSetPassword,
+  verifyStudentDOBLogin,
   verifyStudentPasswordLogin
 } from '../../services/api';
 
 export default function StudentPortalLogin() {
   const navigate = useNavigate();
 
-  // Steps: 'PHONE' | 'SIBLING_SELECT' | 'ENTER_PASSWORD' | 'SET_PASSWORD' | 'LOGGED_IN'
-  const [step, setStep] = useState('PHONE');
+  // Restore saved session if user reloads page
+  const [activeStudent, setActiveStudent] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('bama_active_portal_cadet');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Steps: 'PHONE' | 'SIBLING_SELECT' | 'VERIFY' | 'ENTER_PASSWORD' | 'LOGGED_IN'
+  const [step, setStep] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('bama_active_portal_cadet');
+      return saved ? 'LOGGED_IN' : 'PHONE';
+    } catch (e) {
+      return 'PHONE';
+    }
+  });
 
   const [phone, setPhone] = useState('');
   const [studentOptions, setStudentOptions] = useState([]);
-  const [activeStudent, setActiveStudent] = useState(null);
 
-  const [password, setPassword] = useState('');
   const [dob, setDob] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [password, setPassword] = useState('');
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,16 +57,17 @@ export default function StudentPortalLogin() {
     try {
       const res = await getStudentPortalAuth(cleanP);
       if (!res.success) {
-        setError(res.message || 'No cadet found with this mobile number. Please check or contact Sensei.');
+        setError(res.message || 'No registered cadet found with this mobile number. If you just applied online, please wait for Sensei approval.');
         return;
       }
 
-      if (res.multiple) {
-        // Siblings detected! Ask parent which cadet
+      if (res.multiple && Array.isArray(res.students) && res.students.length > 1) {
+        // Siblings detected! Ask parent to pick cadet
         setStudentOptions(res.students);
         setStep('SIBLING_SELECT');
       } else {
-        proceedWithStudent(res.student, res.hasPassword);
+        const cadet = res.student || (res.students && res.students[0]);
+        selectAndProceed(cadet);
       }
     } catch (err) {
       setError('Connection error. Please try again.');
@@ -60,97 +76,95 @@ export default function StudentPortalLogin() {
     }
   };
 
-  // Helper when student is resolved
-  const proceedWithStudent = (student, hasPass) => {
+  const selectAndProceed = (student) => {
     setActiveStudent(student);
-    if (hasPass) {
-      setStep('ENTER_PASSWORD');
-    } else {
-      // First time login / old student without password: Ask DOB and let them create password
-      setStep('SET_PASSWORD');
-    }
+    setError('');
+    // Direct verification via Date of Birth (No password creation loop!)
+    setStep('VERIFY');
   };
 
   // Step 1.5: Sibling Select
-  const handleSelectSibling = async (student) => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await getStudentPortalAuth(phone, student.id);
-      proceedWithStudent(student, res.hasPassword);
-    } catch (err) {
-      setError('Error selecting cadet profile.');
-    } finally {
-      setLoading(false);
-    }
+  const handleSelectSibling = (student) => {
+    selectAndProceed(student);
   };
 
-  // Step 2A: Verify DOB & Set New Password (For First Time / Old Cadets)
-  const handleSetPasswordSubmit = async (e) => {
+  // Step 2A: Verify via Date of Birth (Primary, 100% Reliable across all devices)
+  const handleDOBSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     if (!dob) {
-      setError('Please select Date of Birth.');
-      return;
-    }
-    if (newPassword.length < 4) {
-      setError('Password must be at least 4 characters.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError('Please select or enter Cadet\'s Date of Birth.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await verifyDOBAndSetPassword(activeStudent.id, dob, newPassword);
+      const res = await verifyStudentDOBLogin(activeStudent.id, dob);
       if (res.success) {
-        setActiveStudent(res.student);
+        const cadet = res.student || activeStudent;
+        setActiveStudent(cadet);
+        try {
+          sessionStorage.setItem('bama_active_portal_cadet', JSON.stringify(cadet));
+        } catch (e) {}
         setStep('LOGGED_IN');
       } else {
-        setError(res.message || 'Date of Birth does not match our records. Please contact Dojo.');
+        setError(res.message || 'Date of Birth does not match official cadet records. Please check or contact Sensei.');
       }
     } catch (err) {
-      setError('Failed to update password.');
+      setError('Failed to verify Date of Birth. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Step 2B: Enter Existing Password
+  // Step 2B: Enter Existing Password (Optional Fallback)
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
 
     setLoading(true);
     try {
       const res = await verifyStudentPasswordLogin(activeStudent.id, password);
       if (res.success) {
-        setActiveStudent(res.student);
+        const cadet = res.student || activeStudent;
+        setActiveStudent(cadet);
+        try {
+          sessionStorage.setItem('bama_active_portal_cadet', JSON.stringify(cadet));
+        } catch (e) {}
         setStep('LOGGED_IN');
       } else {
-        if (res.needsSetup) {
-          setStep('SET_PASSWORD');
-        } else {
-          setError(res.message || 'Incorrect password.');
-        }
+        setError(res.message || 'Incorrect password. You can also log in directly using Date of Birth.');
       }
     } catch (err) {
-      setError('Login error. Please try again.');
+      setError('Login error. Please try again or use Date of Birth.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSignOut = () => {
+    try {
+      sessionStorage.removeItem('bama_active_portal_cadet');
+    } catch (e) {}
+    setActiveStudent(null);
+    setDob('');
+    setPassword('');
+    setError('');
+    setStep('PHONE');
+  };
+
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 relative overflow-hidden">
       <div className="w-full max-w-md glass-card rounded-3xl p-6 sm:p-9 border border-white/10 shadow-2xl relative z-10 backdrop-blur-md">
-        
         {/* Header */}
-        <div className="text-center space-y-2 mb-7">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-red-600 via-amber-500 to-black p-0.5 shadow-xl mx-auto border border-amber-500/40 overflow-hidden">
+        <div className="text-center space-y-2 mb-6">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 via-amber-500 to-black p-0.5 shadow-xl mx-auto border border-amber-500/40 overflow-hidden">
             <img
               src="/logo bama_240616_200739.jpg.jpeg"
               alt="B.A.M.A. Official Logo"
@@ -166,9 +180,9 @@ export default function StudentPortalLogin() {
         </div>
 
         {error && (
-          <div className="mb-5 p-3 bg-red-950/80 border border-red-500/60 rounded-xl text-red-200 text-xs flex items-center gap-2 font-bold shadow-lg">
+          <div className="mb-5 p-3.5 bg-red-950/80 border border-red-500/60 rounded-2xl text-red-200 text-xs flex items-center gap-2.5 font-bold shadow-lg animate-in fade-in duration-150">
             <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-            <span>{error}</span>
+            <span className="leading-relaxed">{error}</span>
           </div>
         )}
 
@@ -185,14 +199,14 @@ export default function StudentPortalLogin() {
                   type="tel"
                   required
                   autoFocus
-                  placeholder="Enter 10-digit Parent Phone (e.g. 9544085442)"
+                  placeholder="Enter 10-digit Parent Phone (e.g. 9562954164)"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full bg-black/60 border border-white/15 rounded-xl pl-10 pr-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-red-500"
                 />
               </div>
               <p className="text-[10px] text-gray-400 pt-0.5">
-                Works for both new and existing enrolled cadets across all dojo branches.
+                Instant access for all active enrolled cadets across all 11 B.A.M.A dojo branches.
               </p>
             </div>
 
@@ -201,26 +215,33 @@ export default function StudentPortalLogin() {
               disabled={loading}
               className="w-full py-3.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl font-black text-xs shadow-xl flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Next</span><ArrowRight className="w-4 h-4" /></>}
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>Verify Mobile Number</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
 
             <div className="text-center pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
               <Link to="/register" className="text-amber-400 hover:underline font-bold">
-                New Admission? Register Here →
+                New Admission Form →
               </Link>
               <Link to="/login" className="text-gray-400 hover:text-white">
-                Staff Office Login
+                Sensei Office Login
               </Link>
             </div>
           </form>
         )}
 
-        {/* STEP 1.5: SIBLING DETECTED - SELECT CADET */}
+        {/* STEP 1.5: SIBLINGS DETECTED - SELECT CADET */}
         {step === 'SIBLING_SELECT' && (
           <div className="space-y-4 text-xs">
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-amber-300 text-xs flex items-center gap-2">
-              <Users className="w-5 h-5 flex-shrink-0" />
-              <span>Found multiple cadets under this mobile number. Please choose cadet:</span>
+              <Users className="w-5 h-5 flex-shrink-0 text-amber-400" />
+              <span>Found multiple cadets under this mobile number. Choose cadet profile:</span>
             </div>
 
             <div className="space-y-2">
@@ -231,14 +252,22 @@ export default function StudentPortalLogin() {
                   className="w-full p-3.5 bg-black/60 hover:bg-white/10 border border-white/15 hover:border-red-500 rounded-2xl flex items-center justify-between text-left transition cursor-pointer group"
                 >
                   <div className="flex items-center gap-3">
-                    <img
-                      src={st.photo || '/assets/prog_adults.jpg'}
-                      alt={st.name}
-                      className="w-10 h-10 rounded-xl object-cover border border-white/20"
-                    />
+                    {st.photo ? (
+                      <img
+                        src={st.photo}
+                        alt={st.name}
+                        className="w-11 h-11 rounded-xl object-cover border border-white/20"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-sm shadow-xs">
+                        {st.name ? st.name.charAt(0).toUpperCase() : 'C'}
+                      </div>
+                    )}
                     <div>
-                      <h4 className="text-white font-black text-xs group-hover:text-red-400 transition">{st.name}</h4>
-                      <p className="text-[10px] text-gray-400">{st.currentBelt || st.current_belt || 'White Belt'} • {st.branch_name || st.branch || 'Head Office'}</p>
+                      <h4 className="text-white font-black text-xs group-hover:text-amber-400 transition">{st.name}</h4>
+                      <p className="text-[10px] text-gray-400">
+                        {st.currentBelt || st.current_belt || 'White Belt'} • {st.branch_name || st.branch || 'Head Office'}
+                      </p>
                     </div>
                   </div>
                   <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-white group-hover:translate-x-1 transition" />
@@ -248,93 +277,104 @@ export default function StudentPortalLogin() {
 
             <button
               onClick={() => setStep('PHONE')}
-              className="w-full py-2 bg-transparent text-gray-400 hover:text-white text-xs font-bold"
+              className="w-full py-2 bg-transparent text-gray-400 hover:text-white text-xs font-bold cursor-pointer"
             >
-              ← Back to Phone Input
+              ← Back to Mobile Number
             </button>
           </div>
         )}
 
-        {/* STEP 2A: FIRST TIME LOGIN - VERIFY DOB & SET PASSWORD */}
-        {step === 'SET_PASSWORD' && activeStudent && (
-          <form onSubmit={handleSetPasswordSubmit} className="space-y-4 text-xs">
-            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-2xl text-blue-200 space-y-1">
-              <span className="font-bold flex items-center gap-1.5 text-xs text-white">
-                <User className="w-4 h-4 text-blue-400" /> Cadet: {activeStudent.name}
-              </span>
-              <p className="text-[10px] text-gray-300">
-                First-time login setup: Verify Cadet's Date of Birth to create your password.
-              </p>
+        {/* STEP 2A: DIRECT LOGIN VIA DATE OF BIRTH (No Password Setup Required) */}
+        {step === 'VERIFY' && activeStudent && (
+          <form onSubmit={handleDOBSubmit} className="space-y-4 text-xs animate-in fade-in duration-150">
+            {/* Cadet Identity Card */}
+            <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
+              {activeStudent.photo ? (
+                <img
+                  src={activeStudent.photo}
+                  alt={activeStudent.name}
+                  className="w-12 h-12 rounded-xl object-cover border border-amber-500/40 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-base flex-shrink-0">
+                  {activeStudent.name ? activeStudent.name.charAt(0).toUpperCase() : 'C'}
+                </div>
+              )}
+              <div className="min-w-0">
+                <span className="text-[9px] uppercase tracking-wider text-amber-400 font-bold block">Cadet Profile</span>
+                <h4 className="text-white font-black text-sm truncate">{activeStudent.name}</h4>
+                <p className="text-[10px] text-gray-400">
+                  {activeStudent.currentBelt || activeStudent.current_belt || 'White Belt'} • {activeStudent.branch_name || activeStudent.branch || 'Head Office'}
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-gray-300 font-bold flex items-center gap-1 text-[11px]">
-                <Calendar className="w-3.5 h-3.5 text-amber-400" /> Cadet's Date of Birth *
+            <div className="space-y-1.5">
+              <label className="text-gray-300 font-bold flex items-center gap-1.5 text-[11px]">
+                <Calendar className="w-4 h-4 text-amber-400" /> Enter Cadet's Date of Birth (DOB) *
               </label>
               <input
                 type="date"
                 required
+                autoFocus
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
-                className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2.5 text-white font-bold focus:border-red-500 focus:outline-none"
+                className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-3 text-white font-bold text-sm focus:border-red-500 focus:outline-none"
               />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-gray-300 font-bold flex items-center gap-1 text-[11px]">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" /> Create Your New Password *
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="Enter new password (min 4 chars)..."
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2.5 text-white font-bold focus:border-red-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-gray-300 font-bold flex items-center gap-1 text-[11px]">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Confirm Password *
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="Re-enter password..."
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2.5 text-white font-bold focus:border-red-500 focus:outline-none"
-              />
+              <p className="text-[10px] text-gray-400">
+                Enter official DOB submitted during academy admission to unlock portal instantly.
+              </p>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+              className="w-full py-3.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl font-black text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Set Password & Open Portal</span><ArrowRight className="w-4 h-4" /></>}
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>Open Cadet Portal</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setStep('PHONE')}
-              className="w-full py-1 text-gray-400 hover:text-white text-xs font-bold"
-            >
-              ← Cancel
-            </button>
+            <div className="flex items-center justify-between text-[11px] pt-1">
+              <button
+                type="button"
+                onClick={() => setStep('ENTER_PASSWORD')}
+                className="text-amber-400 hover:underline font-bold cursor-pointer"
+              >
+                Or Login with Password →
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('PHONE')}
+                className="text-gray-400 hover:text-white cursor-pointer"
+              >
+                Change Number
+              </button>
+            </div>
           </form>
         )}
 
-        {/* STEP 2B: ENTER PASSWORD */}
+        {/* STEP 2B: OPTIONAL PASSWORD LOGIN */}
         {step === 'ENTER_PASSWORD' && activeStudent && (
-          <form onSubmit={handlePasswordSubmit} className="space-y-4 text-xs">
-            <div className="p-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
-              <img
-                src={activeStudent.photo || '/assets/prog_adults.jpg'}
-                alt={activeStudent.name}
-                className="w-10 h-10 rounded-xl object-cover border border-white/20 flex-shrink-0"
-              />
+          <form onSubmit={handlePasswordSubmit} className="space-y-4 text-xs animate-in fade-in duration-150">
+            <div className="p-3.5 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3">
+              {activeStudent.photo ? (
+                <img
+                  src={activeStudent.photo}
+                  alt={activeStudent.name}
+                  className="w-11 h-11 rounded-xl object-cover border border-white/20 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-sm flex-shrink-0">
+                  {activeStudent.name ? activeStudent.name.charAt(0).toUpperCase() : 'C'}
+                </div>
+              )}
               <div className="min-w-0">
                 <h4 className="text-white font-black text-xs truncate">{activeStudent.name}</h4>
                 <p className="text-[10px] text-gray-400">
@@ -351,7 +391,7 @@ export default function StudentPortalLogin() {
                 type="password"
                 required
                 autoFocus
-                placeholder="Enter your password..."
+                placeholder="Enter your secret password..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-3 text-white font-bold focus:border-red-500 focus:outline-none"
@@ -369,15 +409,15 @@ export default function StudentPortalLogin() {
             <div className="flex items-center justify-between text-[11px] pt-1">
               <button
                 type="button"
-                onClick={() => setStep('SET_PASSWORD')}
-                className="text-amber-400 hover:underline font-bold"
+                onClick={() => setStep('VERIFY')}
+                className="text-amber-400 hover:underline font-bold cursor-pointer"
               >
-                Forgot Password? (Use DOB)
+                ← Use Date of Birth (No Password Needed)
               </button>
               <button
                 type="button"
                 onClick={() => setStep('PHONE')}
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white cursor-pointer"
               >
                 Change Number
               </button>
@@ -392,11 +432,17 @@ export default function StudentPortalLogin() {
             <div className="bg-gradient-to-br from-red-950 via-gray-900 to-black p-5 rounded-2xl border border-red-500/40 text-white space-y-4 shadow-xl">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <img
-                    src={activeStudent.photo || '/assets/prog_adults.jpg'}
-                    alt={activeStudent.name}
-                    className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow-md"
-                  />
+                  {activeStudent.photo ? (
+                    <img
+                      src={activeStudent.photo}
+                      alt={activeStudent.name}
+                      className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-xl shadow-md border-2 border-amber-400">
+                      {activeStudent.name ? activeStudent.name.charAt(0).toUpperCase() : 'C'}
+                    </div>
+                  )}
                   <div>
                     <span className="text-[9px] uppercase font-mono tracking-widest text-amber-400">B.A.M.A. Cadet</span>
                     <h3 className="text-base font-black text-white leading-tight">{activeStudent.name}</h3>
@@ -456,10 +502,7 @@ export default function StudentPortalLogin() {
             </a>
 
             <button
-              onClick={() => {
-                setActiveStudent(null);
-                setStep('PHONE');
-              }}
+              onClick={handleSignOut}
               className="w-full py-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-bold text-xs rounded-xl transition cursor-pointer"
             >
               Sign Out

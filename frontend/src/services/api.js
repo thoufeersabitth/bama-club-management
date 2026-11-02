@@ -3352,3 +3352,125 @@ export const verifyStudentPasswordLogin = async (studentId, passwordInput) => {
     return { success: false, message: 'Login error.' };
   }
 };
+
+
+export const verifyStudentDOBLogin = async (studentId, dobInput) => {
+  try {
+    const students = await fetchStudents();
+    const st = (students || []).find(s => 
+      String(s.id) === String(studentId) || 
+      String(s.admission_no || s.admissionNo) === String(studentId)
+    );
+    if (!st) return { success: false, message: 'Cadet record not found.' };
+
+    const cleanInput = String(dobInput || '').trim();
+    if (!cleanInput) {
+      return { success: false, message: 'Please select or enter Date of Birth.' };
+    }
+
+    const stDOB = String(st.dob || st.dateOfBirth || st.birth_date || '').trim();
+
+    // Helper to normalize dates into YYYY-MM-DD
+    const normalizeDate = (dStr) => {
+      if (!dStr) return '';
+      const raw = dStr.split('T')[0].trim();
+      const parts = raw.split(/[-/.]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        } else if (parts[2].length === 4) {
+          return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
+      try {
+        const parsed = new Date(dStr);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().split('T')[0];
+        }
+      } catch (e) {}
+      return raw;
+    };
+
+    const d1 = normalizeDate(stDOB);
+    const d2 = normalizeDate(cleanInput);
+
+    if (d1 && d2 && d1 !== d2) {
+      return { success: false, message: 'Date of Birth does not match official cadet record. Please check or contact Sensei.' };
+    }
+
+    return { success: true, student: st };
+  } catch (err) {
+    return { success: false, message: 'Verification error. Please try again.' };
+  }
+};
+
+// Web Admission Inquiries Backend Sync via Fly.io cms-config
+export const saveAdmissionInquiryBackend = async (inquiry) => {
+  try {
+    let currentInquiries = [];
+    try {
+      const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const configData = json?.data || json || {};
+        if (Array.isArray(configData.admission_inquiries)) {
+          currentInquiries = configData.admission_inquiries;
+        }
+      }
+    } catch (e) {}
+
+    const updated = [inquiry, ...currentInquiries.filter(i => i.id !== inquiry.id && i.phone !== inquiry.phone)];
+
+    await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ admission_inquiries: updated })
+    });
+
+    return updated;
+  } catch (err) {
+    console.warn('Backend admission inquiry sync deferred:', err);
+    return null;
+  }
+};
+
+export const saveAdmissionInquiriesListBackend = async (inquiriesList) => {
+  if (!Array.isArray(inquiriesList)) return false;
+  try {
+    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    const existingData = existingRes.ok ? await existingRes.json() : {};
+    const updatedData = { ...existingData, admission_inquiries: inquiriesList };
+    const res = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(updatedData)
+    });
+    return res.ok;
+  } catch (e) {
+    console.error('Failed to sync admission inquiries to backend cms-config:', e);
+    return false;
+  }
+};
+
+export const fetchAdmissionInquiriesBackend = async () => {
+  try {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const configData = json?.data || json || {};
+      if (Array.isArray(configData.admission_inquiries)) {
+        return configData.admission_inquiries;
+      }
+    }
+  } catch (e) {}
+  return [];
+};
