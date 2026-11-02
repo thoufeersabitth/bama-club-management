@@ -3250,8 +3250,7 @@ export default function StudentManagement() {
             </select>
           </div>
 
-          {!isInstructor && (
-            <div className="flex items-center gap-1.5 flex-1 sm:flex-initial min-w-[120px]">
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-initial min-w-[120px]">
               <span className="text-[11px] whitespace-nowrap">Branch:</span>
               <select
                 value={selectedBranch}
@@ -3276,7 +3275,6 @@ export default function StudentManagement() {
                 ))}
               </select>
             </div>
-          )}
         </div>
       </div>
 
@@ -3938,17 +3936,29 @@ export default function StudentManagement() {
 
               {/* Row 3.5: Branch Dojo Selector */}
               <div>
-                <label className="block text-gray-700 font-bold mb-1 text-red-600">Branch Dojo *</label>
+                <label className="block text-gray-700 font-bold mb-1 text-red-600 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-red-600" /> Branch Dojo *
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-normal">Select branch to view shifts & fees</span>
+                </label>
                 <select
                   required
-                  disabled={isInstructor}
-                  value={formData.branch_id || formData.branch}
+                  value={(() => {
+                    const bVal = formData.branch_name || formData.branch;
+                    const found = branchesList.find(b => b.name === bVal || b.id === bVal);
+                    return found ? found.name : (bVal || '');
+                  })()}
                   onChange={async (e) => {
                     const selVal = e.target.value;
-                    const matchedB = branchesList.find(b => b.id === selVal || b.name === selVal);
+                    const matchedB = branchesList.find(b => 
+                      b.name === selVal || 
+                      b.id === selVal ||
+                      String(b.name).toLowerCase() === String(selVal).toLowerCase()
+                    );
                     const bId = matchedB?.id || selVal;
                     const bName = matchedB?.name || selVal;
-                    const branchShifts = getDynamicShiftOptions(bName, formData.program, branchesList);
+                    const branchShifts = getDynamicShiftOptions(bName, formData.program || 'Karate (Shotokan)', branchesList);
                     const defaultShift = branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
                     
                     const feeInfo = getBranchFeeSettings(bName, branchesList);
@@ -3964,17 +3974,19 @@ export default function StudentManagement() {
                       shift: defaultShift,
                       billingPlan: bPlan,
                       billing_plan: bPlan,
-                      admissionFee: feeInfo.admissionFee,
-                      admissionFeePaidAmount: feeInfo.admissionFee,
+                      admissionFee: feeInfo.admissionFee ?? 1000,
+                      admissionFeePaidAmount: feeInfo.admissionFee ?? 1000,
                       feeAmount: activeFee,
                       initialPaidAmount: activeFee
                     }));
                   }}
-                  className="w-full bg-gray-50 border-2 border-red-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-500 disabled:opacity-50 cursor-pointer transition"
+                  className="w-full bg-white border-2 border-red-300 rounded-xl px-3 py-2.5 text-gray-900 font-bold focus:bg-white focus:outline-none focus:border-red-600 cursor-pointer transition shadow-xs"
                 >
                   <option value="">-- Select Dojo Branch * --</option>
                   {branchesList.map(b => (
-                    <option key={b.id || b.name} value={b.id || b.name}>{b.name}</option>
+                    <option key={b.id || b.name} value={b.name}>
+                      {b.name} {b.code ? `(${b.code})` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -4038,7 +4050,6 @@ export default function StudentManagement() {
                       <span className="text-[10px] text-gray-600 font-bold">Total:</span>
                       <input
                         type="number"
-                        disabled={isInstructor}
                         value={formData.admissionFee}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -4051,7 +4062,7 @@ export default function StudentManagement() {
                             admissionFeePaidAmount: total === 0 ? 0 : (wasFullPaid && formData.admissionFeePaidAmount !== 0 ? total : (formData.admissionFeePaidAmount > total ? total : formData.admissionFeePaidAmount))
                           });
                         }}
-                        className={`w-24 bg-white border border-amber-300 rounded-xl px-2.5 py-1.5 text-amber-900 font-black text-xs font-mono text-right focus:outline-none focus:border-amber-500 ${isInstructor ? 'opacity-70 cursor-not-allowed bg-amber-50/50' : ''}`}
+                        className={`w-24 bg-white border border-amber-300 rounded-xl px-2.5 py-1.5 text-amber-900 font-black text-xs font-mono text-right focus:outline-none focus:border-amber-500 `}
                       />
                     </div>
 
@@ -4213,7 +4224,6 @@ export default function StudentManagement() {
                       <span className="text-[10px] text-gray-600 font-bold">Monthly Fee:</span>
                       <input
                         type="number"
-                        disabled={isInstructor}
                         value={formData.feeAmount}
                         onChange={(e) => {
                           const amt = parseInt(e.target.value) || 0;
@@ -4225,7 +4235,7 @@ export default function StudentManagement() {
                             initialPaidAmount: wasFullPaid && formData.initialPaidAmount !== 0 ? amt : (formData.initialPaidAmount > amt ? amt : formData.initialPaidAmount)
                           });
                         }}
-                        className={`w-24 bg-white border border-emerald-300 rounded-xl px-2.5 py-1.5 text-amber-900 font-black text-xs font-mono text-right focus:outline-none focus:border-emerald-500 ${isInstructor ? 'opacity-70 cursor-not-allowed bg-emerald-50/50' : ''}`}
+                        className={`w-24 bg-white border border-emerald-300 rounded-xl px-2.5 py-1.5 text-amber-900 font-black text-xs font-mono text-right focus:outline-none focus:border-emerald-500 `}
                       />
                     </div>
 
