@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { fetchStudents } from '../../services/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Award, Shield, Search, CheckCircle2, User, MapPin, Phone, Calendar,
@@ -58,6 +59,20 @@ export default function GradingRegistration() {
   const [lookupMessage, setLookupMessage] = useState(null);
   const [multipleMatches, setMultipleMatches] = useState([]);
   const [beltFeeMap, setBeltFeeMap] = useState(getStoredBeltFees());
+  const [allStudentsCache, setAllStudentsCache] = useState([]);
+  const searchDebounceRef = useRef(null);
+  const currentSearchQueryRef = useRef('');
+
+  // Pre-load all students from backend on mount for 0ms instant search
+  useEffect(() => {
+    let isMounted = true;
+    fetchStudents().then(list => {
+      if (isMounted && list && list.length > 0) {
+        setAllStudentsCache(list);
+      }
+    }).catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
 
   // Listen to Belt Fee settings updates
   useEffect(() => {
@@ -182,82 +197,115 @@ export default function GradingRegistration() {
     const q = (queryVal || searchQuery).trim();
     if (!q || q.length < 2) return;
 
+    currentSearchQueryRef.current = q;
     setIsSearching(true);
     setLookupMessage(null);
     setMultipleMatches([]);
 
-    let matches = [];
     const qDigits = cleanDigits(q);
+    const qLower = q.toLowerCase().trim();
+    const qLowerNoPunct = qLower.replace(/[^a-z0-9]/g, '');
 
-    // 1. Try Backend API
-    const urlsToTry = [
-      `https://bama-club-api.fly.dev/api/grading-registrations/lookup-student/?query=${encodeURIComponent(q)}`,
-      `https://bama-club-api.fly.dev/api/students/?search=${encodeURIComponent(q)}`,
-      `https://bama-club-api.fly.dev/api/students/`
-    ];
+    let candidatePool = [];
 
-    for (const url of urlsToTry) {
+    // 1. In-memory / preloaded cache
+    if (allStudentsCache && allStudentsCache.length > 0) {
+      candidatePool = candidatePool.concat(allStudentsCache);
+    }
+
+    // 2. Resilient fetchStudents if cache is empty
+    if (candidatePool.length === 0) {
       try {
-        const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-        if (response.ok) {
-          const resData = await response.json();
-          const foundItems = resData.results || (Array.isArray(resData) ? resData : (resData.found ? [resData] : []));
-          foundItems.forEach(item => {
-            if (item.name || item.student_name) {
-              const itemPhone = cleanDigits(item.phone || item.whatsapp || item.mobile);
-              const itemAdm = String(item.admission_no || item.admissionNo || '').toLowerCase().trim();
-              const itemName = String(item.name || item.student_name || '').toLowerCase().trim();
-              const qLower = q.toLowerCase().trim();
-
-              const phoneMatches = qDigits.length >= 7 && (itemPhone.includes(qDigits) || (qDigits.length >= 10 && itemPhone.slice(-10) === qDigits.slice(-10)));
-              const admMatches = itemAdm && (itemAdm === qLower || itemAdm.includes(qLower));
-              const nameMatches = itemName && (itemName === qLower || itemName.includes(qLower));
-
-              if (phoneMatches || admMatches || nameMatches) {
-                if (!matches.some(m => (m.admission_no || m.admissionNo) === (item.admission_no || item.admissionNo) && (m.name || m.student_name) === (item.name || item.student_name))) {
-                  matches.push({
-                    ...item,
-                    student_name: item.student_name || item.name,
-                    admission_no: item.admission_no || item.admissionNo
-                  });
-                }
-              }
-            }
-          });
-          if (matches.length > 0) break;
+        const fetched = await fetchStudents();
+        if (fetched && fetched.length > 0) {
+          candidatePool = candidatePool.concat(fetched);
+          setAllStudentsCache(fetched);
         }
       } catch (e) {}
     }
 
-    // 2. Local Storage Search
+    // 3. Direct Backend API search on Fly.io
     try {
-      const localRaw = localStorage.getItem('bama_cadets_roster') || localStorage.getItem('bama_students') || localStorage.getItem('bama_cadets');
-      if (localRaw) {
-        const list = JSON.parse(localRaw);
-        if (Array.isArray(list)) {
-          list.forEach(s => {
-            const sPhone = cleanDigits(s.phone || s.whatsapp || s.mobile);
-            const sAdm = String(s.admission_no || s.admissionNo || '').toLowerCase().trim();
-            const sName = String(s.name || s.student_name || '').toLowerCase().trim();
-            const qLower = q.toLowerCase().trim();
-
-            const phoneMatches = qDigits.length >= 7 && (sPhone.includes(qDigits) || (qDigits.length >= 10 && sPhone.slice(-10) === qDigits.slice(-10)));
-            const admMatches = sAdm && (sAdm === qLower || sAdm.includes(qLower));
-            const nameMatches = sName && (sName === qLower || sName.includes(qLower));
-
-            if (phoneMatches || admMatches || nameMatches) {
-              if (!matches.some(m => (m.admission_no || m.admissionNo) === (s.admission_no || s.admissionNo) && (m.name || m.student_name) === (s.name || s.student_name))) {
-                matches.push({
-                  ...s,
-                  student_name: s.name || s.student_name,
-                  admission_no: s.admission_no || s.admissionNo
-                });
-              }
-            }
-          });
+      const url = `https://bama-club-backend.fly.dev/api/students/?search=${encodeURIComponent(q)}`;
+      const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+      if (response.ok) {
+        const resData = await response.json();
+        const foundItems = resData.results || (Array.isArray(resData) ? resData : (resData.found ? [resData] : []));
+        if (foundItems && foundItems.length > 0) {
+          candidatePool = candidatePool.concat(foundItems);
         }
       }
     } catch (e) {}
+
+    // 4. Local Storage Search fallback
+    try {
+      const keys = ['bama_cadets_roster', 'bama_students', 'bama_cadets', 'bama_all_students'];
+      for (const k of keys) {
+        const localRaw = localStorage.getItem(k);
+        if (localRaw) {
+          const parsed = JSON.parse(localRaw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            candidatePool = candidatePool.concat(parsed);
+          }
+        }
+      }
+    } catch (e) {}
+
+    // Deduplicate and filter matches
+    const matches = [];
+    const seenIds = new Set();
+
+    candidatePool.forEach(item => {
+      if (!item || (!item.name && !item.student_name)) return;
+      const sId = String(item.id || item.student_id || item.admission_no || item.admissionNo || item.name).toLowerCase();
+      if (seenIds.has(sId)) return;
+
+      const itemPhone = cleanDigits(item.phone || item.whatsapp || item.mobile || item.contact || item.phoneNumber);
+      const itemAdm = String(item.admission_no || item.admissionNo || item.reg_no || item.registration_no || '').toLowerCase().trim();
+      const itemAdmNoPunct = itemAdm.replace(/[^a-z0-9]/g, '');
+      const itemName = String(item.name || item.student_name || '').toLowerCase().trim();
+
+      // Phone match (clean 10-digit comparison or substring)
+      let phoneMatches = false;
+      if (qDigits.length >= 7) {
+        const q10 = qDigits.slice(-10);
+        const s10 = itemPhone.slice(-10);
+        phoneMatches = (
+          itemPhone.includes(qDigits) ||
+          qDigits.includes(itemPhone) ||
+          (q10.length === 10 && s10.length === 10 && q10 === s10)
+        );
+      }
+
+      // Admission No match
+      let admMatches = false;
+      if (itemAdm) {
+        admMatches = (
+          itemAdm === qLower ||
+          itemAdm.includes(qLower) ||
+          (qLowerNoPunct.length >= 3 && itemAdmNoPunct.includes(qLowerNoPunct)) ||
+          (qDigits.length >= 3 && itemAdm.includes(qDigits))
+        );
+      }
+
+      // Name match
+      let nameMatches = false;
+      if (itemName && qLower.length >= 3) {
+        nameMatches = itemName === qLower || itemName.includes(qLower);
+      }
+
+      if (phoneMatches || admMatches || nameMatches) {
+        seenIds.add(sId);
+        matches.push({
+          ...item,
+          student_name: item.student_name || item.name,
+          admission_no: item.admission_no || item.admissionNo || ''
+        });
+      }
+    });
+
+    // Ignore if query changed while fetching
+    if (currentSearchQueryRef.current !== q) return;
 
     if (matches.length === 1) {
       setMultipleMatches([]);
@@ -284,6 +332,7 @@ export default function GradingRegistration() {
 
   const handleStudentSearch = (e) => {
     e?.preventDefault();
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     performSearch(searchQuery);
   };
 
@@ -291,8 +340,29 @@ export default function GradingRegistration() {
   const handleSearchInputChange = (e) => {
     const val = e.target.value;
     setSearchQuery(val);
-    if (val.trim().length >= 2) {
+    if (lookupMessage && lookupMessage.type === 'error') {
+      setLookupMessage(null);
+    }
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    const qClean = cleanDigits(val);
+    if (qClean.length === 10) {
       performSearch(val);
+      return;
+    }
+
+    if (val.trim().toLowerCase().startsWith('bama-') && val.trim().length >= 8) {
+      performSearch(val);
+      return;
+    }
+
+    if (val.trim().length >= 3) {
+      searchDebounceRef.current = setTimeout(() => {
+        performSearch(val);
+      }, 500);
     }
   };
 
@@ -352,7 +422,7 @@ export default function GradingRegistration() {
     };
 
     try {
-      const res = await fetch('https://bama-club-api.fly.dev/api/grading-registrations/', {
+      const res = await fetch('https://bama-club-backend.fly.dev/api/grading-registrations/', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -369,6 +439,10 @@ export default function GradingRegistration() {
         try {
           const existing = JSON.parse(localStorage.getItem('bama_online_exam_registrations') || '[]');
           localStorage.setItem('bama_online_exam_registrations', JSON.stringify([createdData, ...existing]));
+          const existingCandidates = JSON.parse(localStorage.getItem('bama_grading_candidates') || '[]');
+          localStorage.setItem('bama_grading_candidates', JSON.stringify([createdData, ...existingCandidates]));
+          window.dispatchEvent(new Event('bama_data_updated'));
+          window.dispatchEvent(new Event('bama_cadets_updated'));
         } catch (e) {}
 
         setIsSubmitting(false);
