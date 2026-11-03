@@ -7,7 +7,7 @@ import {
   Download, Printer, FileSpreadsheet, CreditCard
 } from 'lucide-react';
 import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage } from '../../services/api';
-import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS } from '../../services/initialData';
+import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS, getBranchKeyFromStr } from '../../services/initialData';
 
 export default function BranchManagement() {
   const navigate = useNavigate();
@@ -716,6 +716,26 @@ export default function BranchManagement() {
       (b.address || '').toLowerCase().includes(q)
     );
   });
+
+  // Match shift/schedule to a specific branch robustly
+  const isShiftBelongingToBranch = (s, branchObjOrName) => {
+    if (!s || !branchObjOrName) return false;
+    const bName = typeof branchObjOrName === 'object' ? String(branchObjOrName.name || '').trim() : String(branchObjOrName).trim();
+    const bId = typeof branchObjOrName === 'object' ? String(branchObjOrName.id || '').trim().toLowerCase() : '';
+
+    const sBranch = String(s.branch || s.branch_name || '').trim();
+    const sId = String(s.branch_id || '').trim().toLowerCase();
+
+    if (bId && sId && bId === sId) return true;
+    if (bName.toLowerCase() === sBranch.toLowerCase()) return true;
+
+    // Use canonical branch key matching from initialData.js (e.g. 'feroke' != 'ganapath', 'pulikkal' != 'kickboxing')
+    const sKey = getBranchKeyFromStr(sBranch);
+    const bKey = getBranchKeyFromStr(bName);
+    if (sKey && bKey && sKey === bKey) return true;
+
+    return false;
+  };
 
   const filteredSchedules = schedules.filter(s => {
     const q = search.toLowerCase();
