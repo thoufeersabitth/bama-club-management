@@ -582,35 +582,45 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         return false;
       });
 
-      // LIVE REAL-TIME BELT SYNC: Always prioritize student's current belt from academy database!
-      const liveCurrentBelt = candidateStudent?.currentBelt || candidateStudent?.current_belt || r.current_belt || 'White Belt';
-      const liveTargetBelt = getNextTargetBelt(liveCurrentBelt);
+      // PRESERVE SUBMITTED REGISTRATION APPLICATION DETAILS:
+      // If student submitted an official application, respect what they applied for!
+      const submittedCurrentBelt = r.current_belt || candidateStudent?.currentBelt || candidateStudent?.current_belt || 'White Belt';
+      const submittedTargetBelt = r.target_belt || getNextTargetBelt(submittedCurrentBelt);
       
-      const targetLower = liveTargetBelt.toLowerCase();
+      const targetLower = String(submittedTargetBelt || '').toLowerCase();
       let dynamicFormType = r.form_type;
-      if (['black', 'dan', 'shodan', 'nidan', 'sandan'].some(t => targetLower.includes(t))) {
-        dynamicFormType = 'JAPAN_DIRECT_BLACK_BELT';
-      } else if (['brown-3', 'brown 3', 'brown-2', 'brown 2', 'brown-1', 'brown 1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => targetLower.includes(t))) {
-        dynamicFormType = 'JKK_BROWN';
-      } else {
-        dynamicFormType = 'JKK_WHITE_TO_BROWN_4';
+      if (!dynamicFormType) {
+        if (['black', 'dan', 'shodan', 'nidan', 'sandan'].some(t => targetLower.includes(t))) {
+          dynamicFormType = 'JAPAN_DIRECT_BLACK_BELT';
+        } else if (['brown-3', 'brown 3', 'brown-2', 'brown 2', 'brown-1', 'brown 1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => targetLower.includes(t))) {
+          dynamicFormType = 'JKK_BROWN';
+        } else {
+          dynamicFormType = 'JKK_WHITE_TO_BROWN_4';
+        }
       }
 
-      const calculatedFee = getExamFeeForCandidate({ ...r, target_belt: liveTargetBelt, form_type: dynamicFormType });
-      const customFee = feeOverrides[r.id] !== undefined ? feeOverrides[r.id] : (r.custom_exam_fee !== undefined ? r.custom_exam_fee : calculatedFee);
+      const calculatedFee = getExamFeeForCandidate({ ...r, target_belt: submittedTargetBelt, form_type: dynamicFormType });
+      const customFee = feeOverrides[r.id] !== undefined 
+        ? feeOverrides[r.id] 
+        : (r.custom_exam_fee !== undefined && r.custom_exam_fee !== null
+          ? r.custom_exam_fee 
+          : (r.exam_fee !== undefined && r.exam_fee !== null && r.exam_fee !== ''
+            ? Number(r.exam_fee) 
+            : calculatedFee));
       const customPayment = paymentOverrides[r.id] || r.payment_status;
 
       const candPhoto = r.photo || r.photoUrl || r.avatar || r.profile_photo || r.image || r.img || candidateStudent?.photo || candidateStudent?.avatar || candidateStudent?.photoUrl || candidateStudent?.profile_photo || candidateStudent?.image || candidateStudent?.img;
 
       return {
         ...r,
-        current_belt: liveCurrentBelt,
-        target_belt: liveTargetBelt,
+        student_db_id: r.student || candidateStudent?.id,
+        current_belt: submittedCurrentBelt,
+        target_belt: submittedTargetBelt,
         form_type: dynamicFormType,
         photo: candPhoto,
         payment_status: customPayment || 'Pending',
-        exam_fee: customFee !== undefined ? customFee : (r.exam_fee && r.exam_fee !== 1000 ? r.exam_fee : calculatedFee),
-        applied_fee: customFee !== undefined ? customFee : (r.exam_fee && r.exam_fee !== 1000 ? r.exam_fee : calculatedFee)
+        exam_fee: customFee,
+        applied_fee: customFee
       };
     });
 
@@ -935,19 +945,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       const stId = realStudent ? realStudent.id : (c.student_db_id || c.db_id);
 
       const newCurrentBelt = c.target_belt;
-      const nextTargetBelt = getFeeForBelt ? (
-        newCurrentBelt.includes('White') ? 'Yellow Belt' :
-        newCurrentBelt.includes('Yellow') ? 'Orange Belt' :
-        newCurrentBelt.includes('Orange') ? 'Blue Belt' :
-        newCurrentBelt.includes('Blue') ? 'Green Belt' :
-        newCurrentBelt.includes('Green') ? 'Purple Belt' :
-        newCurrentBelt.includes('Purple') ? 'Brown Belt (4th Kyu)' :
-        newCurrentBelt.includes('Brown Belt (4th Kyu)') ? 'Brown Belt (3rd Kyu)' :
-        newCurrentBelt.includes('Brown Belt (3rd Kyu)') ? 'Brown Belt (2nd Kyu)' :
-        newCurrentBelt.includes('Brown Belt (2nd Kyu)') ? 'Brown Belt (1st Kyu)' :
-        newCurrentBelt.includes('Brown Belt (1st Kyu)') ? 'Black Belt (1st Dan)' : '2nd Dan Candidate'
-      ) : 'Orange Belt';
-
+      const nextTargetBelt = getNextTargetBelt(newCurrentBelt);
       const nextExamFee = getFeeForBelt(nextTargetBelt);
 
       // 1. Instant local React state & localStorage update (0 ms response)
