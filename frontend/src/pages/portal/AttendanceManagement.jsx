@@ -502,25 +502,35 @@ export default function AttendanceManagement() {
     const shiftsSet = new Set();
     const activeBranchFilter = selectedBranch !== 'All' ? selectedBranch : null;
 
-    // 1. Shifts from students in this branch (strictly filtered to this branch)
+    const cleanShiftName = (sh) => {
+      if (!sh) return '';
+      return String(sh)
+        .replace(/\bSET\b/g, 'Sat')
+        .replace(/\bset\b/g, 'Sat')
+        .trim();
+    };
+
+    // 1. Configured branch timings / custom shifts for this branch (Primary Source)
+    const dynamicOptions = getDynamicShiftOptions(activeBranchFilter, null, branchesList);
+    dynamicOptions.forEach(sh => {
+      const cleanSh = cleanShiftName(sh);
+      if (cleanSh && cleanSh !== 'undefined' && cleanSh !== 'null' && cleanSh !== 'All') {
+        if (isShiftCompatibleWithBranch(cleanSh, activeBranchFilter)) {
+          shiftsSet.add(cleanSh);
+        }
+      }
+    });
+
+    // 2. Student shifts: only add if not already covered by one of the configured shifts
     const branchStudents = activeBranchFilter 
       ? students.filter(s => isStudentInBranch(s, activeBranchFilter))
       : students;
 
     branchStudents.forEach(s => {
-      const sh = String(s.shift || s.dojoShift || s.batch || '').trim();
+      const sh = cleanShiftName(s.shift || s.dojoShift || s.batch || '');
       if (sh && sh !== 'undefined' && sh !== 'null' && sh !== 'All') {
-        if (isShiftCompatibleWithBranch(sh, activeBranchFilter)) {
-          shiftsSet.add(sh);
-        }
-      }
-    });
-
-    // 2. Configured branch timings / custom shifts for this branch
-    const dynamicOptions = getDynamicShiftOptions(activeBranchFilter, null, branchesList);
-    dynamicOptions.forEach(sh => {
-      if (sh && sh !== 'undefined' && sh !== 'null' && sh !== 'All') {
-        if (isShiftCompatibleWithBranch(sh, activeBranchFilter)) {
+        const covered = Array.from(shiftsSet).some(target => matchesShift(sh, target));
+        if (!covered && isShiftCompatibleWithBranch(sh, activeBranchFilter)) {
           shiftsSet.add(sh);
         }
       }

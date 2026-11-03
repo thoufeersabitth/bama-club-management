@@ -150,21 +150,29 @@ export const matchesShift = (studentShift, targetShift) => {
   // 1. Direct exact match
   if (s === t) return true;
 
-  // 2. If student shift contains full target shift
-  if (s.includes(t)) return true;
+  // 2. Girls Batch Strict Isolation: Girls batch only matches girls batch, never general batches!
+  const sIsGirls = s.includes('girl');
+  const tIsGirls = t.includes('girl');
+  if (sIsGirls !== tIsGirls) return false;
 
-  // 3. Day keywords check
-  const daysList = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-  const tDays = daysList.filter(d => t.includes(d));
-  const sDays = daysList.filter(d => s.includes(d));
+  // 3. Extract Days (supporting 'set' as 'sat')
+  const extractDays = (str) => {
+    const low = str.toLowerCase();
+    const days = [];
+    if (low.includes('mon')) days.push('mon');
+    if (low.includes('tue')) days.push('tue');
+    if (low.includes('wed')) days.push('wed');
+    if (low.includes('thu')) days.push('thu');
+    if (low.includes('fri')) days.push('fri');
+    if (low.includes('sat') || low.includes('set')) days.push('sat');
+    if (low.includes('sun')) days.push('sun');
+    return days;
+  };
 
-  if (tDays.length > 0) {
-    if (sDays.length === 0) return false;
-    const shareDay = tDays.some(d => sDays.includes(d));
-    if (!shareDay) return false;
-  }
+  const tDays = extractDays(t);
+  const sDays = extractDays(s);
 
-  // 4. Time range check (e.g. 6:00 PM - 7:00 PM)
+  // 4. Extract Time range (e.g. 6:00 PM - 7:00 PM)
   const extractTime = (str) => {
     const match = str.match(/\d{1,2}:\d{2}\s*(?:AM|PM)\s*[-–—]\s*\d{1,2}:\d{2}\s*(?:AM|PM)/i);
     return match ? match[0].replace(/\s+/g, ' ').toLowerCase() : '';
@@ -173,17 +181,31 @@ export const matchesShift = (studentShift, targetShift) => {
   const tTime = extractTime(t);
   const sTime = extractTime(s);
 
-  if (tTime && sTime) {
-    if (tTime !== sTime) return false;
-  } else if (tTime && !sTime) {
-    return false;
-  }
+  // If both have time ranges and they don't match -> false
+  if (tTime && sTime && tTime !== sTime) return false;
 
-  if (tDays.length > 0 || tTime) {
+  // If both have days specified, they MUST share at least one day
+  if (tDays.length > 0 && sDays.length > 0) {
+    const shareDay = tDays.some(d => sDays.includes(d));
+    if (!shareDay) return false;
+    // If times are also present, they must match (checked above)
+    if (tTime && sTime) return tTime === sTime;
     return true;
   }
 
-  return s.includes(t);
+  // If one has days specified and the other doesn't, they are NOT the same batch
+  if (tDays.length > 0 && sDays.length === 0) return false;
+  if (sDays.length > 0 && tDays.length === 0) return false;
+
+  // If neither has days, but both have times
+  if (tTime && sTime && tTime === sTime) {
+    const sName = s.replace(sTime, '').replace(/[^a-z]/g, '');
+    const tName = t.replace(tTime, '').replace(/[^a-z]/g, '');
+    if (sName === tName || sName.includes(tName) || tName.includes(sName)) return true;
+    return false;
+  }
+
+  return s.includes(t) || t.includes(s);
 };
 
 // Helper to resolve active training shift schedules dynamically from Branch timings & custom schedules
@@ -364,7 +386,7 @@ export const INITIAL_BRANCHES = [
     email: "braveacademypkl@gmail.com",
     branch_head: "Sensei Abdul Rahman (5th Dan)",
     head: "Sensei Abdul Rahman (5th Dan)",
-    timings: "Mon, Thu: 6:00 PM - 7:00 PM | Tue, Fri: 6:00 PM - 7:00 PM",
+    timings: "Wed, Sat: 6:00 PM - 7:00 PM | Mon, Wed, Fri: 6:00 AM - 7:30 AM | PULIKKAL KARATE GIRLS BATCH (6:00 PM - 7:00 PM)",
     facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags", "❄️ AC Dojo Hall", "🏆 Tournament Sparring Ring"],
     status: "Active",
     isHeadOffice: true,
