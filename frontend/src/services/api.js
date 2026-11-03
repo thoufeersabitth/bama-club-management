@@ -3474,3 +3474,45 @@ export const fetchAdmissionInquiriesBackend = async () => {
   } catch (e) {}
   return [];
 };
+
+// Belt Exam Fee Master Synchronization via Fly.io PostgreSQL cms-config
+export const fetchBeltExamFeesBackend = async () => {
+  try {
+    const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const json = await res.json();
+      const configData = json?.data || json || {};
+      if (configData.belt_exam_fees && typeof configData.belt_exam_fees === 'object') {
+        return configData.belt_exam_fees;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to fetch belt exam fees from backend:', e);
+  }
+  return null;
+};
+
+export const saveBeltExamFeesBackend = async (feesMap) => {
+  if (!feesMap || typeof feesMap !== 'object') return false;
+  try {
+    const existingRes = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    const existingData = existingRes.ok ? await existingRes.json() : {};
+    const updatedData = { ...existingData, belt_exam_fees: feesMap };
+    const res = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(updatedData)
+    });
+    return res.ok;
+  } catch (e) {
+    console.error('Failed to sync belt exam fees to backend cms-config:', e);
+    return false;
+  }
+};
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchStudents } from '../../services/api';
+import { fetchStudents, fetchBeltExamFeesBackend } from '../../services/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Award, Shield, Search, CheckCircle2, User, MapPin, Phone, Calendar,
@@ -7,7 +7,7 @@ import {
   AlertCircle, Upload, Check, RefreshCw
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
-import { getStoredBeltFees, getFeeForBelt } from '../office/OfficeGrading';
+import { getStoredBeltFees, getFeeForBelt, DEFAULT_BELT_FEE_MAP } from '../office/OfficeGrading';
 
 export const NEXT_BELT_PROGRESSION_MAP = {
   'White Belt': 'Yellow Belt',
@@ -74,8 +74,18 @@ export default function GradingRegistration() {
     return () => { isMounted = false; };
   }, []);
 
-  // Listen to Belt Fee settings updates
+  // Listen to Belt Fee settings updates & fetch live fees from backend
   useEffect(() => {
+    fetchBeltExamFeesBackend().then(backendFees => {
+      if (backendFees && typeof backendFees === 'object' && Object.keys(backendFees).length > 0) {
+        const merged = { ...DEFAULT_BELT_FEE_MAP, ...backendFees };
+        setBeltFeeMap(merged);
+        try {
+          localStorage.setItem('bama_belt_fee_settings', JSON.stringify(merged));
+        } catch (e) {}
+      }
+    }).catch(() => {});
+
     const handleFeesUpdated = () => {
       setBeltFeeMap(getStoredBeltFees());
     };
@@ -114,7 +124,7 @@ export default function GradingRegistration() {
     instructor_reference_name: 'Sensei Abdul Rahman',
     instructor_reference_address: 'Pulikkal, Malappuram',
     instructor_reference_phone: '+91 95440 85442',
-    exam_fee: getFeeForBelt('Yellow Belt'),
+    exam_fee: getFeeForBelt('Yellow Belt', getStoredBeltFees()),
     payment_mode: 'UPI / GPay / PhonePe',
     transaction_id: '',
     parent_declaration: false
@@ -148,14 +158,14 @@ export default function GradingRegistration() {
     } else if (['brown-3', 'brown 3', 'brown-2', 'brown 2', 'brown-1', 'brown 1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => target.includes(t))) {
       newFormType = 'JKK_BROWN';
     }
-    const fee = getFeeForBelt(formData.target_belt);
+    const fee = getFeeForBelt(formData.target_belt, beltFeeMap);
 
     setFormData(prev => ({
       ...prev,
       form_type: newFormType,
       exam_fee: fee
     }));
-  }, [formData.target_belt]);
+  }, [formData.target_belt, beltFeeMap]);
 
   const [verifiedStudent, setVerifiedStudent] = useState(null);
 
@@ -165,7 +175,7 @@ export default function GradingRegistration() {
     if (!data) return;
     const currentBelt = data.current_belt || data.belt || data.currentBelt || 'White Belt';
     const nextTarget = data.target_belt || getNextTargetBelt(currentBelt);
-    const calcFee = getFeeForBelt(nextTarget);
+    const calcFee = getFeeForBelt(nextTarget, beltFeeMap);
 
     setVerifiedStudent(data);
     setLookupMessage(null);
@@ -208,36 +218,12 @@ export default function GradingRegistration() {
 
     let candidatePool = [];
 
-    // 1. In-memory / preloaded cache
+    // 1. In-memory / preloaded cache (0ms instant)
     if (allStudentsCache && allStudentsCache.length > 0) {
       candidatePool = candidatePool.concat(allStudentsCache);
     }
 
-    // 2. Resilient fetchStudents if cache is empty
-    if (candidatePool.length === 0) {
-      try {
-        const fetched = await fetchStudents();
-        if (fetched && fetched.length > 0) {
-          candidatePool = candidatePool.concat(fetched);
-          setAllStudentsCache(fetched);
-        }
-      } catch (e) {}
-    }
-
-    // 3. Direct Backend API search on Fly.io
-    try {
-      const url = `https://bama-club-backend.fly.dev/api/students/?search=${encodeURIComponent(q)}`;
-      const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-      if (response.ok) {
-        const resData = await response.json();
-        const foundItems = resData.results || (Array.isArray(resData) ? resData : (resData.found ? [resData] : []));
-        if (foundItems && foundItems.length > 0) {
-          candidatePool = candidatePool.concat(foundItems);
-        }
-      }
-    } catch (e) {}
-
-    // 4. Local Storage Search fallback
+    // 2. Local Storage Search fallback (0ms instant)
     try {
       const keys = ['bama_cadets_roster', 'bama_students', 'bama_cadets', 'bama_all_students'];
       for (const k of keys) {
@@ -250,6 +236,36 @@ export default function GradingRegistration() {
         }
       }
     } catch (e) {}
+
+    // 3. Direct Fast Backend API search on Fly.io (100ms targeted lookup)
+    try {
+      const searchTerms = [q];
+      if (qDigits && qDigits.length >= 7 && !searchTerms.includes(qDigits.slice(-10))) {
+        searchTerms.push(qDigits.slice(-10));
+      }
+      for (const term of searchTerms) {
+        const url = `https://bama-club-backend.fly.dev/api/students/?search=${encodeURIComponent(term)}`;
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+        if (response.ok) {
+          const resData = await response.json();
+          const foundItems = resData.results || (Array.isArray(resData) ? resData : (resData.found ? [resData] : []));
+          if (foundItems && foundItems.length > 0) {
+            candidatePool = candidatePool.concat(foundItems);
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 4. Background fetchStudents fallback if still empty
+    if (candidatePool.length === 0) {
+      try {
+        const fetched = await fetchStudents();
+        if (fetched && fetched.length > 0) {
+          candidatePool = candidatePool.concat(fetched);
+          setAllStudentsCache(fetched);
+        }
+      } catch (e) {}
+    }
 
     // Deduplicate and filter matches
     const matches = [];
@@ -373,7 +389,7 @@ export default function GradingRegistration() {
 
     if (name === 'current_belt') {
       const nextTarget = getNextTargetBelt(value);
-      const fee = getFeeForBelt(nextTarget);
+      const fee = getFeeForBelt(nextTarget, beltFeeMap);
       setFormData(prev => ({
         ...prev,
         current_belt: value,
@@ -912,23 +928,23 @@ export default function GradingRegistration() {
                 >
                   {formData.form_type === 'JKK_WHITE_TO_BROWN_4' ? (
                     <>
-                      <option value="Yellow Belt">Yellow Belt (9th Kyu - Fee: ₹{beltFeeMap['Yellow Belt'] || 500})</option>
-                      <option value="Orange Belt">Orange Belt (8th Kyu - Fee: ₹{beltFeeMap['Orange Belt'] || 600})</option>
-                      <option value="Green Belt">Green Belt (7th Kyu - Fee: ₹{beltFeeMap['Green Belt'] || 700})</option>
-                      <option value="Blue Belt">Blue Belt (6th Kyu - Fee: ₹{beltFeeMap['Blue Belt'] || 800})</option>
-                      <option value="Purple Belt">Purple Belt (5th Kyu - Fee: ₹{beltFeeMap['Purple Belt'] || 900})</option>
-                      <option value="Brown Belt (4th Kyu)">Brown Belt (4th Kyu - Fee: ₹{beltFeeMap['Brown Belt (4th Kyu)'] || 1000})</option>
+                      <option value="Yellow Belt">Yellow Belt (9th Kyu - Fee: ₹{beltFeeMap['Yellow Belt'] || DEFAULT_BELT_FEE_MAP['Yellow Belt'] || 1100})</option>
+                      <option value="Orange Belt">Orange Belt (8th Kyu - Fee: ₹{beltFeeMap['Orange Belt'] || DEFAULT_BELT_FEE_MAP['Orange Belt'] || 1300})</option>
+                      <option value="Green Belt">Green Belt (7th Kyu - Fee: ₹{beltFeeMap['Green Belt'] || DEFAULT_BELT_FEE_MAP['Green Belt'] || 1500})</option>
+                      <option value="Blue Belt">Blue Belt (6th Kyu - Fee: ₹{beltFeeMap['Blue Belt'] || DEFAULT_BELT_FEE_MAP['Blue Belt'] || 1700})</option>
+                      <option value="Purple Belt">Purple Belt (5th Kyu - Fee: ₹{beltFeeMap['Purple Belt'] || DEFAULT_BELT_FEE_MAP['Purple Belt'] || 1800})</option>
+                      <option value="Brown Belt (4th Kyu)">Brown Belt (4th Kyu - Fee: ₹{beltFeeMap['Brown Belt (4th Kyu)'] || DEFAULT_BELT_FEE_MAP['Brown Belt (4th Kyu)'] || 1900})</option>
                     </>
                   ) : formData.form_type === 'JKK_BROWN' ? (
                     <>
-                      <option value="Brown Belt (3rd Kyu)">Brown Belt - 3rd Kyu (Fee: ₹{beltFeeMap['Brown Belt (3rd Kyu)'] || 1000})</option>
-                      <option value="Brown Belt (2nd Kyu)">Brown Belt - 2nd Kyu (Fee: ₹{beltFeeMap['Brown Belt (2nd Kyu)'] || 1000})</option>
-                      <option value="Brown Belt (1st Kyu)">Brown Belt - 1st Kyu (Fee: ₹{beltFeeMap['Brown Belt (1st Kyu)'] || 1200})</option>
+                      <option value="Brown Belt (3rd Kyu)">Brown Belt - 3rd Kyu (Fee: ₹{beltFeeMap['Brown Belt (3rd Kyu)'] || DEFAULT_BELT_FEE_MAP['Brown Belt (3rd Kyu)'] || 2000})</option>
+                      <option value="Brown Belt (2nd Kyu)">Brown Belt - 2nd Kyu (Fee: ₹{beltFeeMap['Brown Belt (2nd Kyu)'] || DEFAULT_BELT_FEE_MAP['Brown Belt (2nd Kyu)'] || 2100})</option>
+                      <option value="Brown Belt (1st Kyu)">Brown Belt - 1st Kyu (Fee: ₹{beltFeeMap['Brown Belt (1st Kyu)'] || DEFAULT_BELT_FEE_MAP['Brown Belt (1st Kyu)'] || 2200})</option>
                     </>
                   ) : (
                     <>
-                      <option value="Black Belt (1st Dan)">Black Belt - 1st Dan (Fee: ₹{beltFeeMap['Black Belt (1st Dan)'] || 1500})</option>
-                      <option value="2nd Dan Candidate">Black Belt - 2nd Dan (Fee: ₹{beltFeeMap['2nd Dan Candidate'] || 2000})</option>
+                      <option value="Black Belt (1st Dan)">Black Belt - 1st Dan (Fee: ₹{beltFeeMap['Black Belt (1st Dan)'] || DEFAULT_BELT_FEE_MAP['Black Belt (1st Dan)'] || 2500})</option>
+                      <option value="2nd Dan Candidate">Black Belt - 2nd Dan (Fee: ₹{beltFeeMap['2nd Dan Candidate'] || DEFAULT_BELT_FEE_MAP['2nd Dan Candidate'] || 3000})</option>
                     </>
                   )}
                 </select>

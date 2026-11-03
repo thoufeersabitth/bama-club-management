@@ -5,23 +5,23 @@ import {
   Share2, Copy, Send, QrCode, Trash2
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
-import { fetchStudents, saveStoredStudents, openWhatsApp } from '../../services/api';
+import { fetchStudents, saveStoredStudents, openWhatsApp, fetchBeltExamFeesBackend, saveBeltExamFeesBackend } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const API_ROOT = 'https://bama-club-backend.fly.dev/api';
 
 export const DEFAULT_BELT_FEE_MAP = {
-  'Yellow Belt': 500,
-  'Orange Belt': 600,
-  'Green Belt': 700,
-  'Blue Belt': 800,
-  'Purple Belt': 900,
-  'Brown Belt (4th Kyu)': 1000,
-  'Brown Belt (3rd Kyu)': 1000,
-  'Brown Belt (2nd Kyu)': 1000,
-  'Brown Belt (1st Kyu)': 1200,
-  'Black Belt (1st Dan)': 1500,
-  '2nd Dan Candidate': 2000
+  'Yellow Belt': 1100,
+  'Orange Belt': 1300,
+  'Green Belt': 1500,
+  'Blue Belt': 1700,
+  'Purple Belt': 1800,
+  'Brown Belt (4th Kyu)': 1900,
+  'Brown Belt (3rd Kyu)': 2000,
+  'Brown Belt (2nd Kyu)': 2100,
+  'Brown Belt (1st Kyu)': 2200,
+  'Black Belt (1st Dan)': 2500,
+  '2nd Dan Candidate': 3000
 };
 
 export const getStoredBeltFees = () => {
@@ -34,11 +34,16 @@ export const getStoredBeltFees = () => {
   return DEFAULT_BELT_FEE_MAP;
 };
 
-export const saveStoredBeltFees = (newMap) => {
+export const saveStoredBeltFees = async (newMap) => {
   try {
     localStorage.setItem('bama_belt_fee_settings', JSON.stringify(newMap));
     window.dispatchEvent(new Event('bama_belt_fees_updated'));
   } catch (e) {}
+  try {
+    await saveBeltExamFeesBackend(newMap);
+  } catch (e) {
+    console.warn('Backend belt fee sync deferred:', e);
+  }
 };
 
 // Payment Status Overrides Persistence (Waterproof Tier 2)
@@ -81,22 +86,24 @@ export const getExamFeeForCandidate = (r) => {
   return getFeeForBelt(r.target_belt);
 };
 
-export const getFeeForBelt = (beltName) => {
-  const currentMap = getStoredBeltFees();
-  if (currentMap[beltName] !== undefined && currentMap[beltName] !== null) {
+export const getFeeForBelt = (beltName, customMap = null) => {
+  const currentMap = customMap || getStoredBeltFees();
+  if (currentMap && currentMap[beltName] !== undefined && currentMap[beltName] !== null) {
     return Number(currentMap[beltName]);
   }
   const targetLower = String(beltName || '').toLowerCase();
-  if (targetLower.includes('yellow')) return Number(currentMap['Yellow Belt'] ?? 500);
-  if (targetLower.includes('orange')) return Number(currentMap['Orange Belt'] ?? 600);
-  if (targetLower.includes('green')) return Number(currentMap['Green Belt'] ?? 800);
-  if (targetLower.includes('blue')) return Number(currentMap['Blue Belt'] ?? 700);
-  if (targetLower.includes('purple')) return Number(currentMap['Purple Belt'] ?? 900);
-  if (targetLower.includes('brown-1') || targetLower.includes('1st kyu')) return Number(currentMap['Brown Belt (1st Kyu)'] ?? 1200);
-  if (targetLower.includes('brown-2') || targetLower.includes('2nd kyu')) return Number(currentMap['Brown Belt (2nd Kyu)'] ?? 1000);
-  if (targetLower.includes('brown-3') || targetLower.includes('3rd kyu')) return Number(currentMap['Brown Belt (3rd Kyu)'] ?? 1000);
-  if (targetLower.includes('brown')) return Number(currentMap['Brown Belt (4th Kyu)'] ?? 1000);
-  return 500;
+  if (targetLower.includes('yellow')) return Number(currentMap['Yellow Belt'] ?? 1100);
+  if (targetLower.includes('orange')) return Number(currentMap['Orange Belt'] ?? 1300);
+  if (targetLower.includes('green')) return Number(currentMap['Green Belt'] ?? 1500);
+  if (targetLower.includes('blue')) return Number(currentMap['Blue Belt'] ?? 1700);
+  if (targetLower.includes('purple')) return Number(currentMap['Purple Belt'] ?? 1800);
+  if (targetLower.includes('brown-1') || targetLower.includes('1st kyu')) return Number(currentMap['Brown Belt (1st Kyu)'] ?? 2200);
+  if (targetLower.includes('brown-2') || targetLower.includes('2nd kyu')) return Number(currentMap['Brown Belt (2nd Kyu)'] ?? 2100);
+  if (targetLower.includes('brown-3') || targetLower.includes('3rd kyu')) return Number(currentMap['Brown Belt (3rd Kyu)'] ?? 2000);
+  if (targetLower.includes('brown')) return Number(currentMap['Brown Belt (4th Kyu)'] ?? 1900);
+  if (targetLower.includes('black') || targetLower.includes('1st dan')) return Number(currentMap['Black Belt (1st Dan)'] ?? 2500);
+  if (targetLower.includes('2nd dan')) return Number(currentMap['2nd Dan Candidate'] ?? 3000);
+  return 1100;
 };
 
 export const getNextTargetBelt = (currentBelt) => {
@@ -142,6 +149,17 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
   const [unpaidBulkList, setUnpaidBulkList] = useState([]);
 
   useEffect(() => {
+    // 1. Fetch latest master belt exam fees from backend cms-config
+    fetchBeltExamFeesBackend().then(backendFees => {
+      if (backendFees && typeof backendFees === 'object' && Object.keys(backendFees).length > 0) {
+        const merged = { ...DEFAULT_BELT_FEE_MAP, ...backendFees };
+        setBeltFeeSettings(merged);
+        try {
+          localStorage.setItem('bama_belt_fee_settings', JSON.stringify(merged));
+        } catch (e) {}
+      }
+    }).catch(() => {});
+
     const handleBeltFeesUpdated = () => {
       setBeltFeeSettings(getStoredBeltFees());
     };
@@ -1908,10 +1926,10 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    saveStoredBeltFees(beltFeeSettings);
+                  onClick={async () => {
+                    await saveStoredBeltFees(beltFeeSettings);
                     setShowBeltFeeModal(false);
-                    alert('✓ Master Belt Promotion Exam Fees updated & synced system-wide!');
+                    alert('✓ Master Belt Promotion Exam Fees updated & synced to cloud backend system-wide!');
                   }}
                   className="px-6 py-2 bg-gradient-to-r from-amber-600 via-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-black rounded-xl text-xs shadow-lg shadow-amber-600/25 flex items-center gap-2 transform hover:-translate-y-0.5 transition cursor-pointer"
                 >
