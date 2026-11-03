@@ -6,7 +6,7 @@ const API_BASE = 'https://bama-club-backend.fly.dev/api';
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 4000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
@@ -884,8 +884,160 @@ let _schedulesCache = null;
 let _schedulesCacheTime = 0;
 const CACHE_TTL_MS = 60000; // 60 seconds fast cache
 
+
+// Authoritative BAMA Branches UUID Map for PostgreSQL Integrity
+export const AUTHORITATIVE_BRANCH_UUIDS = {
+  'pulikkal': 'c6602171-1875-4e80-ae06-ccdaf8dd3d2e',
+  'head office': 'c6602171-1875-4e80-ae06-ccdaf8dd3d2e',
+  'chungam': 'e2dd8c32-3073-44f7-9e8b-0143bfa76a86',
+  'airport': '6eccd83a-471e-49cf-b6f6-40d0ea7d5e32',
+  'koonol': '4d38ae92-3eff-4eeb-b244-9b19dd0de186',
+  'neerad': 'af13fe03-4a60-4c2e-991f-d22d6489317b',
+  'ansar': '0bde2093-e5a9-4194-9d51-b3df923f0f90',
+  'pengad': 'f7003ca2-3144-466e-8b28-d20701f63db4',
+  'btamup': 'f7003ca2-3144-466e-8b28-d20701f63db4',
+  'ganapath': '9aed244a-4818-454a-9002-cee4a48e8c5b',
+  'feroke': '3ba86860-141b-446f-99f4-83f7b8eaafe4',
+  'kanjiraparaba': '182c10b2-dafd-4300-bc25-e1748675cbda',
+  'gmlp': '182c10b2-dafd-4300-bc25-e1748675cbda',
+  'chanda': 'f1e4df64-aee9-4fdd-9958-b0555e8b08fe',
+  'gmup': 'f1e4df64-aee9-4fdd-9958-b0555e8b08fe',
+  'kick boxing': '3bf0add8-00bb-4de3-afa7-0ae857a81daa'
+};
+
+export const resolveAuthoritativeBranchId = (branchInput) => {
+  if (!branchInput) return 'c6602171-1875-4e80-ae06-ccdaf8dd3d2e';
+  const str = String(branchInput).trim();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) {
+    return str;
+  }
+  const lower = str.toLowerCase();
+  for (const [key, uuidVal] of Object.entries(AUTHORITATIVE_BRANCH_UUIDS)) {
+    if (lower.includes(key)) return uuidVal;
+  }
+  try {
+    const custom = JSON.parse(localStorage.getItem('bama_custom_branches') || '[]');
+    const match = custom.find(b => b.name?.toLowerCase() === lower || b.code?.toLowerCase() === lower);
+    if (match && match.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(match.id)) {
+      return match.id;
+    }
+  } catch (e) {}
+  return 'c6602171-1875-4e80-ae06-ccdaf8dd3d2e';
+};
+
+// Resilient Offline Queue & Auto-Sync Engine
+export const getPendingCadetCreations = () => {
+  try {
+    const raw = localStorage.getItem('bama_pending_cadet_creations');
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const savePendingCadetCreations = (list) => {
+  try {
+    if (!Array.isArray(list)) return;
+    localStorage.setItem('bama_pending_cadet_creations', JSON.stringify(list));
+  } catch (e) {}
+};
+
+export const syncPendingCadetsToServer = async (cadetsList = null) => {
+  const pending = cadetsList || getPendingCadetCreations();
+  if (!Array.isArray(pending) || pending.length === 0) return;
+
+  const remaining = [];
+  for (const cadet of pending) {
+    try {
+      const adm = cadet.admission_no || cadet.admissionNo;
+      if (adm) {
+        const checkRes = await fetchWithTimeout(`https://bama-club-backend.fly.dev/api/students/?search=${encodeURIComponent(adm)}`, {
+          headers: { 'Accept': 'application/json' }
+        }, 8000);
+        if (checkRes && checkRes.ok) {
+          const checkData = await checkRes.json();
+          const matches = checkData.results || (Array.isArray(checkData) ? checkData : []);
+          const existingOnServer = matches.find(m => String(m.admission_no).trim().toLowerCase() === String(adm).trim().toLowerCase());
+          if (existingOnServer) {
+            const current = getStoredStudents();
+            const updated = current.map(s => (s.admissionNo === adm || s.admission_no === adm ? { ...s, ...existingOnServer } : s));
+            safeLocalStorageSet('bama_students_list', JSON.stringify(updated));
+            continue;
+          }
+        }
+      }
+
+      const payload = { ...cadet };
+      if (payload.id && (!payload.id.includes('-') || String(payload.id).startsWith('std-'))) {
+        delete payload.id;
+      }
+      payload.branch = resolveAuthoritativeBranchId(payload.branch || payload.branch_id || payload.branch_name);
+
+      const postRes = await fetchWithTimeout('https://bama-club-backend.fly.dev/api/students/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      }, 12000);
+
+      if (postRes && (postRes.ok || postRes.status === 201)) {
+        const serverData = await postRes.json();
+        const current = getStoredStudents();
+        const updated = current.map(s => ((s.admissionNo === adm || s.admission_no === adm || s.id === cadet.id) ? { ...s, ...serverData } : s));
+        safeLocalStorageSet('bama_students_list', JSON.stringify(updated));
+      } else {
+        remaining.push(cadet);
+      }
+    } catch (e) {
+      remaining.push(cadet);
+    }
+  }
+
+  savePendingCadetCreations(remaining);
+  if (remaining.length === 0) {
+    invalidateStudentsCache();
+  }
+};
+
+export const getPendingFeePayments = () => {
+  try {
+    const raw = localStorage.getItem('bama_pending_fee_payments');
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+export const syncPendingFeesToServer = async () => {
+  try {
+    const pending = getPendingFeePayments();
+    if (!Array.isArray(pending) || pending.length === 0) return;
+
+    const remaining = [];
+    for (const fee of pending) {
+      try {
+        const res = await api.post('/fees/', fee, { timeout: 12000 });
+        if (!res || !res.data) remaining.push(fee);
+      } catch (e) {
+        remaining.push(fee);
+      }
+    }
+    localStorage.setItem('bama_pending_fee_payments', JSON.stringify(remaining));
+  } catch (e) {}
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    syncPendingCadetsToServer().catch(() => {});
+    syncPendingFeesToServer().catch(() => {});
+  });
+}
+
 // High-Speed Resilient HTTP Fetch with Strict Timeout (Prevents UI freezing on cold start)
-export const fetchWithTimeout = async (url, options = {}, timeoutMs = 4500) => {
+export const fetchWithTimeout = async (url, options = {}, timeoutMs = 12000) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -1092,7 +1244,8 @@ export const createStudent = async (data) => {
   const cadetFeeFreq = data.fee_frequency || data.feeFrequency || 'MONTHLY';
   const cadetPaidMonths = Array.isArray(data.paid_months) ? data.paid_months : (Array.isArray(data.paidMonths) ? data.paidMonths : []);
 
-  const branchVal = data.branch_id || data.branch || data.branch_name || '4d04730d-8de9-4a3f-9dc4-705b31ef2630';
+  const rawBranch = data.branch_id || data.branch || data.branch_name || 'Pulikkal Branch (Head Office)';
+  const authoritativeBranchId = resolveAuthoritativeBranchId(rawBranch);
   const branchName = data.branch_name || data.branchName || (typeof data.branch === 'string' && data.branch.length < 50 ? data.branch : 'Pulikkal Branch (Head Office)');
 
   const explicitProg = resolveDiscipline(data);
@@ -1117,7 +1270,7 @@ export const createStudent = async (data) => {
     course: explicitProg,
     discipline: explicitProg,
     medical_notes: taggedNotes,
-    branch: branchVal,
+    branch: authoritativeBranchId,
     shift: data.shift || 'Evening Batch (5:00 PM - 7:00 PM)',
     admission_fee: admFee,
     admission_fee_paid_amount: admPaid,
@@ -1140,65 +1293,83 @@ export const createStudent = async (data) => {
     payload.photo = await compressAndUploadCadetPhoto(payload.photo, cleanId);
   }
 
-  try {
-    const res = await fetch('https://bama-club-backend.fly.dev/api/students/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+  // Robust Retry Loop with 15s timeout
+  let serverCadet = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetchWithTimeout('https://bama-club-backend.fly.dev/api/students/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }, 15000);
 
-    if (res.ok) {
-      const serverCadet = await res.json();
-      const serverBranchName = serverCadet?.branch_name || serverCadet?.branch_detail?.name || branchName;
-      const serverBranchId = serverCadet?.branch_id || serverCadet?.branch_detail?.id || serverCadet?.branch || branchVal;
-      const adm = serverCadet?.admission_no || payload.admission_no;
-
-      const saved = {
-        ...payload,
-        ...serverCadet,
-        program: explicitProg,
-        course: explicitProg,
-        discipline: explicitProg,
-        id: serverCadet?.id || `std-${Date.now()}`,
-        admissionNo: adm,
-        admission_no: adm,
-        feeFrequency: cadetFeeFreq,
-        fee_frequency: cadetFeeFreq,
-        feeCycleMonths: cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1,
-        paidMonths: cadetPaidMonths,
-        paid_months: cadetPaidMonths,
-        admissionFee: admFee,
-        admission_fee: admFee,
-        admissionFeePaidAmount: admPaid,
-        admission_fee_paid_amount: admPaid,
-        admissionFeePaid: isAdmPaid,
-        admission_fee_paid: isAdmPaid,
-        branch: serverBranchName,
-        branch_id: serverBranchId,
-        branch_name: serverBranchName,
-        branchName: serverBranchName,
-        dojo_branch: serverBranchName
-      };
-
-      const latestList = getStoredStudents();
-      const updatedRoster = [saved, ...latestList.filter(s => String(s.id) !== String(saved.id) && String(s.admissionNo || s.admission_no) !== String(adm))];
-      saveStoredStudents(updatedRoster);
-      window.dispatchEvent(new Event('bama_data_updated'));
-      return saved;
-    } else {
-      const errText = await res.text();
-      console.error('Server error creating student:', res.status, errText);
+      if (res && (res.ok || res.status === 201)) {
+        serverCadet = await res.json();
+        break;
+      } else if (res) {
+        const errText = await res.text();
+        console.warn(`[createStudent] Attempt ${attempt + 1} server returned ${res.status}:`, errText);
+      }
+    } catch (err) {
+      console.warn(`[createStudent] Network attempt ${attempt + 1} failed:`, err);
     }
-  } catch (err) {
-    console.error('Network error creating student:', err);
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
   }
 
-  const newStudent = { id: `std-${Date.now()}`, ...payload };
+  if (serverCadet) {
+    const serverBranchName = serverCadet?.branch_name || serverCadet?.branch_detail?.name || branchName;
+    const serverBranchId = serverCadet?.branch_id || serverCadet?.branch_detail?.id || serverCadet?.branch || authoritativeBranchId;
+    const adm = serverCadet?.admission_no || payload.admission_no;
+
+    const saved = {
+      ...payload,
+      ...serverCadet,
+      program: explicitProg,
+      course: explicitProg,
+      discipline: explicitProg,
+      id: serverCadet?.id || `std-${Date.now()}`,
+      admissionNo: adm,
+      admission_no: adm,
+      feeFrequency: cadetFeeFreq,
+      fee_frequency: cadetFeeFreq,
+      feeCycleMonths: cadetFeeFreq === 'QUARTERLY' || cadetFeeFreq === '3_MONTHS' ? 3 : 1,
+      paidMonths: cadetPaidMonths,
+      paid_months: cadetPaidMonths,
+      admissionFee: admFee,
+      admission_fee: admFee,
+      admissionFeePaidAmount: admPaid,
+      admission_fee_paid_amount: admPaid,
+      admissionFeePaid: isAdmPaid,
+      admission_fee_paid: isAdmPaid,
+      branch: serverBranchName,
+      branch_id: serverBranchId,
+      branch_name: serverBranchName,
+      branchName: serverBranchName,
+      dojo_branch: serverBranchName
+    };
+
+    const latestList = getStoredStudents();
+    const updatedRoster = [saved, ...latestList.filter(s => String(s.id) !== String(saved.id) && String(s.admissionNo || s.admission_no) !== String(adm))];
+    saveStoredStudents(updatedRoster);
+    invalidateStudentsCache();
+    window.dispatchEvent(new Event('bama_data_updated'));
+    return saved;
+  }
+
+  // Offline fallback: save locally AND queue in pending sync queue
+  console.warn('[createStudent] Fly.io backend unreachable after 3 attempts. Saving locally & queuing for sync.');
+  const newStudent = { id: `std-${Date.now()}`, ...payload, _is_pending_sync: true };
   const latestList = getStoredStudents();
   saveStoredStudents([newStudent, ...latestList]);
+  
+  const pending = getPendingCadetCreations();
+  savePendingCadetCreations([...pending, newStudent]);
+
   window.dispatchEvent(new Event('bama_data_updated'));
   return newStudent;
 };

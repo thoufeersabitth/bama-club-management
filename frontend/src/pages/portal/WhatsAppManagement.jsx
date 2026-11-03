@@ -93,15 +93,24 @@ export default function WhatsAppManagement() {
   };
 
   useEffect(() => {
-    fetchStudents().then(data => {
-      if (data && data.length > 0) {
-        setStudents(data);
-        setSelectedStudentIds(data.map(s => s.id));
-      } else {
-        setStudents([]);
-        setSelectedStudentIds([]);
-      }
-    });
+    const loadWhatsAppCadets = () => {
+      fetchStudents().then(data => {
+        if (data && data.length > 0) {
+          setStudents(data);
+          setSelectedStudentIds(data.map(s => s.id));
+        } else {
+          setStudents([]);
+          setSelectedStudentIds([]);
+        }
+      });
+    };
+    loadWhatsAppCadets();
+    window.addEventListener('bama_data_updated', loadWhatsAppCadets);
+    window.addEventListener('storage', loadWhatsAppCadets);
+    return () => {
+      window.removeEventListener('bama_data_updated', loadWhatsAppCadets);
+      window.removeEventListener('storage', loadWhatsAppCadets);
+    };
   }, []);
 
   const firstSelectedStudent = students.find(s => selectedStudentIds.includes(s.id)) || students[0] || {};

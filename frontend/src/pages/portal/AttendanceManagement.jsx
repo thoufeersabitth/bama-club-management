@@ -193,13 +193,22 @@ export default function AttendanceManagement() {
 
   const monthlyStats = getMonthlyClassStats();
 
-  // 1. Fast Load students on mount (and update cache in background)
+  // 1. Fast Load students on mount & auto-refresh on roster updates
   useEffect(() => {
-    fetchStudents().then((data) => {
-      if (data && data.length > 0) {
-        setStudents(data);
-      }
-    });
+    const loadCadets = () => {
+      fetchStudents().then((data) => {
+        if (data && data.length > 0) {
+          setStudents(data);
+        }
+      });
+    };
+    loadCadets();
+    window.addEventListener('bama_data_updated', loadCadets);
+    window.addEventListener('storage', loadCadets);
+    return () => {
+      window.removeEventListener('bama_data_updated', loadCadets);
+      window.removeEventListener('storage', loadCadets);
+    };
   }, []);
 
 // Attendance and Day Status auto-synced above
