@@ -386,7 +386,7 @@ export const INITIAL_BRANCHES = [
     email: "braveacademypkl@gmail.com",
     branch_head: "Sensei Abdul Rahman (5th Dan)",
     head: "Sensei Abdul Rahman (5th Dan)",
-    timings: "Wed, Sat: 6:00 PM - 7:00 PM | Mon, Wed, Fri: 6:00 AM - 7:30 AM | PULIKKAL KARATE GIRLS BATCH (6:00 PM - 7:00 PM)",
+    timings: "Mon, Thu: 6:00 PM - 7:00 PM | Wed, Sat: 6:00 PM - 7:00 PM | Mon, Wed, Fri: 6:00 AM - 7:30 AM | PULIKKAL KARATE GIRLS BATCH (6:00 PM - 7:00 PM)",
     facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags", "❄️ AC Dojo Hall", "🏆 Tournament Sparring Ring"],
     status: "Active",
     isHeadOffice: true,
