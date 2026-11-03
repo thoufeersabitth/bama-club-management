@@ -81,9 +81,9 @@ export const saveStoredFeeOverride = (candidateId, fee) => {
   } catch (e) {}
 };
 
-export const getExamFeeForCandidate = (r) => {
+export const getExamFeeForCandidate = (r, customMap = null) => {
   if (r.custom_exam_fee !== undefined && r.custom_exam_fee !== null) return Number(r.custom_exam_fee);
-  return getFeeForBelt(r.target_belt);
+  return getFeeForBelt(r.target_belt, customMap);
 };
 
 export const getFeeForBelt = (beltName, customMap = null) => {
@@ -599,7 +599,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         }
       }
 
-      const calculatedFee = getExamFeeForCandidate({ ...r, target_belt: submittedTargetBelt, form_type: dynamicFormType });
+      const calculatedFee = getExamFeeForCandidate({ ...r, target_belt: submittedTargetBelt, form_type: dynamicFormType }, beltFeeSettings);
       const customFee = feeOverrides[r.id] !== undefined 
         ? feeOverrides[r.id] 
         : (r.custom_exam_fee !== undefined && r.custom_exam_fee !== null
@@ -2146,10 +2146,49 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                     <p className="flex justify-between"><strong className="text-gray-700">Karate Organization:</strong> <span className="font-black text-red-700">{c.jka_organization || 'JKA INDIA'}</span></p>
                   )}
 
-                  <p className="flex justify-between items-center pt-1 border-t border-amber-200">
-                    <strong className="text-gray-700">Exam Fee Amount:</strong> 
-                    <span className="font-mono font-black text-emerald-700 text-base">₹{c.exam_fee || getExamFeeForCandidate(c)} ({c.payment_mode || 'UPI'})</span>
-                  </p>
+                  {/* Payment Details & Fee Management Box */}
+                  <div className="pt-2 border-t border-amber-200/90 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="text-gray-700 text-xs font-bold">Exam Fee Amount:</strong>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-gray-500 font-mono">₹</span>
+                        <input
+                          type="number"
+                          value={c.exam_fee !== undefined ? c.exam_fee : getExamFeeForCandidate(c)}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 0;
+                            handleFeeChange(c.id, val);
+                            setViewFormCandidate(prev => prev ? { ...prev, exam_fee: val, applied_fee: val } : prev);
+                          }}
+                          className="w-24 px-2 py-1 bg-white border-2 border-emerald-500 rounded-xl text-emerald-700 font-black font-mono text-sm text-right shadow-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-200/60">
+                      <span className="text-gray-600 font-bold">Payment Status:</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const nextStatus = c.payment_status?.includes('Paid') ? 'Pending Payment' : 'Paid / Verified';
+                          await handlePaymentStatusChange(c.id, nextStatus);
+                          setViewFormCandidate(prev => prev ? { ...prev, payment_status: nextStatus } : prev);
+                        }}
+                        className={`px-2.5 py-1 rounded-xl text-[11px] font-black transition cursor-pointer flex items-center gap-1 border ${
+                          c.payment_status?.includes('Paid')
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                            : 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200'
+                        }`}
+                      >
+                        {c.payment_status?.includes('Paid') ? '✅ Verified Paid' : '⚠️ Mark as Paid'}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-0.5">
+                      <span>Payment Mode:</span>
+                      <span className="font-mono font-bold text-gray-800">{c.payment_mode || 'UPI / GPay / PhonePe'}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
