@@ -6,7 +6,7 @@ import {
   Sparkles, Eye, Camera, Upload, Image as ImageIcon, RefreshCw, Loader2,
   Download, Printer, FileSpreadsheet, CreditCard
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage, getBranchFeeSettings, updateBranchFeeSettings } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS, getBranchKeyFromStr } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -209,11 +209,13 @@ export default function BranchManagement() {
     loadAll();
     window.addEventListener('bama_data_updated', loadAll);
     window.addEventListener('bama_branches_updated', loadAll);
+    window.addEventListener('bama_fee_settings_updated', loadAll);
     window.addEventListener('bama_schedules_updated', loadAll);
     window.addEventListener('storage', loadAll);
     return () => {
       window.removeEventListener('bama_data_updated', loadAll);
       window.removeEventListener('bama_branches_updated', loadAll);
+      window.removeEventListener('bama_fee_settings_updated', loadAll);
       window.removeEventListener('bama_schedules_updated', loadAll);
       window.removeEventListener('storage', loadAll);
     };
@@ -252,6 +254,10 @@ export default function BranchManagement() {
         const updatedItem = {
           ...editBranch,
           ...formData,
+          monthly_fee: formData.monthly_fee,
+          monthlyFee: formData.monthly_fee,
+          admission_fee: formData.admission_fee,
+          admissionFee: formData.admission_fee,
           facilities: facilityArray,
           image: photoUrl,
           img: photoUrl,
@@ -263,6 +269,10 @@ export default function BranchManagement() {
           await saveBranchImageBackend(editBranch.id, photoUrl, updatedItem.code, updatedItem.name).catch(() => {});
         }
         await updateBranchBackend(editBranch.id, updatedItem).catch(() => {});
+        await updateBranchFeeSettings(editBranch.id, {
+          monthly_fee: formData.monthly_fee,
+          admission_fee: formData.admission_fee
+        }).catch(() => {});
 
         // 2. Update local state and storage
         updatedList = branches.map(b => b.id === editBranch.id ? updatedItem : b);
@@ -343,6 +353,10 @@ export default function BranchManagement() {
         const newB = {
           id: `branch-${Date.now()}`,
           ...formData,
+          monthly_fee: formData.monthly_fee,
+          monthlyFee: formData.monthly_fee,
+          admission_fee: formData.admission_fee,
+          admissionFee: formData.admission_fee,
           code: bCode,
           facilities: facilityArray,
           image: photoUrl,
@@ -361,6 +375,11 @@ export default function BranchManagement() {
         if (photoUrl && !photoUrl.startsWith('/assets/')) {
           await saveBranchImageBackend(finalId, photoUrl, bCode, formData.name).catch(() => {});
         }
+
+        await updateBranchFeeSettings(finalId, {
+          monthly_fee: formData.monthly_fee,
+          admission_fee: formData.admission_fee
+        }).catch(() => {});
 
         updatedList = [...branches.filter(b => b.id !== newB.id), { ...newB, id: finalId }];
         setBranches(updatedList);
@@ -576,6 +595,7 @@ export default function BranchManagement() {
   };
 
   const openEdit = (b) => {
+    const feeInfo = getBranchFeeSettings(b.id || b.name, branches);
     setEditBranch(b);
     setFormData({
       name: b.name || '',
@@ -590,8 +610,8 @@ export default function BranchManagement() {
       mapUrl: b.mapUrl || '',
       image: b.image || b.img || b.photo || '/assets/prog_adults.jpg',
       isHeadOffice: !!b.isHeadOffice,
-      monthly_fee: b.monthly_fee ?? b.monthlyFee ?? 500,
-      admission_fee: b.admission_fee ?? b.admissionFee ?? 1000
+      monthly_fee: feeInfo.monthlyFee ?? (b.monthly_fee ? parseInt(b.monthly_fee) : 500),
+      admission_fee: feeInfo.admissionFee ?? (b.admission_fee !== undefined && b.admission_fee !== null ? parseInt(b.admission_fee) : 1000)
     });
     setShowAddModal(true);
   };
@@ -1303,12 +1323,19 @@ export default function BranchManagement() {
                       <Shield className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
                       <span>Chief Instructor: {b.branch_head || 'Sensei Abdul Rahman (5th Dan)'}</span>
                     </p>
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-gray-700 bg-emerald-50/80 border border-emerald-200 px-2.5 py-1 rounded-xl mt-2">
-                      <CreditCard className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                      <span>Fee: <strong className="text-emerald-800">₹{b.monthly_fee || b.monthlyFee || 500}</strong>/mo</span>
-                      <span>•</span>
-                      <span>Adm: <strong className="text-amber-800">₹{b.admission_fee ?? b.admissionFee ?? 1000}</strong></span>
-                    </div>
+                    {(() => {
+                      const feeInfo = getBranchFeeSettings(b.id || b.name, branches);
+                      const mFee = feeInfo.monthlyFee ?? (b.monthly_fee ? parseInt(b.monthly_fee) : 500);
+                      const aFee = feeInfo.admissionFee ?? (b.admission_fee !== undefined && b.admission_fee !== null ? parseInt(b.admission_fee) : 1000);
+                      return (
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-gray-700 bg-emerald-50/80 border border-emerald-200 px-2.5 py-1 rounded-xl mt-2">
+                          <CreditCard className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                          <span>Fee: <strong className="text-emerald-800">₹{mFee}</strong>/mo</span>
+                          <span>•</span>
+                          <span>Adm: <strong className="text-amber-800">₹{aFee}</strong></span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Enrolled Cadets Pill */}

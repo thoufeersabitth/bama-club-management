@@ -502,6 +502,10 @@ export const INITIAL_BRANCHES = [
     facilities: ["🥋 Pro Karate Mats", "🥊 Focus Mitts & Shields"],
     status: "Active",
     isHeadOffice: false,
+    monthly_fee: 250,
+    monthlyFee: 250,
+    admission_fee: 600,
+    admissionFee: 600,
     mapUrl: "https://maps.google.com/?q=Airport+Malappuram"
   },
   {

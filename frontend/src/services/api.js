@@ -520,10 +520,55 @@ export const updateBranchFeeSettings = async (branchId, feeData) => {
     if (feeData.admission_fee !== undefined) payload.admission_fee = feeData.admission_fee;
     if (feeData.school_batch_fee !== undefined) payload.school_batch_fee = feeData.school_batch_fee;
 
-    // 1. Update backend if branchId is a valid UUID
+    // Resolve target backend UUID and branch names
+    let targetBackendId = (typeof branchId === 'string' && branchId.length > 20 && !branchId.startsWith('branch-')) ? branchId : null;
+    let matchedName = null;
+    let matchedCode = null;
+
     try {
-      await api.patch('/branches/' + branchId + '/', payload);
-    } catch (err) {}
+      const stored = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+      if (stored) {
+        const branches = JSON.parse(stored);
+        if (Array.isArray(branches)) {
+          const match = branches.find(b => b.id === branchId || b.name === branchId || b.code === branchId);
+          if (match) {
+            matchedName = match.name;
+            matchedCode = match.code;
+            if (!targetBackendId && typeof match.id === 'string' && match.id.length > 20 && !match.id.startsWith('branch-')) {
+              targetBackendId = match.id;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 1. Update backend if target UUID exists or can be resolved
+    if (targetBackendId) {
+      try {
+        await api.patch('/branches/' + targetBackendId + '/', payload);
+      } catch (err) {}
+    } else {
+      try {
+        const ac = new AbortController();
+        const timeout = setTimeout(() => ac.abort(), 4000);
+        const bRes = await fetch('https://bama-club-backend.fly.dev/api/branches/', { signal: ac.signal });
+        clearTimeout(timeout);
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          const list = bData.results || (Array.isArray(bData) ? bData : []);
+          const match = list.find(x => 
+            (x.id && String(x.id) === String(branchId)) ||
+            (x.code && String(x.code).toUpperCase() === String(branchId).toUpperCase()) ||
+            (x.name && String(x.name).toLowerCase() === String(branchId).toLowerCase()) ||
+            (matchedName && x.name && String(x.name).toLowerCase() === String(matchedName).toLowerCase())
+          );
+          if (match && match.id) {
+            targetBackendId = match.id;
+            await api.patch('/branches/' + targetBackendId + '/', payload).catch(() => {});
+          }
+        }
+      } catch (e) {}
+    }
 
     // 2. Update local custom branches
     try {
@@ -532,21 +577,37 @@ export const updateBranchFeeSettings = async (branchId, feeData) => {
         const branches = JSON.parse(stored);
         if (Array.isArray(branches)) {
           const updated = branches.map(b => {
-            if (b.id === branchId || b.name === branchId || b.code === branchId) {
-              return { ...b, ...payload, monthlyFee: payload.monthly_fee, admissionFee: payload.admission_fee };
+            const isMatch = b.id === branchId || 
+                            b.name === branchId || 
+                            b.code === branchId || 
+                            (targetBackendId && b.id === targetBackendId) || 
+                            (matchedName && b.name === matchedName);
+            if (isMatch) {
+              return { 
+                ...b, 
+                ...payload, 
+                monthlyFee: payload.monthly_fee ?? b.monthlyFee, 
+                monthly_fee: payload.monthly_fee ?? b.monthly_fee,
+                admissionFee: payload.admission_fee ?? b.admissionFee,
+                admission_fee: payload.admission_fee ?? b.admission_fee
+              };
             }
             return b;
           });
-          localStorage.setItem('bama_custom_branches', JSON.stringify(updated));
+          safeLocalStorageSet('bama_custom_branches', updated);
+          safeLocalStorageSet('bama_branches', updated);
         }
       }
     } catch (e) {}
 
-    // 3. Save to dedicated branch fees map
+    // 3. Save to dedicated branch fees map under ID, name, and UUID
     try {
       const storedMap = localStorage.getItem('bama_branch_fees_map');
       const map = storedMap ? JSON.parse(storedMap) : {};
       map[branchId] = { ...(map[branchId] || {}), ...feeData };
+      if (targetBackendId) map[targetBackendId] = { ...(map[targetBackendId] || {}), ...feeData };
+      if (matchedName) map[matchedName] = { ...(map[matchedName] || {}), ...feeData };
+      if (matchedCode) map[matchedCode] = { ...(map[matchedCode] || {}), ...feeData };
       localStorage.setItem('bama_branch_fees_map', JSON.stringify(map));
     } catch (e) {}
 
@@ -568,8 +629,14 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
     };
   }
 
+  const lookupKey = String(branchIdOrName).toLowerCase().trim();
+
   let matched = Array.isArray(branchesList) 
-    ? branchesList.find(b => b.id === branchIdOrName || b.name === branchIdOrName || b.code === branchIdOrName) 
+    ? branchesList.find(b => 
+        String(b.id || '').toLowerCase().trim() === lookupKey || 
+        String(b.name || '').toLowerCase().trim() === lookupKey || 
+        String(b.code || '').toLowerCase().trim() === lookupKey
+      ) 
     : null;
 
   if (!matched) {
@@ -578,7 +645,11 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
       if (stored) {
         const branches = JSON.parse(stored);
         if (Array.isArray(branches)) {
-          matched = branches.find(b => b.id === branchIdOrName || b.name === branchIdOrName || b.code === branchIdOrName);
+          matched = branches.find(b => 
+            String(b.id || '').toLowerCase().trim() === lookupKey || 
+            String(b.name || '').toLowerCase().trim() === lookupKey || 
+            String(b.code || '').toLowerCase().trim() === lookupKey
+          );
         }
       }
     } catch (e) {}
@@ -589,8 +660,15 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
     const storedMap = localStorage.getItem('bama_branch_fees_map');
     if (storedMap) {
       const map = JSON.parse(storedMap);
-      if (map[branchIdOrName] || (matched && map[matched.id]) || (matched && map[matched.name])) {
-        mappedFee = map[branchIdOrName] || (matched && map[matched.id]) || (matched && map[matched.name]) || {};
+      for (const [k, v] of Object.entries(map)) {
+        const kLow = String(k).toLowerCase().trim();
+        if (
+          k === branchIdOrName || 
+          kLow === lookupKey || 
+          (matched && (k === matched.id || kLow === String(matched.name || '').toLowerCase().trim() || kLow === String(matched.code || '').toLowerCase().trim()))
+        ) {
+          mappedFee = { ...mappedFee, ...v };
+        }
       }
     }
   } catch (e) {}
@@ -2012,8 +2090,16 @@ export const fetchBranches = async (forceRefresh = false) => {
                             ((b.is_head_office ?? b.isHeadOffice) ? '/assets/prog_adults.jpg' : '/assets/prog_kids.jpg');
             }
 
+            const feeInfo = getBranchFeeSettings(b.id || b.name, [b]);
+            const mFee = (b.monthly_fee !== undefined && b.monthly_fee !== null && !isNaN(parseInt(b.monthly_fee))) ? parseInt(b.monthly_fee) : feeInfo.monthlyFee;
+            const aFee = (b.admission_fee !== undefined && b.admission_fee !== null && !isNaN(parseInt(b.admission_fee))) ? parseInt(b.admission_fee) : feeInfo.admissionFee;
+
             branchMap.set(key, {
               ...b,
+              monthly_fee: mFee,
+              monthlyFee: mFee,
+              admission_fee: aFee,
+              admissionFee: aFee,
               isHeadOffice: b.is_head_office ?? b.isHeadOffice,
               head: b.branch_head || b.head,
               image: resolvedImg,
@@ -2129,6 +2215,12 @@ export const createBranchBackend = async (branchData, retryCount = 2) => {
     timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
     status: branchData.status || 'Active'
   };
+  if (branchData.monthly_fee !== undefined || branchData.monthlyFee !== undefined) {
+    payload.monthly_fee = branchData.monthly_fee ?? branchData.monthlyFee;
+  }
+  if (branchData.admission_fee !== undefined || branchData.admissionFee !== undefined) {
+    payload.admission_fee = branchData.admission_fee ?? branchData.admissionFee;
+  }
 
   try {
     const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_branch_ids') || '[]');
@@ -2208,6 +2300,12 @@ export const updateBranchBackend = async (id, branchData) => {
       timings: branchData.timings || 'Mon, Wed, Fri: 5:00 PM - 7:00 PM',
       status: branchData.status || 'Active'
     };
+    if (branchData.monthly_fee !== undefined || branchData.monthlyFee !== undefined) {
+      payload.monthly_fee = branchData.monthly_fee ?? branchData.monthlyFee;
+    }
+    if (branchData.admission_fee !== undefined || branchData.admissionFee !== undefined) {
+      payload.admission_fee = branchData.admission_fee ?? branchData.admissionFee;
+    }
     
     let targetBackendId = (typeof id === 'string' && id.length > 20) ? id : null;
     if (!targetBackendId) {
