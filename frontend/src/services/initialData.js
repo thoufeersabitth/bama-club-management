@@ -193,6 +193,15 @@ export const matchesShift = (studentShift, targetShift) => {
     return true;
   }
 
+  // Regular Dojo Timings tolerance for branch training batches:
+  if (s.includes('regular') || t.includes('regular')) {
+    const sClean = s.replace(/\([^)]*\)/g, '').replace(/regular.*$/i, '').trim();
+    const tClean = t.replace(/\([^)]*\)/g, '').replace(/regular.*$/i, '').trim();
+    if (!sClean || !tClean || sClean === tClean || sClean.includes(tClean) || tClean.includes(sClean)) {
+      return true;
+    }
+  }
+
   // If one has days specified and the other doesn't, they are NOT the same batch
   if (tDays.length > 0 && sDays.length === 0) return false;
   if (sDays.length > 0 && tDays.length === 0) return false;
@@ -402,7 +411,7 @@ export const INITIAL_BRANCHES = [
     email: "info@bama.org",
     branch_head: "Sensei Abdul Nafih",
     head: "Sensei Abdul Nafih",
-    timings: "Tue, Fri: 4:30 PM - 5:30 PM",
+    timings: "Fri: 4:00 PM - 5:00 PM",
     facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags"],
     status: "Active",
     isHeadOffice: false,
@@ -418,7 +427,7 @@ export const INITIAL_BRANCHES = [
     email: "info@bama.org",
     branch_head: "Sensei Abdul Nafih",
     head: "Sensei Abdul Nafih",
-    timings: "Sat: 3:30 PM - 4:30 PM",
+    timings: "Wed: 3:30 PM - 4:30 PM",
     facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags"],
     status: "Active",
     isHeadOffice: false,
@@ -450,7 +459,7 @@ export const INITIAL_BRANCHES = [
     email: "info@bama.org",
     branch_head: "Sensei Abdul Nafih",
     head: "Sensei Abdul Nafih",
-    timings: "Wed: 4:30 PM - 5:30 PM",
+    timings: "Fri: 10:00 AM - 11:30 AM | Wed: 4:30 PM - 5:30 PM",
     facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags"],
     status: "Active",
     isHeadOffice: false,
@@ -482,7 +491,7 @@ export const INITIAL_BRANCHES = [
     email: "info@bama.org",
     branch_head: "Sensei Abdul Nafih",
     head: "Sensei Abdul Nafih",
-    timings: "Sat: 4:30 PM - 5:30 PM",
+    timings: "Tue: 4:00 PM - 5:00 PM | Wed: 4:15 PM - 5:15 PM",
     facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags"],
     status: "Active",
     isHeadOffice: false,
@@ -534,7 +543,7 @@ export const INITIAL_BRANCHES = [
     email: "info@bama.org",
     branch_head: "Sensei Abdul Nafih",
     head: "Sensei Abdul Nafih",
-    timings: "Fri: 4:00 PM - 5:00 PM",
+    timings: "Fri: 9:00 AM - 10:00 AM",
     facilities: ["🥋 Tatami Safety Mats", "🥊 Punching Heavy Bags"],
     status: "Active",
     isHeadOffice: false,
