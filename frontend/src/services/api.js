@@ -681,7 +681,8 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
   const bNameStr = String(matched?.name || branchIdOrName || '').toLowerCase();
   const isDefaultSchool = bNameStr.includes('school') || bNameStr.includes('amlp') || bNameStr.includes('gmlp') || bNameStr.includes('ansar') || bNameStr.includes('btamup');
   const defaultMode = isDefaultSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY';
-  const rawMode = mappedFee.billing_mode || mappedFee.billingMode || matched?.billing_mode || matched?.billingMode || defaultMode;
+  const foundMode = mappedFee.billing_mode || mappedFee.billingMode || matched?.billing_mode || matched?.billingMode;
+  const rawMode = (foundMode === 'MONTHLY_ONLY' || foundMode === 'TERM_ONLY') ? foundMode : defaultMode;
 
   return {
     admissionFee: (rawAdm !== undefined && rawAdm !== null && !isNaN(parseInt(rawAdm))) ? parseInt(rawAdm) : (global.defaultAdmissionFee ?? 1000),

@@ -187,11 +187,25 @@ export default function StudentManagement() {
         admissionFee: g.defaultAdmissionFee ?? 1000,
         monthlyFee: g.defaultMonthlyFee ?? 500,
         schoolBatchFee: g.defaultSchoolBatchFee ?? 500,
-        billingMode: 'BOTH'
+        billingMode: 'MONTHLY_ONLY'
       });
     } else {
       const bFees = getBranchFeeSettings(branchVal, branchesList);
-      setBranchFeeData(bFees);
+      const isSchool = branchVal && (
+        String(branchVal).toLowerCase().includes('school') ||
+        String(branchVal).toLowerCase().includes('amlp') ||
+        String(branchVal).toLowerCase().includes('gmlp') ||
+        String(branchVal).toLowerCase().includes('ansar') ||
+        String(branchVal).toLowerCase().includes('btamup')
+      );
+      const cleanMode = (bFees.billingMode === 'MONTHLY_ONLY' || bFees.billingMode === 'TERM_ONLY')
+        ? bFees.billingMode
+        : (isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
+
+      setBranchFeeData({
+        ...bFees,
+        billingMode: cleanMode
+      });
     }
   };
   const [showInquiriesModal, setShowInquiriesModal] = useState(false);
@@ -1056,7 +1070,13 @@ export default function StudentManagement() {
               fee_amount: applicableRate,
               feeAmount: applicableRate,
               admission_fee: newAdm,
-              admissionFee: newAdm
+              admissionFee: newAdm,
+              billing_plan: isSchool ? 'SCHOOL_BATCH' : 'REGULAR',
+              billingPlan: isSchool ? 'SCHOOL_BATCH' : 'REGULAR',
+              fee_frequency: isSchool ? 'QUARTERLY' : 'MONTHLY',
+              feeFrequency: isSchool ? 'QUARTERLY' : 'MONTHLY',
+              fee_cycle_months: isSchool ? 3 : 1,
+              feeCycleMonths: isSchool ? 3 : 1
             }).catch(() => {});
           }
           return updatedObj;
@@ -1071,10 +1091,10 @@ export default function StudentManagement() {
       setShowGlobalFeeModal(false);
       alert(
         `Fee settings saved for ${branchName}:\n\n` +
-        `Billing Mode: ${effectiveMode === 'MONTHLY_ONLY' ? '🥋 1 Month Only (Monthly)' : effectiveMode === 'TERM_ONLY' ? '🏫 3 Months Only (School Term)' : '🔄 Both (1 & 3 Months)'}\n` +
+        `Billing Plan: ${effectiveMode === 'MONTHLY_ONLY' ? '🥋 1 Month Only (Monthly Regular Dojo)' : '🏫 3 Months Only (School Term Batch)'}\n` +
         `Admission Fee: Rs.${newAdm}\n` +
-        (effectiveMode !== 'TERM_ONLY' ? `Monthly Fee: Rs.${newMonthly}\n` : '') +
-        (effectiveMode !== 'MONTHLY_ONLY' ? `School Term Fee: Rs.${newSchool}` : '')
+        (effectiveMode === 'MONTHLY_ONLY' ? `Monthly Fee: Rs.${newMonthly} / Month\n` : `School Term Fee: Rs.${newSchool} / 3 Months\n`) +
+        (globalFeeSettings.updateExistingStudents ? `\n✅ All active cadets of ${branchName} updated to this fee plan across roster and receipts!` : '')
       );
       return;
     }
@@ -5298,92 +5318,96 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Branch Billing Mode Toggle: Choose 1 Month, 3 Months, or Both */}
+              {/* Branch Billing Mode Toggle: Strict 1 Month vs 3 Months Selection */}
               {(() => {
                 const bNameStr = selectedFeeBranch === 'ALL' ? '' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
                 const isSchool = bNameStr && (bNameStr.toLowerCase().includes('school') || bNameStr.toLowerCase().includes('amlp') || bNameStr.toLowerCase().includes('gmlp') || bNameStr.toLowerCase().includes('ansar') || bNameStr.toLowerCase().includes('btamup'));
-                const currentMode = branchFeeData.billingMode || (selectedFeeBranch === 'ALL' ? 'BOTH' : isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
+                const currentMode = (branchFeeData.billingMode === 'MONTHLY_ONLY' || branchFeeData.billingMode === 'TERM_ONLY') 
+                  ? branchFeeData.billingMode 
+                  : (isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
 
                 return (
-                  <div className="p-3 bg-gradient-to-r from-red-50/40 via-amber-50/40 to-blue-50/40 border-2 border-red-200 rounded-xl space-y-2 shadow-xs">
+                  <div className="p-3.5 bg-gradient-to-r from-red-50/50 via-amber-50/30 to-blue-50/50 border-2 border-red-200 rounded-2xl space-y-2.5 shadow-xs">
                     <div className="flex items-center justify-between">
                       <label className="text-red-950 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
-                        <Clock className="w-4 h-4 text-red-600" /> Active Fee Plan for {selectedFeeBranch === 'ALL' ? 'Academy' : bNameStr} *
+                        <Clock className="w-4 h-4 text-red-600" /> Active Fee Plan for {selectedFeeBranch === 'ALL' ? 'Academy Branches' : bNameStr} *
                       </label>
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        currentMode === 'MONTHLY_ONLY' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                        currentMode === 'TERM_ONLY' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
-                        'bg-purple-100 text-purple-800 border border-purple-200'
+                      <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full shadow-xs ${
+                        currentMode === 'MONTHLY_ONLY' 
+                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                          : 'bg-blue-100 text-blue-800 border border-blue-300'
                       }`}>
-                        {currentMode === 'MONTHLY_ONLY' ? '🥋 1 Month (Monthly)' : currentMode === 'TERM_ONLY' ? '🏫 3 Months (Term)' : '🔄 Both (1 & 3 Mos)'}
+                        {currentMode === 'MONTHLY_ONLY' ? '🥋 1 Month (Monthly)' : '🏫 3 Months (School Term)'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-gray-600 font-medium">
-                      Select which billing cycle applies to this branch. Unwanted plans will be completely turned <strong>OFF</strong>.
+                    <p className="text-[11px] text-gray-600 font-medium">
+                      Select fee collection schedule for this branch. Cadets will be billed and receipts issued accordingly.
                     </p>
 
-                    <div className="grid grid-cols-3 gap-2 pt-1">
+                    <div className="grid grid-cols-2 gap-3 pt-1">
                       <button
                         type="button"
                         onClick={() => setBranchFeeData({ ...branchFeeData, billingMode: 'MONTHLY_ONLY' })}
-                        className={`p-2 rounded-xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 text-center ${
+                        className={`p-3 rounded-2xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-1 text-center shadow-xs ${
                           currentMode === 'MONTHLY_ONLY'
-                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300'
                             : 'bg-white text-gray-700 border-gray-200 hover:bg-emerald-50 hover:border-emerald-300'
                         }`}
                       >
-                        <span className="text-sm">🥋</span>
-                        <span className="leading-tight text-[11px]">1 Month (Monthly)</span>
-                        <span className={`text-[9px] font-bold ${currentMode === 'MONTHLY_ONLY' ? 'text-emerald-100' : 'text-gray-400'}`}>3-Mo Term OFF</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">🥋</span>
+                          <span className="text-xs font-black">1 Month (Monthly)</span>
+                        </div>
+                        <span className={`text-[10px] font-bold ${currentMode === 'MONTHLY_ONLY' ? 'text-emerald-100' : 'text-gray-400'}`}>
+                          Regular Dojo (Pulikkal, Chungam, Feroke, etc.)
+                        </span>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full mt-0.5 ${currentMode === 'MONTHLY_ONLY' ? 'bg-emerald-700 text-emerald-100' : 'bg-gray-100 text-gray-500'}`}>
+                          {currentMode === 'MONTHLY_ONLY' ? '✓ ACTIVE PLAN' : '3-Month Term OFF'}
+                        </span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setBranchFeeData({ ...branchFeeData, billingMode: 'TERM_ONLY' })}
-                        className={`p-2 rounded-xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 text-center ${
+                        className={`p-3 rounded-2xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-1 text-center shadow-xs ${
                           currentMode === 'TERM_ONLY'
-                            ? 'bg-blue-600 text-white border-blue-700 shadow-sm'
+                            ? 'bg-blue-600 text-white border-blue-700 shadow-md ring-2 ring-blue-300'
                             : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300'
                         }`}
                       >
-                        <span className="text-sm">🏫</span>
-                        <span className="leading-tight text-[11px]">3 Months (Term)</span>
-                        <span className={`text-[9px] font-bold ${currentMode === 'TERM_ONLY' ? 'text-blue-100' : 'text-gray-400'}`}>Monthly Fee OFF</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setBranchFeeData({ ...branchFeeData, billingMode: 'BOTH' })}
-                        className={`p-2 rounded-xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 text-center ${
-                          currentMode === 'BOTH'
-                            ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
-                            : 'bg-white text-gray-700 border-gray-200 hover:bg-purple-50 hover:border-purple-300'
-                        }`}
-                      >
-                        <span className="text-sm">🔄</span>
-                        <span className="leading-tight text-[11px]">Both (Flexible)</span>
-                        <span className={`text-[9px] font-bold ${currentMode === 'BOTH' ? 'text-purple-100' : 'text-gray-400'}`}>1 & 3 Months</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-base">🏫</span>
+                          <span className="text-xs font-black">3 Months (School Term)</span>
+                        </div>
+                        <span className={`text-[10px] font-bold ${currentMode === 'TERM_ONLY' ? 'text-blue-100' : 'text-gray-400'}`}>
+                          School Batches (AMLP, GMUP, Ansar, etc.)
+                        </span>
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full mt-0.5 ${currentMode === 'TERM_ONLY' ? 'bg-blue-700 text-blue-100' : 'bg-gray-100 text-gray-500'}`}>
+                          {currentMode === 'TERM_ONLY' ? '✓ ACTIVE PLAN' : 'Monthly Fee OFF'}
+                        </span>
                       </button>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* Monthly Cadet Fee (Regular Dojo) - Only shown when Monthly or Both is ON */}
+              {/* Monthly Cadet Fee (Regular Dojo) - Only shown when Monthly is active or configuring All Branches */}
               {(() => {
                 const bNameStr = selectedFeeBranch === 'ALL' ? '' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
                 const isSchool = bNameStr && (bNameStr.toLowerCase().includes('school') || bNameStr.toLowerCase().includes('amlp') || bNameStr.toLowerCase().includes('gmlp') || bNameStr.toLowerCase().includes('ansar') || bNameStr.toLowerCase().includes('btamup'));
-                const currentMode = branchFeeData.billingMode || (selectedFeeBranch === 'ALL' ? 'BOTH' : isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
+                const currentMode = (branchFeeData.billingMode === 'MONTHLY_ONLY' || branchFeeData.billingMode === 'TERM_ONLY') 
+                  ? branchFeeData.billingMode 
+                  : (isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
 
-                if (currentMode === 'TERM_ONLY') {
+                if (selectedFeeBranch !== 'ALL' && currentMode === 'TERM_ONLY') {
                   return (
                     <div className="p-3 bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-between text-xs text-gray-500">
                       <span className="flex items-center gap-1.5 font-bold">
                         <CreditCard className="w-4 h-4 text-gray-400" />
                         <span>Regular Dojo Monthly Fee:</span>
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 font-black text-[10px] uppercase">
-                        🔴 TURNED OFF (3-Month Term Active)
+                      <span className="px-2.5 py-0.5 rounded-full bg-gray-200 text-gray-700 font-black text-[10px] uppercase">
+                        🔴 TURNED OFF (3-Month School Term Active)
                       </span>
                     </div>
                   );
@@ -5421,21 +5445,23 @@ export default function StudentManagement() {
                 );
               })()}
 
-              {/* School Batch 3-Month Term Fee - Only shown when Term or Both is ON */}
+              {/* School Batch 3-Month Term Fee - Only shown when Term is active or configuring All Branches */}
               {(() => {
                 const bNameStr = selectedFeeBranch === 'ALL' ? '' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
                 const isSchool = bNameStr && (bNameStr.toLowerCase().includes('school') || bNameStr.toLowerCase().includes('amlp') || bNameStr.toLowerCase().includes('gmlp') || bNameStr.toLowerCase().includes('ansar') || bNameStr.toLowerCase().includes('btamup'));
-                const currentMode = branchFeeData.billingMode || (selectedFeeBranch === 'ALL' ? 'BOTH' : isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
+                const currentMode = (branchFeeData.billingMode === 'MONTHLY_ONLY' || branchFeeData.billingMode === 'TERM_ONLY') 
+                  ? branchFeeData.billingMode 
+                  : (isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
 
-                if (currentMode === 'MONTHLY_ONLY') {
+                if (selectedFeeBranch !== 'ALL' && currentMode === 'MONTHLY_ONLY') {
                   return (
                     <div className="p-3 bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-between text-xs text-gray-500">
                       <span className="flex items-center gap-1.5 font-bold">
                         <Clock className="w-4 h-4 text-gray-400" />
                         <span>School Batch Term Fee (3 Months):</span>
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 font-black text-[10px] uppercase">
-                        🔴 TURNED OFF (1-Month Plan Active)
+                      <span className="px-2.5 py-0.5 rounded-full bg-gray-200 text-gray-700 font-black text-[10px] uppercase">
+                        🔴 TURNED OFF (1-Month Monthly Plan Active)
                       </span>
                     </div>
                   );
