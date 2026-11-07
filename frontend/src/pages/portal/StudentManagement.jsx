@@ -3038,14 +3038,13 @@ export default function StudentManagement() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              {!isInstructor && (
-                <button
-                  onClick={() => { handleFeeBranchChange(selectedBranch !== 'ALL' ? selectedBranch : 'ALL'); setShowGlobalFeeModal(true); }}
-                  className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
-                >
-                  <Settings className="w-4 h-4 text-amber-600 flex-shrink-0" /> <span className="whitespace-nowrap">Fee Settings</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => { handleFeeBranchChange(selectedBranch !== 'ALL' ? selectedBranch : 'ALL'); setShowGlobalFeeModal(true); }}
+                className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+              >
+                <Settings className="w-4 h-4 text-amber-600 flex-shrink-0" /> <span className="whitespace-nowrap">Fee Settings</span>
+              </button>
 
           {/* Share Online Admission Link Button */}
           <button
@@ -4826,14 +4825,12 @@ export default function StudentManagement() {
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-emerald-900 font-black text-xs flex items-center gap-1.5">
                     <DollarSign className="w-4 h-4 text-emerald-600" /> Tuition Fee Rate (₹)
-                    {isInstructor && <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">🔒 Admin Only</span>}
                   </label>
                   <input
                     type="number"
-                    disabled={isInstructor}
                     value={editingStudent.fee_amount ?? editingStudent.feeAmount ?? 500}
                     onChange={(e) => setEditingStudent({ ...editingStudent, feeAmount: parseInt(e.target.value) || 0, fee_amount: parseInt(e.target.value) || 0 })}
-                    className="w-32 bg-white border border-emerald-300 rounded-xl px-3 py-2 text-emerald-900 font-black text-sm font-mono focus:outline-none focus:border-blue-500 text-right disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-32 bg-white border border-emerald-300 rounded-xl px-3 py-2 text-emerald-900 font-black text-sm font-mono focus:outline-none focus:border-blue-500 text-right"
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-emerald-200/60">
@@ -5210,9 +5207,8 @@ export default function StudentManagement() {
         </div>
       )}
 
-      {/* Global Academy Fee & Tariff Configuration Modal (Super Admin Only) */}
-      {/* Global Academy Fee & Tariff Configuration Modal (Super Admin Only) */}
-      {showGlobalFeeModal && !isInstructor && (
+      {/* Global Academy Fee & Tariff Configuration Modal */}
+      {showGlobalFeeModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[150] flex items-center justify-center p-3 sm:p-4">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-200 overflow-hidden max-h-[92vh] flex flex-col animate-in fade-in zoom-in duration-200">
             <div className="bg-gradient-to-r from-gray-900 via-gray-900 to-red-950 p-4 text-white flex items-center justify-between flex-shrink-0">
