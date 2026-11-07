@@ -733,12 +733,21 @@ export default function BranchManagement() {
   // Match shift/schedule to a specific branch robustly
   const isShiftBelongingToBranch = (s, branchObjOrName) => {
     if (!s || !branchObjOrName) return false;
-    const bName = typeof branchObjOrName === 'object' ? String(branchObjOrName.name || '').trim() : String(branchObjOrName).trim();
-    const bId = typeof branchObjOrName === 'object' ? String(branchObjOrName.id || '').trim().toLowerCase() : '';
-    const bCode = typeof branchObjOrName === 'object' ? String(branchObjOrName.code || '').trim().toLowerCase() : '';
+    const targetBranch = typeof branchObjOrName === 'object'
+      ? branchObjOrName
+      : (branches.find(b => b.name === branchObjOrName || b.id === branchObjOrName || b.code === branchObjOrName) || { name: String(branchObjOrName) });
+
+    const bName = String(targetBranch.name || '').trim();
+    const bId = String(targetBranch.id || '').trim().toLowerCase();
+    const bCode = String(targetBranch.code || '').trim().toLowerCase();
 
     const sBranch = String(s.branch || s.branch_name || '').trim();
     const sId = String(s.branch_id || '').trim().toLowerCase();
+
+    // Check canonical branch keys first - if both exist and don't match, strictly reject!
+    const sKey = getBranchKeyFromStr(sBranch || s.name);
+    const bKey = getBranchKeyFromStr(bName || bId || bCode);
+    if (sKey && bKey && sKey !== bKey) return false;
 
     // 1. Direct ID / UUID match
     if (bId && sId && bId === sId) return true;
@@ -750,8 +759,6 @@ export default function BranchManagement() {
     if (bCode && (sBranch.toLowerCase() === bCode || sId === bCode)) return true;
 
     // 4. Use canonical branch key matching from initialData.js (e.g. 'feroke' != 'ganapath', 'pulikkal' != 'kickboxing' != 'ladiesfitness')
-    const sKey = getBranchKeyFromStr(sBranch || s.name);
-    const bKey = getBranchKeyFromStr(bName || bId || bCode);
     if (sKey && bKey && sKey === bKey) return true;
 
     return false;
@@ -811,7 +818,7 @@ export default function BranchManagement() {
     const bName = String(bObj.name || (typeof b === 'string' ? b : '')).toLowerCase().trim();
     const bId = String(bObj.id || '').toLowerCase().trim();
     const bCode = String(bObj.code || '').toLowerCase().trim();
-    const isHeadOffice = !!(bObj.is_head_office || bObj.isHeadOffice || bCode === 'plk-01' || bId === '4d04730d-8de9-4a3f-9dc4-705b31ef2630');
+    const isHeadOffice = !!(bObj.is_head_office || bObj.isHeadOffice || bCode === 'plk-01' || bId === '4d04730d-8de9-4a3f-9dc4-705b31ef2630' || bId === 'c6602171-1875-4e80-ae06-ccdaf8dd3d2e');
 
     const branchCadets = roster.filter(s => {
       const sBranchId = String(s.branch_id || (typeof s.branch === 'object' ? s.branch?.id : '') || s.branch_detail?.id || '').toLowerCase().trim();
@@ -830,7 +837,7 @@ export default function BranchManagement() {
       // 4. Special case ONLY for the official Head Office Branch (PLK-01)
       if (isHeadOffice) {
         const isKickBoxing = sBranchName.includes('kick boxing') || sBranchName.includes('boxing');
-        const isSchool = sBranchName.includes('school') || sBranchName.includes('ups') || sBranchName.includes('lps') || sBranchName.includes('neerad') || sBranchName.includes('pengad') || sBranchName.includes('airport');
+        const isSchool = sBranchName.includes('school') || sBranchName.includes('ups') || sBranchName.includes('lps') || sBranchName.includes('neerad') || sBranchName.includes('pengad') || sBranchName.includes('airport') || sBranchName.includes('ladies') || sBranchName.includes('ledies') || sBranchName.includes('fittnaes');
         if (!isKickBoxing && !isSchool) {
           if (sBranchName === 'pulikkal branch (head office)' || sBranchName === 'pulikkal' || sBranchName === 'head office' || !sBranchName) {
             return true;
@@ -841,13 +848,20 @@ export default function BranchManagement() {
       return false;
     });
 
-    if (shiftFilter && String(shiftFilter).trim() !== '') {
-      const sFilterLow = String(shiftFilter).toLowerCase().trim();
-      return branchCadets.filter(s => {
-        const sShift = String(s.shift || '').toLowerCase().trim();
-        if (!sShift) return false;
-        return matchesShift(s.shift, shiftFilter) || sShift.includes(sFilterLow) || sFilterLow.includes(sShift);
-      });
+    if (shiftFilter) {
+      let targetShift = '';
+      if (typeof shiftFilter === 'object') {
+        targetShift = shiftFilter.name || (shiftFilter.days && shiftFilter.time ? `${shiftFilter.branch || bObj.name} (${shiftFilter.days}: ${shiftFilter.time})` : (shiftFilter.time || ''));
+      } else {
+        targetShift = String(shiftFilter).trim();
+      }
+
+      if (targetShift) {
+        return branchCadets.filter(s => {
+          if (!s.shift) return false;
+          return matchesShift(s.shift, targetShift);
+        });
+      }
     }
 
     return branchCadets;
@@ -870,7 +884,7 @@ export default function BranchManagement() {
   };
 
   const openShiftCadetsRoster = (sch) => {
-    const list = getBranchCadets(sch.branch, sch.time || sch.name);
+    const list = getBranchCadets(sch.branch, sch);
     setRosterModal({
       isOpen: true,
       title: `${sch.name || 'Training Shift'} (${sch.branch})`,
@@ -1598,7 +1612,7 @@ export default function BranchManagement() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredSchedules.map((sch) => {
-                const shiftCadetCount = getBranchCadets(sch.branch, sch.time || sch.name).length;
+                const shiftCadetCount = getBranchCadets(sch.branch, sch).length;
 
                 return (
                   <div

@@ -2649,7 +2649,10 @@ export const filterOutDummyShifts = (list) => {
     if (!s) return false;
     const sName = String(s.name || '').toLowerCase().trim();
     const sBranch = String(s.branch || s.branch_name || '').toLowerCase().trim();
+    const sTime = String(s.time || '').toLowerCase().trim();
     if (sName.startsWith('general training batch') || sBranch === 'zxcvbnm' || sBranch === 'cfgvhbjk' || sName.includes('cfgvhbjk')) return false;
+    // Drop ghost / redundant regular timings for Airport Karate
+    if (sBranch.includes('airport') && (sTime === 'regular dojo timings' || sName.includes('regular dojo timings'))) return false;
     return true;
   }));
 };
