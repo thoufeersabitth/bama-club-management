@@ -4,7 +4,7 @@ import {
   Users, CreditCard, CalendarCheck, Award, Building2, TrendingUp, CheckCircle2, DollarSign, AlertCircle, Clock, Check, RefreshCw, Briefcase, BookOpen, Trash2
 } from 'lucide-react';
 import { fetchStudents, fetchFees, getStoredStaff, fetchBranches, getStandardBranchName } from '../../services/api';
-import { BELT_LEVELS, INITIAL_BRANCHES, ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
+import { BELT_LEVELS, INITIAL_BRANCHES, ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions, isStudentInBranch, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReportsAnalytics() {
@@ -47,6 +47,18 @@ export default function ReportsAnalytics() {
   const [selectedBranch, setSelectedBranch] = useState('All');
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedInstructor, setSelectedInstructor] = useState('All');
+
+  // Reset shift to 'All' whenever branch changes
+  const handleBranchChange = (newBranch) => {
+    setSelectedBranch(newBranch);
+    setSelectedShift('All');
+  };
+
+  // Dynamic Shift Options for selected branch ONLY
+  const availableShifts = React.useMemo(() => {
+    const activeBranchFilter = selectedBranch !== 'All' ? selectedBranch : null;
+    return getDynamicShiftOptions(activeBranchFilter, null, branchesList);
+  }, [selectedBranch, branchesList]);
 
   // Date-to-Date Filter State
   const [fromDate, setFromDate] = useState(firstDayOfMonthStr);
@@ -120,24 +132,30 @@ export default function ReportsAnalytics() {
 
         setFees(dynamicFees);
 
-        // Aggregate attendance records from localStorage
+        // Aggregate attendance records from localStorage (handles both global and branch keys cleanly)
         const aggregatedAttendance = {};
         try {
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && key.startsWith('bama_attendance_')) {
-              const datePart = key.replace('bama_attendance_', '');
-              const rec = JSON.parse(localStorage.getItem(key) || '{}');
+              const dateMatch = key.match(/\d{4}-\d{2}-\d{2}/);
+              const datePart = dateMatch ? dateMatch[0] : null;
+              if (!datePart) continue;
 
-              Object.entries(rec).forEach(([stdId, status]) => {
-                if (!aggregatedAttendance[stdId]) {
-                  aggregatedAttendance[stdId] = { present: 0, absent: 0, total: 0, recordsByDate: {} };
-                }
-                aggregatedAttendance[stdId].recordsByDate[datePart] = status;
-                aggregatedAttendance[stdId].total += 1;
-                if (status === 'PRESENT') aggregatedAttendance[stdId].present += 1;
-                if (status === 'ABSENT') aggregatedAttendance[stdId].absent += 1;
-              });
+              const rec = JSON.parse(localStorage.getItem(key) || '{}');
+              if (rec && typeof rec === 'object') {
+                Object.entries(rec).forEach(([stdId, status]) => {
+                  if (!aggregatedAttendance[stdId]) {
+                    aggregatedAttendance[stdId] = { present: 0, absent: 0, total: 0, recordsByDate: {} };
+                  }
+                  if (!aggregatedAttendance[stdId].recordsByDate[datePart]) {
+                    aggregatedAttendance[stdId].recordsByDate[datePart] = status;
+                    aggregatedAttendance[stdId].total += 1;
+                    if (status === 'PRESENT') aggregatedAttendance[stdId].present += 1;
+                    if (status === 'ABSENT') aggregatedAttendance[stdId].absent += 1;
+                  }
+                });
+              }
             }
           }
         } catch (e) {}
@@ -189,25 +207,14 @@ export default function ReportsAnalytics() {
     setToDate('');
   };
 
-  // Filtered Students with Date-to-Date Filter
+  // Filtered Students with Branch & Shift Matchers (Accessible to all Instructors & Senseis)
   const filteredStudents = students.filter(s => {
-    const rawBranch = s.branch_name || s.branch_detail?.name || (typeof s.branch === 'object' ? s.branch?.name : s.branch) || s.branch_id || (s.shift ? String(s.shift).split('(')[0] : '');
-    const branchName = getStandardBranchName(rawBranch, branchesList);
-
-    if (isInstructor) {
-      const instructorBranch = user?.branch || 'Chungam Branch';
-      if (!branchName.toLowerCase().includes(instructorBranch.toLowerCase())) {
-        return false;
-      }
-    }
-
-    if (selectedBranch !== 'All' && !branchName.toLowerCase().includes(selectedBranch.toLowerCase())) {
+    if (selectedBranch !== 'All' && !isStudentInBranch(s, selectedBranch, branchesList)) {
       return false;
     }
 
     if (selectedShift !== 'All') {
-      const cadetShift = s.shift || 'Evening Batch (5:00 PM - 7:00 PM)';
-      if (!cadetShift.toLowerCase().includes(selectedShift.toLowerCase())) {
+      if (!matchesShift(s, selectedShift)) {
         return false;
       }
     }
@@ -236,23 +243,12 @@ export default function ReportsAnalytics() {
   // Filtered Fee Invoices with Date-to-Date Filter
   const filteredFees = fees.filter(f => {
     const std = f.student_detail || {};
-    const rawBranch = std.branch_name || std.branch_detail?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch) || std.branch_id || (std.shift ? String(std.shift).split('(')[0] : '');
-    const branchName = getStandardBranchName(rawBranch, branchesList);
-
-    if (isInstructor) {
-      const instructorBranch = user?.branch || 'Chungam Branch';
-      if (!branchName.toLowerCase().includes(instructorBranch.toLowerCase())) {
-        return false;
-      }
-    }
-
-    if (selectedBranch !== 'All' && !branchName.toLowerCase().includes(selectedBranch.toLowerCase())) {
+    if (selectedBranch !== 'All' && !isStudentInBranch(std, selectedBranch, branchesList)) {
       return false;
     }
 
     if (selectedShift !== 'All') {
-      const cadetShift = std.shift || 'Evening Batch (5:00 PM - 7:00 PM)';
-      if (!cadetShift.toLowerCase().includes(selectedShift.toLowerCase())) {
+      if (!matchesShift(std, selectedShift)) {
         return false;
       }
     }
@@ -740,38 +736,120 @@ export default function ReportsAnalytics() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                <Clock className="w-4 h-4 text-red-600" />
-                <span>Shift:</span>
+              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-xs">
+                <Building2 className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <span>Dojo:</span>
                 <select
-                  value={selectedShift}
-                  onChange={(e) => setSelectedShift(e.target.value)}
-                  className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-red-500 cursor-pointer shadow-sm"
+                  value={selectedBranch}
+                  onChange={(e) => handleBranchChange(e.target.value)}
+                  className="bg-transparent text-xs text-gray-900 font-black focus:outline-none cursor-pointer max-w-[180px] truncate"
                 >
-                  <option value="All">All Shifts</option>
-                  {getDynamicShiftOptions().map((s, idx) => (
-                    <option key={idx} value={s}>{s}</option>
+                  <option value="All">🌐 All Branches</option>
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
                   ))}
                 </select>
               </div>
 
-              {!isInstructor && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                  <Building2 className="w-4 h-4 text-red-600" />
-                  <span>Dojo:</span>
-                  <select
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-red-500 cursor-pointer shadow-sm"
-                  >
-                    <option value="All">All Branches</option>
-                    {branchesList.map(b => (
-                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-xs">
+                <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <span>Batch:</span>
+                <select
+                  value={selectedShift}
+                  onChange={(e) => setSelectedShift(e.target.value)}
+                  className="bg-transparent text-xs text-gray-900 font-black focus:outline-none cursor-pointer max-w-[200px] truncate"
+                >
+                  <option value="All">All Batches</option>
+                  {availableShifts.map((s, idx) => (
+                    <option key={idx} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
             </div>
+          </div>
+
+          {/* 📱 Quick Touch Dojo Bar */}
+          <div className="pt-2 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <span className="text-[11px] font-black text-gray-500 uppercase flex-shrink-0 mr-1 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-red-600" /> Dojo:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleBranchChange('All')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+                selectedBranch === 'All'
+                  ? 'bg-red-600 text-white shadow-xs'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
+            >
+              🌐 All Branches
+            </button>
+            {branchesList.map(b => {
+              const isSel = selectedBranch === b.name;
+              return (
+                <button
+                  key={b.id || b.name}
+                  type="button"
+                  onClick={() => handleBranchChange(b.name)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+                    isSel
+                      ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-xs'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {b.name}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ⏰ Quick Touch Batch / Shift Switcher for Selected Dojo */}
+          {availableShifts.length > 0 && (
+            <div className="pt-1.5 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <span className="text-[11px] font-black text-gray-500 uppercase flex-shrink-0 mr-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-amber-600" /> Batch:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedShift('All')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+                  selectedShift === 'All'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                }`}
+              >
+                🌐 All Batches
+              </button>
+              {availableShifts.map((sh, idx) => {
+                const isSel = selectedShift === sh;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedShift(sh)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+                      isSel
+                        ? 'bg-gradient-to-r from-amber-600 to-red-600 text-white shadow-xs font-black'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold'
+                    }`}
+                  >
+                    {sh}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Active Dojo & Batch Confirmation Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl text-xs font-bold text-red-950">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Report Dojo: <strong>{selectedBranch === 'All' ? 'All Dojo Branches' : selectedBranch}</strong></span>
+              {selectedShift !== 'All' && <span className="text-gray-600">• Batch: <strong>{selectedShift}</strong></span>}
+            </div>
+            <span className="text-[11px] text-red-800 font-mono">
+              👥 {filteredStudents.length} Cadets Enrolled
+            </span>
           </div>
 
           <div className="overflow-x-auto">
@@ -782,6 +860,7 @@ export default function ReportsAnalytics() {
                   <th className="py-3 px-4">Admission No</th>
                   <th className="py-3 px-4">Belt Rank</th>
                   <th className="py-3 px-4">Branch Dojo</th>
+                  <th className="py-3 px-4">Batch / Shift</th>
                   <th className="py-3 px-4 text-center">Total Dojo Classes</th>
                   <th className="py-3 px-4 text-center">Attended / Total</th>
                   <th className="py-3 px-4 text-right">Attendance %</th>
@@ -826,21 +905,34 @@ export default function ReportsAnalytics() {
                   return (
                     <tr key={s.id || s.admissionNo} className="hover:bg-gray-50 transition-colors font-sans">
                       <td className="py-3 px-4 font-bold text-gray-900 flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-red-100 text-red-700 font-black flex items-center justify-center text-xs">
+                        <div className="w-7 h-7 rounded-full bg-red-100 text-red-700 font-black flex items-center justify-center text-xs flex-shrink-0">
                           {s.name?.charAt(0)}
                         </div>
-                        <span>{s.name}</span>
+                        <span className="whitespace-nowrap">{s.name}</span>
                       </td>
-                      <td className="py-3 px-4 font-mono font-bold text-gray-600">{s.admissionNo || s.admission_no}</td>
-                      <td className="py-3 px-4 font-bold text-amber-700">{s.beltRank || s.current_belt || 'White Belt'}</td>
-                      <td className="py-3 px-4 text-gray-700">{typeof s.branch === 'object' ? s.branch?.name : s.branch}</td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-gray-900">
-                        {finalTotal === 0 ? '0 (Holiday)' : `${finalTotal} Classes`}
+                      <td className="py-3 px-4 font-mono font-bold text-gray-600 whitespace-nowrap">{s.admissionNo || s.admission_no}</td>
+                      <td className="py-3 px-4 font-bold text-amber-700 whitespace-nowrap">{s.beltRank || s.current_belt || 'White Belt'}</td>
+                      <td className="py-3 px-4 text-gray-700 font-medium whitespace-nowrap">
+                        {s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : null) || getStandardBranchName(s.branch, branchesList) || s.branch || 'Head Office'}
                       </td>
-                      <td className="py-3 px-4 text-center font-bold text-emerald-700">
-                        {finalTotal === 0 ? '🏖️ Official Holiday' : `${finalPresent} / ${finalTotal} Attended`}
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 font-bold text-[10px]">
+                          {s.shift || s.batch || s.dojoShift || 'Regular'}
+                        </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-black text-emerald-600">{pct}%</td>
+                      <td className="py-3 px-4 text-center font-mono font-bold text-gray-900 whitespace-nowrap">
+                        {finalTotal === 0 ? '0 (Holiday / Leave)' : `${finalTotal} Classes`}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-emerald-700 whitespace-nowrap">
+                        {finalTotal === 0 ? '🏖️ Exempt / 100%' : `${finalPresent} / ${finalTotal} Attended`}
+                      </td>
+                      <td className="py-3 px-4 text-right font-black whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                          parseFloat(pct) >= 75 ? 'bg-emerald-100 text-emerald-800' : parseFloat(pct) >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {pct}%
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -953,37 +1045,35 @@ export default function ReportsAnalytics() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                <Clock className="w-4 h-4 text-emerald-600" />
-                <span>Shift:</span>
+              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-xs">
+                <Building2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Dojo:</span>
                 <select
-                  value={selectedShift}
-                  onChange={(e) => setSelectedShift(e.target.value)}
-                  className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-sm"
+                  value={selectedBranch}
+                  onChange={(e) => handleBranchChange(e.target.value)}
+                  className="bg-transparent text-xs text-gray-900 font-black focus:outline-none cursor-pointer max-w-[180px] truncate"
                 >
-                  <option value="All">All Shifts</option>
-                  {getDynamicShiftOptions().map((s, idx) => (
-                    <option key={idx} value={s}>{s}</option>
+                  <option value="All">🌐 All Branches</option>
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
                   ))}
                 </select>
               </div>
 
-              {!isInstructor && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                  <Building2 className="w-4 h-4 text-emerald-600" />
-                  <span>Dojo:</span>
-                  <select
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-sm"
-                  >
-                    <option value="All">All Branches</option>
-                    {branchesList.map(b => (
-                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-xs">
+                <Clock className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Batch:</span>
+                <select
+                  value={selectedShift}
+                  onChange={(e) => setSelectedShift(e.target.value)}
+                  className="bg-transparent text-xs text-gray-900 font-black focus:outline-none cursor-pointer max-w-[200px] truncate"
+                >
+                  <option value="All">All Batches</option>
+                  {availableShifts.map((s, idx) => (
+                    <option key={idx} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1155,37 +1245,35 @@ export default function ReportsAnalytics() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <span>Shift:</span>
+              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-xs">
+                <Building2 className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <span>Dojo:</span>
                 <select
-                  value={selectedShift}
-                  onChange={(e) => setSelectedShift(e.target.value)}
-                  className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
+                  value={selectedBranch}
+                  onChange={(e) => handleBranchChange(e.target.value)}
+                  className="bg-transparent text-xs text-gray-900 font-black focus:outline-none cursor-pointer max-w-[180px] truncate"
                 >
-                  <option value="All">All Shifts</option>
-                  {getDynamicShiftOptions().map((s, idx) => (
-                    <option key={idx} value={s}>{s}</option>
+                  <option value="All">🌐 All Branches</option>
+                  {branchesList.map(b => (
+                    <option key={b.id || b.name} value={b.name}>{b.name}</option>
                   ))}
                 </select>
               </div>
 
-              {!isInstructor && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold">
-                  <Building2 className="w-4 h-4 text-amber-600" />
-                  <span>Dojo:</span>
-                  <select
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
-                    className="bg-white border border-gray-200 rounded-xl px-2.5 py-1 text-xs text-gray-900 font-bold focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
-                  >
-                    <option value="All">All Branches</option>
-                    {branchesList.map(b => (
-                      <option key={b.id || b.name} value={b.name}>{b.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-bold bg-white px-2.5 py-1 rounded-xl border border-gray-200 shadow-xs">
+                <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <span>Batch:</span>
+                <select
+                  value={selectedShift}
+                  onChange={(e) => setSelectedShift(e.target.value)}
+                  className="bg-transparent text-xs text-gray-900 font-black focus:outline-none cursor-pointer max-w-[200px] truncate"
+                >
+                  <option value="All">All Batches</option>
+                  {availableShifts.map((s, idx) => (
+                    <option key={idx} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
