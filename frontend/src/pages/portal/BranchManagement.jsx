@@ -6,7 +6,7 @@ import {
   Sparkles, Eye, Camera, Upload, Image as ImageIcon, RefreshCw, Loader2,
   Download, Printer, FileSpreadsheet, CreditCard
 } from 'lucide-react';
-import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage, getBranchFeeSettings, updateBranchFeeSettings } from '../../services/api';
+import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage, getBranchFeeSettings, updateBranchFeeSettings, parseBranchSlot } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS, getBranchKeyFromStr, matchesShift } from '../../services/initialData';
 
 export default function BranchManagement() {
@@ -294,27 +294,26 @@ export default function BranchManagement() {
             const prog = branchName.toLowerCase().includes('kick') ? 'Kickboxing' : 'Karate (Shotokan)';
             let mergedShifts = [...schedules];
             slots.forEach((slot, sIdx) => {
-              let days = 'Mon, Wed, Fri';
-              let time = slot;
-              if (slot.includes(':')) {
-                const colonIndex = slot.indexOf(':');
-                days = slot.substring(0, colonIndex).trim();
-                time = slot.substring(colonIndex + 1).trim();
-              }
-              const exists = mergedShifts.some(s => 
-                String(s.branch || '').toLowerCase().trim() === String(branchName).toLowerCase().trim() &&
-                String(s.time || '').toLowerCase().trim() === String(time).toLowerCase().trim()
-              );
+              const { days, time, name, target } = parseBranchSlot(slot, branchName);
+              const bBranchKey = getBranchKeyFromStr(branchName);
+              const exists = mergedShifts.some(s => {
+                const sB = getBranchKeyFromStr(s.branch || s.branch_name || s.name);
+                if (sB !== bBranchKey) return false;
+                const sD = String(s.days || '').toLowerCase().trim();
+                const sT = String(s.time || '').toLowerCase().trim();
+                const sN = String(s.name || '').toLowerCase().trim();
+                return (sD === days.toLowerCase().trim() && sT === time.toLowerCase().trim()) || sN === name.toLowerCase().trim();
+              });
               if (!exists) {
                 mergedShifts.push({
                   id: `shift-${editBranch.id}-${sIdx}`,
-                  name: `${branchName} (${time})`,
+                  name: name,
                   branch: branchName,
                   program: prog,
                   days,
                   time,
                   instructor: updatedItem.branch_head || 'Sensei Abdul Rahman (5th Dan)',
-                  targetGroup: 'All Belts & Cadets',
+                  targetGroup: target,
                   status: 'Active'
                 });
               }
@@ -396,22 +395,16 @@ export default function BranchManagement() {
             const prog = branchName.toLowerCase().includes('kick') ? 'Kickboxing' : 'Karate (Shotokan)';
             let mergedShifts = [...schedules];
             slots.forEach((slot, sIdx) => {
-              let days = 'Mon, Wed, Fri';
-              let time = slot;
-              if (slot.includes(':')) {
-                const colonIndex = slot.indexOf(':');
-                days = slot.substring(0, colonIndex).trim();
-                time = slot.substring(colonIndex + 1).trim();
-              }
+              const { days, time, name, target } = parseBranchSlot(slot, branchName);
               mergedShifts.push({
                 id: `shift-${finalId}-${sIdx}`,
-                name: `${branchName} (${time})`,
+                name: name,
                 branch: branchName,
                 program: prog,
                 days,
                 time,
                 instructor: formData.branch_head || 'Sensei Abdul Rahman (5th Dan)',
-                targetGroup: 'All Belts & Cadets',
+                targetGroup: target,
                 status: 'Active'
               });
             });
@@ -742,16 +735,23 @@ export default function BranchManagement() {
     if (!s || !branchObjOrName) return false;
     const bName = typeof branchObjOrName === 'object' ? String(branchObjOrName.name || '').trim() : String(branchObjOrName).trim();
     const bId = typeof branchObjOrName === 'object' ? String(branchObjOrName.id || '').trim().toLowerCase() : '';
+    const bCode = typeof branchObjOrName === 'object' ? String(branchObjOrName.code || '').trim().toLowerCase() : '';
 
     const sBranch = String(s.branch || s.branch_name || '').trim();
     const sId = String(s.branch_id || '').trim().toLowerCase();
 
+    // 1. Direct ID / UUID match
     if (bId && sId && bId === sId) return true;
-    if (bName.toLowerCase() === sBranch.toLowerCase()) return true;
 
-    // Use canonical branch key matching from initialData.js (e.g. 'feroke' != 'ganapath', 'pulikkal' != 'kickboxing')
-    const sKey = getBranchKeyFromStr(sBranch);
-    const bKey = getBranchKeyFromStr(bName);
+    // 2. Direct exact name match (case-insensitive)
+    if (bName && sBranch && bName.toLowerCase() === sBranch.toLowerCase()) return true;
+
+    // 3. Exact code match
+    if (bCode && (sBranch.toLowerCase() === bCode || sId === bCode)) return true;
+
+    // 4. Use canonical branch key matching from initialData.js (e.g. 'feroke' != 'ganapath', 'pulikkal' != 'kickboxing' != 'ladiesfitness')
+    const sKey = getBranchKeyFromStr(sBranch || s.name);
+    const bKey = getBranchKeyFromStr(bName || bId || bCode);
     if (sKey && bKey && sKey === bKey) return true;
 
     return false;
@@ -768,9 +768,7 @@ export default function BranchManagement() {
     );
     if (!matchesSearch) return false;
     if (scheduleBranchFilter && scheduleBranchFilter !== 'ALL') {
-      const sBranch = String(s.branch || s.branch_name || '').toLowerCase().trim();
-      const targetB = String(scheduleBranchFilter).toLowerCase().trim();
-      return sBranch === targetB || sBranch.includes(targetB) || targetB.includes(sBranch);
+      return isShiftBelongingToBranch(s, scheduleBranchFilter);
     }
     return true;
   });
@@ -1511,11 +1509,7 @@ export default function BranchManagement() {
             </button>
 
             {branches.map(b => {
-              const bShiftCount = schedules.filter(s => {
-                const sB = String(s.branch || s.branch_name || '').toLowerCase().trim();
-                const bN = String(b.name || '').toLowerCase().trim();
-                return sB === bN || sB.includes(bN) || bN.includes(sB);
-              }).length;
+              const bShiftCount = schedules.filter(s => isShiftBelongingToBranch(s, b)).length;
 
               const isSel = scheduleBranchFilter === b.name;
               return (

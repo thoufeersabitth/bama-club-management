@@ -59,6 +59,7 @@ export const getBranchKeyFromStr = (str) => {
   const s = String(str).toLowerCase().trim();
   if (s === 'all') return 'all';
   if (s.includes('kick')) return 'kickboxing';
+  if (s.includes('ledies') || s.includes('ladies') || s.includes('fittnaes') || s.includes('dojo-13') || s.includes('18c3b2f2')) return 'ladiesfitness';
   if (s.includes('chanda') || s.includes('gmup')) return 'chanda';
   if (s.includes('ansar')) return 'ansar';
   if (s.includes('kanjiraparaba') || s.includes('gmlp')) return 'kanjiraparaba';

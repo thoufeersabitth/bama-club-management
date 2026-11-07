@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import { SAMPLE_STUDENTS, INITIAL_BRANCHES, BELT_LEVELS, WHATSAPP_TEMPLATES, INITIAL_STAFF } from './initialData';
+import { SAMPLE_STUDENTS, INITIAL_BRANCHES, BELT_LEVELS, WHATSAPP_TEMPLATES, INITIAL_STAFF, getBranchKeyFromStr } from './initialData';
 
 const API_BASE = 'https://bama-club-backend.fly.dev/api';
 
@@ -2509,6 +2509,30 @@ export const deleteTrainingScheduleBackend = async (id, shiftName = '') => {
   } catch (err) {}
 };
 
+// Helper to parse timing slot string (handles girls batches, day:time, etc.)
+export const parseBranchSlot = (slot, branchName) => {
+  let days = 'Mon, Wed, Fri';
+  let time = slot;
+  let name = '';
+  let target = 'All Belts & Cadets';
+
+  const parenMatch = String(slot).match(/^(.*?)\((.*?)\)$/);
+  if (parenMatch && !String(slot).match(/^[A-Za-z,\s&]+:/)) {
+    name = String(slot).trim();
+    days = 'Girls Special Batch';
+    time = parenMatch[2].trim();
+    target = 'Girls Batch';
+  } else {
+    const colonIdx = String(slot).indexOf(':');
+    if (colonIdx > 0) {
+      days = String(slot).substring(0, colonIdx).trim();
+      time = String(slot).substring(colonIdx + 1).trim();
+    }
+    name = `${branchName} (${slot})`;
+  }
+  return { days, time, name, target };
+};
+
 // Strict deduplication helper for training schedules / shifts
 export const deduplicateSchedules = (schedules) => {
   if (!Array.isArray(schedules)) return [];
@@ -2524,7 +2548,7 @@ export const deduplicateSchedules = (schedules) => {
     if (sName.startsWith('general training batch') || bLow === 'zxcvbnm' || bLow === 'cfgvhbjk' || sName.includes('cfgvhbjk')) return;
     
     // Normalized composite key: branch + days + time
-    const bKey = bLow.replace(/[^a-z0-9]/g, '');
+    const bKey = getBranchKeyFromStr(normBranch || sName);
     const dKey = String(s.days || '').toLowerCase().trim();
     const tKey = String(s.time || '').toLowerCase().trim();
     const compositeKey = `${bKey}__${dKey}__${tKey}`;
@@ -2700,44 +2724,44 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
       if (!b || !b.name || !b.timings) return;
       const rawTimings = String(b.timings).trim();
       const slots = rawTimings.includes('|') ? rawTimings.split('|').map(x => x.trim()) : [rawTimings];
+      const bBranchKey = getBranchKeyFromStr(b.name);
       const prog = b.name.toLowerCase().includes('kick') ? 'Kickboxing' : (b.name.toLowerCase().includes('fitness') ? 'Fitness Training' : 'Karate (Shotokan)');
 
       slots.forEach((slot, sIdx) => {
         if (!slot) return;
-        let days = 'Mon, Wed, Fri';
-        let time = slot;
-        if (slot.includes(':')) {
-          const colonIndex = slot.indexOf(':');
-          days = slot.substring(0, colonIndex).trim();
-          time = slot.substring(colonIndex + 1).trim();
-        }
-        const bKey = String(b.name).toLowerCase().trim();
+        const { days, time, name, target } = parseBranchSlot(slot, b.name);
         const dKey = String(days).toLowerCase().trim();
         const tKey = String(time).toLowerCase().trim();
-        const key = `${bKey}__${dKey}__${tKey}`;
+        const key = `${bBranchKey}__${dKey}__${tKey}`;
 
-        // Check if an existing schedule matches this branch and time/slot
+        // Check if an existing schedule matches this branch and slot/time
         const alreadyExists = Array.from(scheduleMap.values()).some(s => {
-          const sB = String(s.branch || s.branch_name || '').toLowerCase().trim();
+          const sB = getBranchKeyFromStr(s.branch || s.branch_name || s.name);
+          if (sB !== bBranchKey) return false;
+          const sD = String(s.days || '').toLowerCase().trim();
           const sT = String(s.time || '').toLowerCase().trim();
           const sN = String(s.name || '').toLowerCase().trim();
           const slotLow = String(slot).toLowerCase().trim();
-          const isBranchMatch = sB === bKey || sB.includes(bKey) || bKey.includes(sB);
-          return isBranchMatch && (sT === tKey || sT === slotLow || sN.includes(tKey) || sN.includes(slotLow));
+          const nameLow = String(name).toLowerCase().trim();
+
+          if (sN === slotLow || sN === nameLow) return true;
+          if (sD === dKey && sT === tKey) return true;
+          if (sT === slotLow) return true;
+          return false;
         });
 
         if (!alreadyExists && !scheduleMap.has(key)) {
           const bId = b.id || b.code || b.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
           scheduleMap.set(key, {
             id: `shift-${bId}-${sIdx}`,
-            name: slot.includes('BATCH') || slot.includes('Batch') ? slot : `${b.name} (${slot})`,
+            name: name,
             branch: b.name,
             branch_name: b.name,
             days: days,
             time: time,
             program: prog,
             instructor: b.branch_head || 'Sensei Abdul Rahman (5th Dan)',
-            targetGroup: 'All Belts & Cadets',
+            targetGroup: target,
             status: 'Active'
           });
         }
