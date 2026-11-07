@@ -1325,14 +1325,20 @@ export default function BranchManagement() {
                     </p>
                     {(() => {
                       const feeInfo = getBranchFeeSettings(b.id || b.name, branches);
-                      const mFee = feeInfo.monthlyFee ?? (b.monthly_fee ? parseInt(b.monthly_fee) : 500);
+                      const isSchool = (b.name || '').toLowerCase().includes('school') || (b.name || '').toLowerCase().includes('amlp') || (b.name || '').toLowerCase().includes('gmlp') || (b.name || '').toLowerCase().includes('ansar') || (b.name || '').toLowerCase().includes('btamup');
+                      const mFee = isSchool ? (feeInfo.schoolBatchFee || 500) : (feeInfo.monthlyFee ?? (b.monthly_fee ? parseInt(b.monthly_fee) : 500));
                       const aFee = feeInfo.admissionFee ?? (b.admission_fee !== undefined && b.admission_fee !== null ? parseInt(b.admission_fee) : 1000);
                       return (
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-gray-700 bg-emerald-50/80 border border-emerald-200 px-2.5 py-1 rounded-xl mt-2">
-                          <CreditCard className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                          <span>Fee: <strong className="text-emerald-800">₹{mFee}</strong>/mo</span>
+                        <div className={`flex items-center gap-2 text-[11px] font-bold px-2.5 py-1 rounded-xl mt-2 ${isSchool ? 'bg-blue-50/90 border border-blue-200 text-blue-900' : 'bg-emerald-50/80 border border-emerald-200 text-gray-700'}`}>
+                          <CreditCard className={`w-3.5 h-3.5 flex-shrink-0 ${isSchool ? 'text-blue-600' : 'text-emerald-600'}`} />
+                          <span>Fee: <strong className={isSchool ? 'text-blue-800' : 'text-emerald-800'}>₹{mFee}</strong>{isSchool ? '/3 mos' : '/mo'}</span>
                           <span>•</span>
-                          <span>Adm: <strong className="text-amber-800">₹{aFee}</strong></span>
+                          <span>Adm: <strong className="text-amber-800">{aFee === 0 ? 'Free' : `₹${aFee}`}</strong></span>
+                          {isSchool && (
+                            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-blue-200/70 text-blue-950 font-black">
+                              School Term
+                            </span>
+                          )}
                         </div>
                       );
                     })()}

@@ -155,6 +155,67 @@ export default function FeeManagement() {
     return pendingMonths;
   };
 
+  // Helper to extract 3-Month Terms for School Batch Cadets
+  const getCadetPendingTerms = (f) => {
+    if (!f) return [];
+    const std = f.student_detail || {};
+    const paidMonthsList = Array.isArray(std.paid_months) 
+      ? std.paid_months 
+      : (Array.isArray(std.paidMonths) ? std.paidMonths : []);
+    
+    const feeAmt = parseFloat(f.amount || std.fee_amount || std.feeAmount || 500);
+    const initialPaid = parseFloat(std.initial_paid_amount ?? std.initialPaidAmount ?? 0);
+
+    const joinDateStr = std.joiningDate || std.joining_date || std.created_at || '2026-08-01';
+    let joinMonthIdx = 7; // Default August
+    let startYear = 2026;
+    try {
+      const d = new Date(joinDateStr);
+      if (!isNaN(d.getTime())) {
+        joinMonthIdx = d.getMonth();
+        startYear = d.getFullYear();
+      }
+    } catch (e) {}
+
+    const MONTH_NAMES = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    const terms = [];
+    for (let t = 0; t < 4; t++) {
+      const termMonths = [];
+      const termStartGlobalIdx = joinMonthIdx + (t * 3);
+      for (let i = 0; i < 3; i++) {
+        const globalIdx = termStartGlobalIdx + i;
+        const mIdx = globalIdx % 12;
+        const yr = startYear + Math.floor(globalIdx / 12);
+        termMonths.push(`${MONTH_NAMES[mIdx]} ${yr}`);
+      }
+      const startM = termMonths[0].split(' ')[0];
+      const endM = termMonths[2].split(' ')[0];
+      const yr1 = termMonths[0].split(' ')[1];
+      const yr2 = termMonths[2].split(' ')[1];
+      const yrLabel = yr1 === yr2 ? yr1 : `${yr1}–${yr2}`;
+
+      const allInList = termMonths.every(m => paidMonthsList.includes(m));
+      const isInitialCovered = (t === 0 && (initialPaid >= feeAmt || String(std.fee_status || std.feeStatus).toLowerCase() === 'paid'));
+      const isPaid = allInList || isInitialCovered;
+
+      terms.push({
+        termIndex: t,
+        title: `Term ${t + 1}`,
+        period: `${startM} – ${endM} ${yrLabel}`,
+        label: `Term ${t + 1} (${startM} – ${endM} ${yrLabel})`,
+        months: termMonths,
+        rate: feeAmt,
+        isPaid
+      });
+    }
+
+    return terms;
+  };
+
   // Accurately resolve which month's receipt or reminder is being handled
   const resolveFeeMonth = (f) => {
     if (!f) return 'August';
@@ -175,7 +236,7 @@ export default function FeeManagement() {
       fetchStudents().then(stdList => {
         const cadets = stdList || getStoredStudents();
         const globalSettings = getGlobalFeeSettings();
-        const defaultSchoolRate = parseInt(globalSettings.defaultSchoolBatchFee) || 1200;
+        const defaultSchoolRate = parseInt(globalSettings.defaultSchoolBatchFee) || 500;
         const defaultMonthlyRate = parseInt(globalSettings.defaultMonthlyFee) || 500;
         const defaultAdmSetting = parseInt(globalSettings.defaultAdmissionFee);
         const isAcademyAdmFree = defaultAdmSetting === 0;
@@ -381,9 +442,15 @@ export default function FeeManagement() {
           ? paymentModalFee.student_detail.paid_months 
           : (Array.isArray(paymentModalFee.student_detail?.paidMonths) ? paymentModalFee.student_detail.paidMonths : []);
 
-        const newPaidMonths = isQuarterly
-          ? Array.from(new Set([...currentPaidMonths, 'August 2026', 'September 2026', 'October 2026']))
-          : Array.from(new Set([...currentPaidMonths, chosenMonthStr]));
+        let newPaidMonths = [...currentPaidMonths];
+        if (isQuarterly) {
+          const pTerms = getCadetPendingTerms(paymentModalFee);
+          const matchedTerm = pTerms.find(t => t.label === paymentMonth || t.title === paymentMonth || paymentMonth.includes(t.title));
+          const termMonthsToClear = matchedTerm ? matchedTerm.months : ['August 2026', 'September 2026', 'October 2026'];
+          newPaidMonths = Array.from(new Set([...currentPaidMonths, ...termMonthsToClear]));
+        } else {
+          newPaidMonths = Array.from(new Set([...currentPaidMonths, chosenMonthStr]));
+        }
 
         const updatedStudents = storedStudents.map(s => {
           if (s.id === targetId || s.admissionNo === paymentModalFee.student_detail?.admissionNo) {
@@ -443,42 +510,48 @@ export default function FeeManagement() {
     const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
 
     let text = '';
+    const isQuarterlyCadet = fee.is_quarterly || String(std.fee_frequency || std.feeFrequency).toUpperCase() === 'QUARTERLY';
+
     if (pendingAmt === 0 && admPendingAmt === 0) {
       // 🧾 OFFICIAL PAYMENT RECEIPT / ACKNOWLEDGMENT (When already Paid!)
       text = 
         `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
-        `🧾 *OFFICIAL PAYMENT RECEIPT / ഫീസ് രസീത്*\n` +
+        `🧾 *OFFICIAL ${isQuarterlyCadet ? 'SCHOOL BATCH TERM FEE RECEIPT' : 'MONTHLY FEE PAYMENT RECEIPT'} / ഫീസ് രസീത്*\n` +
         `Receipt No: *${fee.receipt_no || `REC-${std.admissionNo || std.admission_no || '001'}`}*\n` +
         `Cadet Name: *${cadetName}* (${std.admissionNo || std.admission_no || ''})\n` +
         `Branch Dojo: *${std.branch || 'Head Office Dojo'}*\n` +
+        `Billing Plan: *${isQuarterlyCadet ? 'School Batch (3-Month Term Plan)' : 'Regular Dojo (Monthly Plan)'}*\n` +
         `Course: *${std.program || std.course || 'Karate (Shotokan)'}*\n` +
-        `Shift: *${std.shift || 'Evening Batch'}*\n` +
-        `Month: *${activeMonthName} ${fee.year || 2026}*\n` +
-        `----------------------------------------\n` +
-        `Total Paid: *₹${totalAmt}* (✅ FULLY PAID)\n` +
+        `Shift: *${std.shift || 'Regular Batch'}*\n` +
+        `Payment Date: *${new Date().toLocaleDateString('en-GB')}*\n\n` +
+        `📋 *${isQuarterlyCadet ? 'CLEARED TERM DETAILS' : 'CLEARED MONTHS'}:* \n` +
+        `• ${isQuarterlyCadet ? 'Term' : 'Month'}: *${activeMonthName}* [FULLY PAID]\n` +
+        `💰 *TOTAL AMOUNT RECEIVED: ₹${totalAmt}*\n` +
         `Payment Status: *CLEARED / PAID*\n` +
         `Remaining Dues: *₹0*\n` +
         `----------------------------------------\n\n` +
-        `Dear Parent (${parentName}), we have successfully received and recorded the fee payment. Thank you for your continued support! OSS 🥋`;
+        `Dear Parent (${parentName}), fee payment for ${isQuarterlyCadet ? '3-month term' : '1 month(s)'} has been successfully recorded. Thank you! OSS 🥋`;
     } else if (selectedStatus === 'AdmissionPending' || (admPendingAmt > 0 && pendingAmt === 0)) {
       text = 
         `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
         `📌 *OFFICIAL ADMISSION / REGISTRATION FEE NOTICE*\n` +
         `Cadet Name: *${cadetName}* (${std.admissionNo || std.admission_no || ''})\n` +
         `Branch Dojo: *${std.branch || 'Head Office Dojo'}*\n` +
-        `Shift: *${std.shift || 'Evening Batch'}*\n` +
+        `Shift: *${std.shift || 'Regular Batch'}*\n` +
         `Admission Fee: *${isAdmFree ? '🎁 FREE / WAIVED (₹0)' : `₹${std.admissionFee || 1000}`}*\n` +
         (isAdmFree ? '' : `Admission Fee Dues: *₹${admPendingAmt}*\n\n`) +
         `Dear Parent (${parentName}), kindly settle the pending admission/registration fee at the academy office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
     } else {
       text = 
         `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
-        `📌 *OFFICIAL MONTHLY FEE REMINDER*\n` +
+        `📌 *OFFICIAL ${isQuarterlyCadet ? 'SCHOOL BATCH TERM FEE REMINDER' : 'MONTHLY FEE REMINDER'}*\n` +
         `Cadet Name: *${cadetName}* (${std.admissionNo || std.admission_no || ''})\n` +
-        `Shift: *${std.shift || 'Evening Batch'}*\n` +
-        `Month: *${activeMonthName} ${fee.year || 2026}*\n` +
-        `Total Monthly Fee: *₹${totalAmt}*\n` +
-        `Pending Monthly Dues: *₹${pendingAmt}*` +
+        `Branch Dojo: *${std.branch || 'Head Office Dojo'}*\n` +
+        `Billing Plan: *${isQuarterlyCadet ? 'School Batch (Every 3 Months)' : 'Regular Dojo (Monthly)'}*\n` +
+        `Shift: *${std.shift || 'Regular Batch'}*\n` +
+        `${isQuarterlyCadet ? 'Term' : 'Month'}: *${activeMonthName} ${fee.year || 2026}*\n` +
+        `Total ${isQuarterlyCadet ? 'Term Fee (3 Months)' : 'Monthly Fee'}: *₹${totalAmt}*\n` +
+        `Pending Dues: *₹${pendingAmt}*` +
         (!isAdmFree && admPendingAmt > 0 ? `\nAdmission Fee Dues: *₹${admPendingAmt}*` : isAdmFree ? `\nAdmission Fee: *🎁 FREE / WAIVED*` : '') +
         `\n\nDear Parent (${parentName}), kindly settle the fee dues at office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
     }
@@ -1107,9 +1180,14 @@ export default function FeeManagement() {
                   <button
                     onClick={() => {
                       setPaymentModalFee(fee);
-                      const pMonths = getCadetPendingMonths(fee);
-                      if (pMonths.length > 0) {
-                        setPaymentMonth(`${pMonths[0]} 2026`);
+                      const isQ1 = fee.is_quarterly || String(fee.student_detail?.fee_frequency || fee.student_detail?.feeFrequency).toUpperCase() === 'QUARTERLY';
+                      if (isQ1) {
+                        const pTerms = getCadetPendingTerms(fee);
+                        const nextTerm = pTerms.find(t => !t.isPaid) || pTerms[0];
+                        if (nextTerm) setPaymentMonth(nextTerm.label);
+                      } else {
+                        const pMonths = getCadetPendingMonths(fee);
+                        if (pMonths.length > 0) setPaymentMonth(`${pMonths[0]} 2026`);
                       }
                       if (admPendingAmt > 0 && pendingAmt === 0) {
                         setPaymentType('ADMISSION');
@@ -1507,15 +1585,15 @@ export default function FeeManagement() {
                     onClick={() => {
                       setPaymentType('MONTHLY');
                       const monthlyPending = getPendingDuesAmount(paymentModalFee);
-                      setPaymentAmount(monthlyPending > 0 ? String(monthlyPending) : '500');
+                      setPaymentAmount(monthlyPending > 0 ? String(monthlyPending) : String(paymentModalFee.amount || 500));
                     }}
                     className={`py-2 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                       paymentType === 'MONTHLY'
-                        ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                        ? (paymentModalFee.is_quarterly ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-gray-900 text-white border-gray-900 shadow-sm')
                         : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                     }`}
                   >
-                    <span>🥋 Monthly Tuition Fee</span>
+                    <span>{paymentModalFee.is_quarterly ? '🏫 School Batch (3-Mo Term)' : '🥋 Monthly Tuition Fee'}</span>
                   </button>
 
                   <button
@@ -1536,13 +1614,48 @@ export default function FeeManagement() {
                 </div>
               </div>
 
-              {/* Which Month Are You Collecting For? ONLY PENDING MONTHS */}
+              {/* Which Month / Term Are You Collecting For? */}
               {paymentType === 'MONTHLY' && (() => {
+                const isQuarterly = paymentModalFee.is_quarterly || String(paymentModalFee.student_detail?.fee_frequency || paymentModalFee.student_detail?.feeFrequency).toUpperCase() === 'QUARTERLY';
+
+                if (isQuarterly) {
+                  const terms = getCadetPendingTerms(paymentModalFee);
+                  const pendingTerms = terms.filter(t => !t.isPaid);
+                  return (
+                    <div>
+                      <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1 font-black text-blue-950">
+                          <Clock className="w-3.5 h-3.5 text-blue-600" /> Pending School Term (3 Months) *
+                        </span>
+                        <span className="text-[10px] text-blue-700 font-black bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                          {pendingTerms.length} Term(s) Due
+                        </span>
+                      </label>
+                      <select
+                        value={paymentMonth}
+                        onChange={(e) => setPaymentMonth(e.target.value)}
+                        className="w-full bg-blue-50/50 border border-blue-300 rounded-xl px-3 py-2.5 text-blue-950 font-black focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs text-xs"
+                      >
+                        {terms.map(t => (
+                          <option key={t.label} value={t.label}>
+                            {t.isPaid ? `✅ ${t.label} (Cleared)` : `⚠️ ${t.label} (₹${t.rate} Due)`}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-gray-500 font-medium mt-1">
+                        🏫 Collecting this term will clear all 3 months of this period for this cadet.
+                      </p>
+                    </div>
+                  );
+                }
+
                 const pendingMonths = getCadetPendingMonths(paymentModalFee);
                 return (
                   <div>
                     <label className="block text-gray-700 font-bold mb-1 flex items-center justify-between">
-                      <span>Pending Billing Month *</span>
+                      <span className="flex items-center gap-1 font-black text-gray-900">
+                        <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Pending Billing Month *
+                      </span>
                       <span className="text-[10px] text-rose-700 font-black bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
                         {pendingMonths.length} Month(s) Due
                       </span>
@@ -1550,7 +1663,7 @@ export default function FeeManagement() {
                     <select
                       value={paymentMonth}
                       onChange={(e) => setPaymentMonth(e.target.value)}
-                      className="w-full bg-rose-50/40 border border-rose-200 rounded-xl px-3 py-2.5 text-gray-900 font-black focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer shadow-2xs"
+                      className="w-full bg-rose-50/40 border border-rose-200 rounded-xl px-3 py-2.5 text-gray-900 font-black focus:bg-white focus:outline-none focus:border-red-500 cursor-pointer shadow-2xs text-xs"
                     >
                       {pendingMonths.map(m => (
                         <option key={m} value={`${m} 2026`}>
@@ -1558,6 +1671,9 @@ export default function FeeManagement() {
                         </option>
                       ))}
                     </select>
+                    <p className="text-[10px] text-gray-500 font-medium mt-1">
+                      🥋 Regular Dojo: Collects single monthly tuition fee.
+                    </p>
                   </div>
                 );
               })()}
@@ -1663,8 +1779,14 @@ export default function FeeManagement() {
                 <strong className="text-amber-800 font-bold">{activeReceipt.student_detail?.shift || 'Evening Batch'}</strong>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2">
-                <span className="text-gray-500 font-medium">Billing Month:</span>
-                <strong className="text-gray-900 font-black">{resolveFeeMonth(activeReceipt)} {activeReceipt.year || 2026}</strong>
+                <span className="text-gray-500 font-medium">Billing Plan:</span>
+                <strong className="font-bold text-gray-900">
+                  {activeReceipt.is_quarterly ? '🏫 School Batch (3-Month Term Plan)' : '🥋 Regular Dojo (Monthly Plan)'}
+                </strong>
+              </div>
+              <div className="flex justify-between border-b border-gray-100 pb-2">
+                <span className="text-gray-500 font-medium">{activeReceipt.is_quarterly ? 'Cleared Term:' : 'Billing Month:'}</span>
+                <strong className="text-gray-900 font-black">{activeReceipt.month || `${resolveFeeMonth(activeReceipt)} ${activeReceipt.year || 2026}`}</strong>
               </div>
               <div className="flex justify-between border-b border-gray-100 pb-2 bg-emerald-50/60 p-2.5 rounded-xl">
                 <span className="text-emerald-800 font-bold">Total Paid:</span>

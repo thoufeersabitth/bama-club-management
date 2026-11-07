@@ -1019,7 +1019,8 @@ export default function StudentManagement() {
 
           if (!isThisBranch) return s;
 
-          const isSchool = s.billingPlan === 'SCHOOL_BATCH' || s.billing_plan === 'SCHOOL_BATCH' || s.feeFrequency === 'QUARTERLY';
+          const isBranchSchool = branchName.toLowerCase().includes('school') || branchName.toLowerCase().includes('amlp') || branchName.toLowerCase().includes('gmlp') || branchName.toLowerCase().includes('ansar') || branchName.toLowerCase().includes('btamup');
+          const isSchool = isBranchSchool || s.billingPlan === 'SCHOOL_BATCH' || s.billing_plan === 'SCHOOL_BATCH' || s.feeFrequency === 'QUARTERLY';
           const applicableRate = isSchool ? newSchool : newMonthly;
           const currentPaid = parseInt(s.initialPaidAmount || s.initial_paid_amount || 0);
           const newPending = Math.max(0, applicableRate - currentPaid);
@@ -1027,6 +1028,11 @@ export default function StudentManagement() {
 
           const updatedObj = {
             ...s,
+            billingPlan: isSchool ? 'SCHOOL_BATCH' : 'REGULAR',
+            billing_plan: isSchool ? 'SCHOOL_BATCH' : 'REGULAR',
+            feeFrequency: isSchool ? 'QUARTERLY' : 'MONTHLY',
+            fee_frequency: isSchool ? 'QUARTERLY' : 'MONTHLY',
+            feeCycleMonths: isSchool ? 3 : 1,
             feeAmount: applicableRate,
             fee_amount: applicableRate,
             monthlyFee: applicableRate,
@@ -3988,7 +3994,7 @@ export default function StudentManagement() {
                     const defaultShift = branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)';
                     
                     const feeInfo = getBranchFeeSettings(bName, branchesList);
-                    const isSchool = bName.toLowerCase().includes('school') || bName.toLowerCase().includes('amlp') || bName.toLowerCase().includes('gmlp') || bName.toLowerCase().includes('ansar');
+                    const isSchool = bName.toLowerCase().includes('school') || bName.toLowerCase().includes('amlp') || bName.toLowerCase().includes('gmlp') || bName.toLowerCase().includes('ansar') || bName.toLowerCase().includes('btamup');
                     const bPlan = isSchool ? 'SCHOOL_BATCH' : 'REGULAR';
                     const activeFee = bPlan === 'SCHOOL_BATCH' ? (feeInfo.schoolBatchFee || 500) : (feeInfo.monthlyFee || 500);
 
@@ -4000,6 +4006,9 @@ export default function StudentManagement() {
                       shift: defaultShift,
                       billingPlan: bPlan,
                       billing_plan: bPlan,
+                      feeFrequency: isSchool ? 'QUARTERLY' : 'MONTHLY',
+                      fee_frequency: isSchool ? 'QUARTERLY' : 'MONTHLY',
+                      feeCycleMonths: isSchool ? 3 : 1,
                       admissionFee: feeInfo.admissionFee ?? 1000,
                       admissionFeePaidAmount: feeInfo.admissionFee ?? 1000,
                       feeAmount: activeFee,
@@ -4179,7 +4188,21 @@ export default function StudentManagement() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div 
-                    onClick={() => setFormData({ ...formData, feeFrequency: 'MONTHLY' })}
+                    onClick={() => {
+                      const curB = formData.branch || formData.branch_name;
+                      const fInfo = getBranchFeeSettings(curB, branchesList);
+                      const targetFee = fInfo.monthlyFee || 500;
+                      setFormData({ 
+                        ...formData, 
+                        feeFrequency: 'MONTHLY',
+                        fee_frequency: 'MONTHLY',
+                        billingPlan: 'REGULAR',
+                        billing_plan: 'REGULAR',
+                        feeCycleMonths: 1,
+                        feeAmount: targetFee,
+                        initialPaidAmount: targetFee
+                      });
+                    }}
                     className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-center gap-2.5 ${
                       (formData.feeFrequency || 'MONTHLY') === 'MONTHLY'
                         ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
@@ -4198,7 +4221,21 @@ export default function StudentManagement() {
                   </div>
 
                   <div 
-                    onClick={() => setFormData({ ...formData, feeFrequency: 'QUARTERLY' })}
+                    onClick={() => {
+                      const curB = formData.branch || formData.branch_name;
+                      const fInfo = getBranchFeeSettings(curB, branchesList);
+                      const targetFee = fInfo.schoolBatchFee || 500;
+                      setFormData({ 
+                        ...formData, 
+                        feeFrequency: 'QUARTERLY',
+                        fee_frequency: 'QUARTERLY',
+                        billingPlan: 'SCHOOL_BATCH',
+                        billing_plan: 'SCHOOL_BATCH',
+                        feeCycleMonths: 3,
+                        feeAmount: targetFee,
+                        initialPaidAmount: targetFee
+                      });
+                    }}
                     className={`p-3 rounded-xl border-2 cursor-pointer transition flex items-center gap-2.5 ${
                       formData.feeFrequency === 'QUARTERLY'
                         ? 'bg-blue-600 text-white border-blue-700 shadow-sm ring-2 ring-blue-300'
@@ -5190,11 +5227,33 @@ export default function StudentManagement() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-gray-600 font-medium pt-0.5">
-                  {selectedFeeBranch === 'ALL' 
-                    ? 'Academy-wide default rates. Used as fallback for branches without custom rates.' 
-                    : `Configure separate admission & monthly training fees specifically for ${branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch}.`}
-                </p>
+                {(() => {
+                  const bNameStr = selectedFeeBranch === 'ALL' ? '' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
+                  const isSchool = bNameStr && (bNameStr.toLowerCase().includes('school') || bNameStr.toLowerCase().includes('amlp') || bNameStr.toLowerCase().includes('gmlp') || bNameStr.toLowerCase().includes('ansar') || bNameStr.toLowerCase().includes('btamup'));
+                  
+                  if (selectedFeeBranch === 'ALL') {
+                    return (
+                      <div className="p-2 bg-gray-100 rounded-lg text-[10px] text-gray-700 font-semibold flex items-center gap-1.5 mt-1">
+                        <span>🌐</span>
+                        <span><strong>Academy Fallback Rates:</strong> Default rates used for branches without custom rates.</span>
+                      </div>
+                    );
+                  }
+                  if (isSchool) {
+                    return (
+                      <div className="p-2 bg-blue-50 text-blue-900 border border-blue-200 rounded-lg text-[10px] font-bold flex items-center gap-1.5 mt-1">
+                        <span>🏫</span>
+                        <span><strong>School Batch Dojo ({bNameStr}):</strong> Billed once every 3 months. Set the <strong>School Batch Term Fee (₹ / 3 Months)</strong> below.</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="p-2 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg text-[10px] font-bold flex items-center gap-1.5 mt-1">
+                      <span>🥋</span>
+                      <span><strong>Regular Dojo ({bNameStr}):</strong> Billed monthly. Set the <strong>Regular Dojo Monthly Fee (₹ / Month)</strong> below.</span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* One-Time Admission Fee */}
