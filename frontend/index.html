@@ -11,6 +11,18 @@
     <meta http-equiv="Expires" content="0" />
     <meta name="description" content="B.A.M.A. - Brave Academy of Martial Arts Official Club Management Portal" />
     <title>B.A.M.A. | Brave Academy of Martial Arts</title>
+    <script>
+      // Auto-recover if cached index.html points to an outdated CSS hash after a deployment
+      window.addEventListener('error', function(e) {
+        if (e.target && e.target.tagName === 'LINK' && e.target.rel === 'stylesheet') {
+          var lastReload = sessionStorage.getItem('bama_css_reloaded');
+          if (!lastReload || (Date.now() - parseInt(lastReload)) > 15000) {
+            sessionStorage.setItem('bama_css_reloaded', Date.now());
+            window.location.reload();
+          }
+        }
+      }, true);
+    </script>
   </head>
   <body>
     <div id="root"></div>
