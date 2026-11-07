@@ -186,7 +186,8 @@ export default function StudentManagement() {
       setBranchFeeData({
         admissionFee: g.defaultAdmissionFee ?? 1000,
         monthlyFee: g.defaultMonthlyFee ?? 500,
-        schoolBatchFee: g.defaultSchoolBatchFee ?? 500
+        schoolBatchFee: g.defaultSchoolBatchFee ?? 500,
+        billingMode: 'BOTH'
       });
     } else {
       const bFees = getBranchFeeSettings(branchVal, branchesList);
@@ -987,10 +988,14 @@ export default function StudentManagement() {
       const newMonthly = parseInt(branchFeeData.monthlyFee) || 500;
       const newSchool = parseInt(branchFeeData.schoolBatchFee) || 500;
 
+      const isBranchSchool = branchName.toLowerCase().includes('school') || branchName.toLowerCase().includes('amlp') || branchName.toLowerCase().includes('gmlp') || branchName.toLowerCase().includes('ansar') || branchName.toLowerCase().includes('btamup');
+      const effectiveMode = branchFeeData.billingMode || (isBranchSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
+
       await updateBranchFeeSettings(branchId, {
         monthly_fee: newMonthly,
         admission_fee: newAdm,
-        school_batch_fee: newSchool
+        school_batch_fee: newSchool,
+        billing_mode: effectiveMode
       });
 
       setBranchesList(prev => prev.map(b => {
@@ -1002,7 +1007,9 @@ export default function StudentManagement() {
             admission_fee: newAdm,
             admissionFee: newAdm,
             school_batch_fee: newSchool,
-            schoolBatchFee: newSchool
+            schoolBatchFee: newSchool,
+            billing_mode: effectiveMode,
+            billingMode: effectiveMode
           };
         }
         return b;
@@ -1019,8 +1026,7 @@ export default function StudentManagement() {
 
           if (!isThisBranch) return s;
 
-          const isBranchSchool = branchName.toLowerCase().includes('school') || branchName.toLowerCase().includes('amlp') || branchName.toLowerCase().includes('gmlp') || branchName.toLowerCase().includes('ansar') || branchName.toLowerCase().includes('btamup');
-          const isSchool = isBranchSchool || s.billingPlan === 'SCHOOL_BATCH' || s.billing_plan === 'SCHOOL_BATCH' || s.feeFrequency === 'QUARTERLY';
+          const isSchool = effectiveMode === 'TERM_ONLY' ? true : (effectiveMode === 'MONTHLY_ONLY' ? false : (s.billingPlan === 'SCHOOL_BATCH' || s.billing_plan === 'SCHOOL_BATCH' || s.feeFrequency === 'QUARTERLY'));
           const applicableRate = isSchool ? newSchool : newMonthly;
           const currentPaid = parseInt(s.initialPaidAmount || s.initial_paid_amount || 0);
           const newPending = Math.max(0, applicableRate - currentPaid);
@@ -1063,7 +1069,13 @@ export default function StudentManagement() {
       window.dispatchEvent(new Event('bama_fee_settings_updated'));
       window.dispatchEvent(new Event('bama_data_updated'));
       setShowGlobalFeeModal(false);
-      alert('Fee settings saved for ' + branchName + ':\n\nAdmission Fee: Rs.' + newAdm + '\nMonthly Fee: Rs.' + newMonthly + '\nSchool Term Fee: Rs.' + newSchool);
+      alert(
+        `Fee settings saved for ${branchName}:\n\n` +
+        `Billing Mode: ${effectiveMode === 'MONTHLY_ONLY' ? '🥋 1 Month Only (Monthly)' : effectiveMode === 'TERM_ONLY' ? '🏫 3 Months Only (School Term)' : '🔄 Both (1 & 3 Months)'}\n` +
+        `Admission Fee: Rs.${newAdm}\n` +
+        (effectiveMode !== 'TERM_ONLY' ? `Monthly Fee: Rs.${newMonthly}\n` : '') +
+        (effectiveMode !== 'MONTHLY_ONLY' ? `School Term Fee: Rs.${newSchool}` : '')
+      );
       return;
     }
 
@@ -5286,65 +5298,180 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              {/* Monthly Cadet Fee (Regular Dojo) */}
-              <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2 shadow-xs">
-                <label className="text-emerald-950 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Regular Dojo Monthly Fee (₹ / Month)</span>
-                  <span className="text-emerald-800 font-mono text-sm font-black">₹{branchFeeData.monthlyFee || 500} / Month</span>
-                </label>
-                <input
-                  type="number"
-                  value={branchFeeData.monthlyFee || 500}
-                  onChange={(e) => setBranchFeeData({ ...branchFeeData, monthlyFee: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-emerald-500"
-                />
-                <div className="flex flex-wrap gap-1 pt-0.5">
-                  {[500, 600, 700, 800, 1000, 1200, 1500].map(amt => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setBranchFeeData({ ...branchFeeData, monthlyFee: amt })}
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
-                        (branchFeeData.monthlyFee || 500) === amt
-                          ? 'bg-emerald-600 text-white shadow'
-                          : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
-                      }`}
-                    >
-                      ₹{amt}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {/* Branch Billing Mode Toggle: Choose 1 Month, 3 Months, or Both */}
+              {(() => {
+                const bNameStr = selectedFeeBranch === 'ALL' ? '' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
+                const isSchool = bNameStr && (bNameStr.toLowerCase().includes('school') || bNameStr.toLowerCase().includes('amlp') || bNameStr.toLowerCase().includes('gmlp') || bNameStr.toLowerCase().includes('ansar') || bNameStr.toLowerCase().includes('btamup'));
+                const currentMode = branchFeeData.billingMode || (selectedFeeBranch === 'ALL' ? 'BOTH' : isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
 
-              {/* School Batch 3-Month Term Fee */}
-              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 shadow-xs">
-                <label className="text-blue-950 font-black text-xs flex items-center justify-between">
-                  <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-blue-600" /> School Batch Term Fee (₹ / 3 Months)</span>
-                  <span className="text-blue-800 font-mono text-sm font-black">₹{branchFeeData.schoolBatchFee || 500} / 3 Mos</span>
-                </label>
-                <input
-                  type="number"
-                  value={branchFeeData.schoolBatchFee || 500}
-                  onChange={(e) => setBranchFeeData({ ...branchFeeData, schoolBatchFee: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-white border border-blue-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-blue-500"
-                />
-                <div className="flex flex-wrap gap-1 pt-0.5">
-                  {[500, 600, 750, 900, 1200, 1500].map(amt => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setBranchFeeData({ ...branchFeeData, schoolBatchFee: amt })}
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
-                        (branchFeeData.schoolBatchFee || 500) === amt
-                          ? 'bg-blue-600 text-white shadow'
-                          : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
-                      }`}
-                    >
-                      ₹{amt}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                return (
+                  <div className="p-3 bg-gradient-to-r from-red-50/40 via-amber-50/40 to-blue-50/40 border-2 border-red-200 rounded-xl space-y-2 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-red-950 font-black text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                        <Clock className="w-4 h-4 text-red-600" /> Active Fee Plan for {selectedFeeBranch === 'ALL' ? 'Academy' : bNameStr} *
+                      </label>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        currentMode === 'MONTHLY_ONLY' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                        currentMode === 'TERM_ONLY' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                        'bg-purple-100 text-purple-800 border border-purple-200'
+                      }`}>
+                        {currentMode === 'MONTHLY_ONLY' ? '🥋 1 Month (Monthly)' : currentMode === 'TERM_ONLY' ? '🏫 3 Months (Term)' : '🔄 Both (1 & 3 Mos)'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-600 font-medium">
+                      Select which billing cycle applies to this branch. Unwanted plans will be completely turned <strong>OFF</strong>.
+                    </p>
+
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setBranchFeeData({ ...branchFeeData, billingMode: 'MONTHLY_ONLY' })}
+                        className={`p-2 rounded-xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 text-center ${
+                          currentMode === 'MONTHLY_ONLY'
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-emerald-50 hover:border-emerald-300'
+                        }`}
+                      >
+                        <span className="text-sm">🥋</span>
+                        <span className="leading-tight text-[11px]">1 Month (Monthly)</span>
+                        <span className={`text-[9px] font-bold ${currentMode === 'MONTHLY_ONLY' ? 'text-emerald-100' : 'text-gray-400'}`}>3-Mo Term OFF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBranchFeeData({ ...branchFeeData, billingMode: 'TERM_ONLY' })}
+                        className={`p-2 rounded-xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 text-center ${
+                          currentMode === 'TERM_ONLY'
+                            ? 'bg-blue-600 text-white border-blue-700 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:border-blue-300'
+                        }`}
+                      >
+                        <span className="text-sm">🏫</span>
+                        <span className="leading-tight text-[11px]">3 Months (Term)</span>
+                        <span className={`text-[9px] font-bold ${currentMode === 'TERM_ONLY' ? 'text-blue-100' : 'text-gray-400'}`}>Monthly Fee OFF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBranchFeeData({ ...branchFeeData, billingMode: 'BOTH' })}
+                        className={`p-2 rounded-xl border-2 font-black text-xs transition cursor-pointer flex flex-col items-center justify-center gap-0.5 text-center ${
+                          currentMode === 'BOTH'
+                            ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-purple-50 hover:border-purple-300'
+                        }`}
+                      >
+                        <span className="text-sm">🔄</span>
+                        <span className="leading-tight text-[11px]">Both (Flexible)</span>
+                        <span className={`text-[9px] font-bold ${currentMode === 'BOTH' ? 'text-purple-100' : 'text-gray-400'}`}>1 & 3 Months</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Monthly Cadet Fee (Regular Dojo) - Only shown when Monthly or Both is ON */}
+              {(() => {
+                const bNameStr = selectedFeeBranch === 'ALL' ? '' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
+                const isSchool = bNameStr && (bNameStr.toLowerCase().includes('school') || bNameStr.toLowerCase().includes('amlp') || bNameStr.toLowerCase().includes('gmlp') || bNameStr.toLowerCase().includes('ansar') || bNameStr.toLowerCase().includes('btamup'));
+                const currentMode = branchFeeData.billingMode || (selectedFeeBranch === 'ALL' ? 'BOTH' : isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
+
+                if (currentMode === 'TERM_ONLY') {
+                  return (
+                    <div className="p-3 bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-between text-xs text-gray-500">
+                      <span className="flex items-center gap-1.5 font-bold">
+                        <CreditCard className="w-4 h-4 text-gray-400" />
+                        <span>Regular Dojo Monthly Fee:</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 font-black text-[10px] uppercase">
+                        🔴 TURNED OFF (3-Month Term Active)
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2 shadow-xs">
+                    <label className="text-emerald-950 font-black text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Regular Dojo Monthly Fee (₹ / Month)</span>
+                      <span className="text-emerald-800 font-mono text-sm font-black">₹{branchFeeData.monthlyFee || 500} / Month</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={branchFeeData.monthlyFee || 500}
+                      onChange={(e) => setBranchFeeData({ ...branchFeeData, monthlyFee: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-emerald-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {[500, 600, 700, 800, 1000, 1200, 1500].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setBranchFeeData({ ...branchFeeData, monthlyFee: amt })}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
+                            (branchFeeData.monthlyFee || 500) === amt
+                              ? 'bg-emerald-600 text-white shadow'
+                              : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
+                          }`}
+                        >
+                          ₹{amt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* School Batch 3-Month Term Fee - Only shown when Term or Both is ON */}
+              {(() => {
+                const bNameStr = selectedFeeBranch === 'ALL' ? '' : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
+                const isSchool = bNameStr && (bNameStr.toLowerCase().includes('school') || bNameStr.toLowerCase().includes('amlp') || bNameStr.toLowerCase().includes('gmlp') || bNameStr.toLowerCase().includes('ansar') || bNameStr.toLowerCase().includes('btamup'));
+                const currentMode = branchFeeData.billingMode || (selectedFeeBranch === 'ALL' ? 'BOTH' : isSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY');
+
+                if (currentMode === 'MONTHLY_ONLY') {
+                  return (
+                    <div className="p-3 bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-between text-xs text-gray-500">
+                      <span className="flex items-center gap-1.5 font-bold">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span>School Batch Term Fee (3 Months):</span>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-gray-200 text-gray-700 font-black text-[10px] uppercase">
+                        🔴 TURNED OFF (1-Month Plan Active)
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 shadow-xs">
+                    <label className="text-blue-950 font-black text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-blue-600" /> School Batch Term Fee (₹ / 3 Months)</span>
+                      <span className="text-blue-800 font-mono text-sm font-black">₹{branchFeeData.schoolBatchFee || 500} / 3 Mos</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={branchFeeData.schoolBatchFee || 500}
+                      onChange={(e) => setBranchFeeData({ ...branchFeeData, schoolBatchFee: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-blue-300 rounded-lg px-3 py-1.5 text-gray-900 font-black text-xs font-mono focus:outline-none focus:border-blue-500"
+                    />
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {[500, 600, 750, 900, 1200, 1500].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setBranchFeeData({ ...branchFeeData, schoolBatchFee: amt })}
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold transition cursor-pointer ${
+                            (branchFeeData.schoolBatchFee || 500) === amt
+                              ? 'bg-blue-600 text-white shadow'
+                              : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-200'
+                          }`}
+                        >
+                          ₹{amt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Effective Month & Scope Configuration */}
               <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5 shadow-xs">

@@ -519,6 +519,7 @@ export const updateBranchFeeSettings = async (branchId, feeData) => {
     if (feeData.monthly_fee !== undefined) payload.monthly_fee = feeData.monthly_fee;
     if (feeData.admission_fee !== undefined) payload.admission_fee = feeData.admission_fee;
     if (feeData.school_batch_fee !== undefined) payload.school_batch_fee = feeData.school_batch_fee;
+    if (feeData.billing_mode !== undefined) payload.billing_mode = feeData.billing_mode;
 
     // Resolve target backend UUID and branch names
     let targetBackendId = (typeof branchId === 'string' && branchId.length > 20 && !branchId.startsWith('branch-')) ? branchId : null;
@@ -677,10 +678,16 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
   const rawMonthly = mappedFee.monthly_fee ?? mappedFee.monthlyFee ?? matched?.monthly_fee ?? matched?.monthlyFee;
   const rawSchool = mappedFee.school_batch_fee ?? mappedFee.schoolBatchFee ?? matched?.school_batch_fee ?? matched?.schoolBatchFee;
 
+  const bNameStr = String(matched?.name || branchIdOrName || '').toLowerCase();
+  const isDefaultSchool = bNameStr.includes('school') || bNameStr.includes('amlp') || bNameStr.includes('gmlp') || bNameStr.includes('ansar') || bNameStr.includes('btamup');
+  const defaultMode = isDefaultSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY';
+  const rawMode = mappedFee.billing_mode || mappedFee.billingMode || matched?.billing_mode || matched?.billingMode || defaultMode;
+
   return {
     admissionFee: (rawAdm !== undefined && rawAdm !== null && !isNaN(parseInt(rawAdm))) ? parseInt(rawAdm) : (global.defaultAdmissionFee ?? 1000),
     monthlyFee: (rawMonthly !== undefined && rawMonthly !== null && !isNaN(parseInt(rawMonthly))) ? parseInt(rawMonthly) : (global.defaultMonthlyFee ?? 500),
-    schoolBatchFee: (rawSchool !== undefined && rawSchool !== null && !isNaN(parseInt(rawSchool))) ? parseInt(rawSchool) : (global.defaultSchoolBatchFee ?? 500)
+    schoolBatchFee: (rawSchool !== undefined && rawSchool !== null && !isNaN(parseInt(rawSchool))) ? parseInt(rawSchool) : (global.defaultSchoolBatchFee ?? 500),
+    billingMode: rawMode
   };
 };
 
