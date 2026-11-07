@@ -7,7 +7,7 @@ import {
   Download, Printer, FileSpreadsheet, CreditCard
 } from 'lucide-react';
 import { fetchBranches, fetchTrainingSchedules, fetchStudents, getStoredStudents, createBranchBackend, updateBranchBackend, deleteBranchBackend, saveBranchImageBackend, createTrainingScheduleBackend, updateTrainingScheduleBackend, deleteTrainingScheduleBackend, saveTrainingSchedulesBackend, filterOutDummyShifts, openWhatsApp, generateUniqueBranchCode, safeLocalStorageSet, getBranchPhotoUrl, uploadImageToCdn, isValidBranchImage, getBranchFeeSettings, updateBranchFeeSettings } from '../../services/api';
-import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS, getBranchKeyFromStr } from '../../services/initialData';
+import { INITIAL_BRANCHES, SHIFT_OPTIONS, PROGRAM_OPTIONS, getBranchKeyFromStr, matchesShift } from '../../services/initialData';
 
 export default function BranchManagement() {
   const navigate = useNavigate();
@@ -848,7 +848,7 @@ export default function BranchManagement() {
       return branchCadets.filter(s => {
         const sShift = String(s.shift || '').toLowerCase().trim();
         if (!sShift) return false;
-        return sShift.includes(sFilterLow) || sFilterLow.includes(sShift);
+        return matchesShift(s.shift, shiftFilter) || sShift.includes(sFilterLow) || sFilterLow.includes(sShift);
       });
     }
 

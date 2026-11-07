@@ -2663,28 +2663,88 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
     console.error('Failed to fetch training schedules from Fly.io cms-config:', err);
   }
 
-  // 2. If server returned schedules, server is authoritative! If server was offline, load from localStorage
-  if (serverSchedules.length === 0) {
-    try {
-      const stored = localStorage.getItem('bama_training_schedules');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          const cleanLocal = deduplicateSchedules(parsed);
-          cleanLocal.forEach(s => {
-            if (s && s.id) {
-              const bKey = String(s.branch || s.branch_name || '').toLowerCase().trim();
-              const dKey = String(s.days || '').toLowerCase().trim();
-              const tKey = String(s.time || '').toLowerCase().trim();
-              const key = `${bKey}__${dKey}__${tKey}`;
-              if (!scheduleMap.has(key)) {
-                scheduleMap.set(key, s);
-              }
+  // 2. Load from localStorage if any
+  try {
+    const stored = localStorage.getItem('bama_training_schedules');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        const cleanLocal = deduplicateSchedules(parsed);
+        cleanLocal.forEach(s => {
+          if (s && s.id) {
+            const bKey = String(s.branch || s.branch_name || '').toLowerCase().trim();
+            const dKey = String(s.days || '').toLowerCase().trim();
+            const tKey = String(s.time || '').toLowerCase().trim();
+            const key = `${bKey}__${dKey}__${tKey}`;
+            if (!scheduleMap.has(key)) {
+              scheduleMap.set(key, s);
             }
+          }
+        });
+      }
+    }
+  } catch (e) {}
+
+  // 3. Guarantee that EVERY active branch in the academy has all of its official timing slots populated!
+  try {
+    let branches = [];
+    try {
+      const storedBranches = localStorage.getItem('bama_custom_branches') || localStorage.getItem('bama_branches');
+      if (storedBranches) branches = JSON.parse(storedBranches);
+    } catch (e) {}
+    if (!Array.isArray(branches) || branches.length === 0) {
+      branches = INITIAL_BRANCHES;
+    }
+
+    branches.forEach(b => {
+      if (!b || !b.name || !b.timings) return;
+      const rawTimings = String(b.timings).trim();
+      const slots = rawTimings.includes('|') ? rawTimings.split('|').map(x => x.trim()) : [rawTimings];
+      const prog = b.name.toLowerCase().includes('kick') ? 'Kickboxing' : (b.name.toLowerCase().includes('fitness') ? 'Fitness Training' : 'Karate (Shotokan)');
+
+      slots.forEach((slot, sIdx) => {
+        if (!slot) return;
+        let days = 'Mon, Wed, Fri';
+        let time = slot;
+        if (slot.includes(':')) {
+          const colonIndex = slot.indexOf(':');
+          days = slot.substring(0, colonIndex).trim();
+          time = slot.substring(colonIndex + 1).trim();
+        }
+        const bKey = String(b.name).toLowerCase().trim();
+        const dKey = String(days).toLowerCase().trim();
+        const tKey = String(time).toLowerCase().trim();
+        const key = `${bKey}__${dKey}__${tKey}`;
+
+        // Check if an existing schedule matches this branch and time/slot
+        const alreadyExists = Array.from(scheduleMap.values()).some(s => {
+          const sB = String(s.branch || s.branch_name || '').toLowerCase().trim();
+          const sT = String(s.time || '').toLowerCase().trim();
+          const sN = String(s.name || '').toLowerCase().trim();
+          const slotLow = String(slot).toLowerCase().trim();
+          const isBranchMatch = sB === bKey || sB.includes(bKey) || bKey.includes(sB);
+          return isBranchMatch && (sT === tKey || sT === slotLow || sN.includes(tKey) || sN.includes(slotLow));
+        });
+
+        if (!alreadyExists && !scheduleMap.has(key)) {
+          const bId = b.id || b.code || b.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+          scheduleMap.set(key, {
+            id: `shift-${bId}-${sIdx}`,
+            name: slot.includes('BATCH') || slot.includes('Batch') ? slot : `${b.name} (${slot})`,
+            branch: b.name,
+            branch_name: b.name,
+            days: days,
+            time: time,
+            program: prog,
+            instructor: b.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+            targetGroup: 'All Belts & Cadets',
+            status: 'Active'
           });
         }
-      }
-    } catch (e) {}
+      });
+    });
+  } catch (err) {
+    console.error('Error auto-populating branch schedules from timings:', err);
   }
 
   const finalSchedules = deduplicateSchedules(Array.from(scheduleMap.values()));
@@ -2692,6 +2752,9 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
   if (finalSchedules.length > 0) {
     try {
       localStorage.setItem('bama_training_schedules', JSON.stringify(finalSchedules));
+      if (serverSchedules.length < finalSchedules.length) {
+        saveTrainingSchedulesBackend(finalSchedules).catch(() => {});
+      }
     } catch (e) {}
   }
 
