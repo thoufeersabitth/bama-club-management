@@ -65,9 +65,9 @@ export default function AttendanceManagement() {
   const [reportBranch, setReportBranch] = useState('All');
   const [reportShift, setReportShift] = useState('All');
 
-  // Day Status State (CLASS vs HOLIDAY)
-  const [dayStatus, setDayStatus] = useState('CLASS');
-  const [holidayReason, setHolidayReason] = useState('Weekly Dojo Off Day');
+  // Day Status State (CLASS vs HOLIDAY) - Defaults automatically to HOLIDAY (Dojo Off / Leave) if unrecorded
+  const [dayStatus, setDayStatus] = useState('HOLIDAY');
+  const [holidayReason, setHolidayReason] = useState('No Class Conducted / Off Day');
 
   // Bulk Absentee WhatsApp Queue State
   const [showAbsentModal, setShowAbsentModal] = useState(false);
@@ -78,84 +78,120 @@ export default function AttendanceManagement() {
   useEffect(() => {
     const bKey = getBranchStorageKey(selectedBranch);
     
-    // 1. Read cached Day Status
-    const cachedBranchStatus = localStorage.getItem(`bama_day_status_${bKey}_${selectedDate}`);
-    const cachedBranchReason = localStorage.getItem(`bama_holiday_reason_${bKey}_${selectedDate}`);
-    const cachedGlobalStatus = localStorage.getItem(`bama_day_status_global_${selectedDate}`) || localStorage.getItem(`bama_day_status_${selectedDate}`);
-    const cachedGlobalReason = localStorage.getItem(`bama_holiday_reason_global_${selectedDate}`) || localStorage.getItem(`bama_holiday_reason_${selectedDate}`);
-
-    const activeStatus = cachedBranchStatus || cachedGlobalStatus || 'CLASS';
-    const activeReason = cachedBranchReason || cachedGlobalReason || 'Weekly Dojo Off Day';
-    setDayStatus(activeStatus);
-    setHolidayReason(activeReason);
-
-    // 2. Fetch authoritative Day Status from Fly.io Backend
-    fetchDayStatusFromBackend(selectedDate, selectedBranch).then(serverStatus => {
-      if (serverStatus && serverStatus.status) {
-        setDayStatus(serverStatus.status);
-        if (serverStatus.reason) setHolidayReason(serverStatus.reason);
-        localStorage.setItem(`bama_day_status_${bKey}_${selectedDate}`, serverStatus.status);
-        if (serverStatus.reason) localStorage.setItem(`bama_holiday_reason_${bKey}_${selectedDate}`, serverStatus.reason);
-      }
-    });
-
-    // 3. Read cached attendance
-    let hasLocal = false;
+    // 1. Read cached attendance FIRST to detect if roll call was taken
+    let hasLocalAtt = false;
     try {
       const saved = localStorage.getItem(`bama_attendance_${bKey}_${selectedDate}`) || localStorage.getItem(`bama_attendance_${selectedDate}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
           setAttendanceRecords(parsed);
-          hasLocal = true;
+          hasLocalAtt = true;
         }
       }
     } catch (e) {}
 
-    // 4. Fetch Attendance from Fly.io Backend
-    fetchAttendanceFromBackend(selectedDate, selectedBranch).then(serverAtt => {
-      if (serverAtt && Object.keys(serverAtt).length > 0) {
+    // 2. Read cached Day Status
+    const cachedBranchStatus = localStorage.getItem(`bama_day_status_${bKey}_${selectedDate}`);
+    const cachedBranchReason = localStorage.getItem(`bama_holiday_reason_${bKey}_${selectedDate}`);
+    const cachedGlobalStatus = localStorage.getItem(`bama_day_status_global_${selectedDate}`) || localStorage.getItem(`bama_day_status_${selectedDate}`);
+    const cachedGlobalReason = localStorage.getItem(`bama_holiday_reason_global_${selectedDate}`) || localStorage.getItem(`bama_holiday_reason_${selectedDate}`);
+
+    // Core rule: If attendance has not been taken, day automatically defaults to HOLIDAY (No Class / Leave)
+    let initialStatus = 'HOLIDAY';
+    let initialReason = 'No Class Conducted / Off Day';
+
+    if (cachedBranchStatus) {
+      initialStatus = cachedBranchStatus;
+      initialReason = cachedBranchReason || 'No Class Conducted / Off Day';
+    } else if (cachedGlobalStatus) {
+      initialStatus = cachedGlobalStatus;
+      initialReason = cachedGlobalReason || 'No Class Conducted / Off Day';
+    } else if (hasLocalAtt) {
+      initialStatus = 'CLASS';
+      initialReason = '';
+    } else {
+      // Unrecorded day = Dojo Off Day (Zero penalty, 100% attendance rate)
+      initialStatus = 'HOLIDAY';
+      initialReason = 'No Class Conducted / Off Day';
+      setAttendanceRecords({});
+    }
+
+    setDayStatus(initialStatus);
+    setHolidayReason(initialReason);
+
+    // 3. Fetch authoritative Day Status and Attendance from Backend
+    Promise.all([
+      fetchDayStatusFromBackend(selectedDate, selectedBranch),
+      fetchAttendanceFromBackend(selectedDate, selectedBranch)
+    ]).then(([serverStatus, serverAtt]) => {
+      const hasServerAtt = serverAtt && typeof serverAtt === 'object' && Object.keys(serverAtt).length > 0;
+
+      if (hasServerAtt) {
         setAttendanceRecords(prev => ({ ...prev, ...serverAtt }));
         localStorage.setItem(`bama_attendance_${bKey}_${selectedDate}`, JSON.stringify(serverAtt));
-      } else if (!hasLocal) {
-        const initial = {};
-        (students || []).forEach(s => {
-          initial[s.id || s.admissionNo] = 'PRESENT';
-        });
-        setAttendanceRecords(initial);
       }
-    });
+
+      if (serverStatus && serverStatus.status) {
+        setDayStatus(serverStatus.status);
+        if (serverStatus.reason) setHolidayReason(serverStatus.reason);
+        localStorage.setItem(`bama_day_status_${bKey}_${selectedDate}`, serverStatus.status);
+        if (serverStatus.reason) localStorage.setItem(`bama_holiday_reason_${bKey}_${selectedDate}`, serverStatus.reason);
+      } else if (hasServerAtt) {
+        setDayStatus('CLASS');
+        localStorage.setItem(`bama_day_status_${bKey}_${selectedDate}`, 'CLASS');
+      } else if (!cachedBranchStatus && !cachedGlobalStatus && !hasLocalAtt) {
+        // Unmarked day confirmed as Leave / Off Day
+        setDayStatus('HOLIDAY');
+        setHolidayReason('No Class Conducted / Off Day');
+        setAttendanceRecords({});
+      }
+    }).catch(() => {});
   }, [selectedDate, selectedBranch]);
 
   const handleDayStatusChange = (newStatus, reason = holidayReason, forAll = applyAllBranches) => {
     setDayStatus(newStatus);
-    setHolidayReason(reason);
+    const finalReason = newStatus === 'HOLIDAY' ? (reason || 'No Class Conducted / Off Day') : '';
+    setHolidayReason(finalReason);
     setApplyAllBranches(forAll);
     const bKey = getBranchStorageKey(selectedBranch);
     try {
       if (forAll) {
         localStorage.setItem(`bama_day_status_global_${selectedDate}`, newStatus);
-        localStorage.setItem(`bama_holiday_reason_global_${selectedDate}`, reason);
+        localStorage.setItem(`bama_holiday_reason_global_${selectedDate}`, finalReason);
         localStorage.setItem(`bama_day_status_${selectedDate}`, newStatus);
-        localStorage.setItem(`bama_holiday_reason_${selectedDate}`, reason);
+        localStorage.setItem(`bama_holiday_reason_${selectedDate}`, finalReason);
       } else {
         localStorage.setItem(`bama_day_status_${bKey}_${selectedDate}`, newStatus);
-        localStorage.setItem(`bama_holiday_reason_${bKey}_${selectedDate}`, reason);
+        localStorage.setItem(`bama_holiday_reason_${bKey}_${selectedDate}`, finalReason);
       }
 
-      saveDayStatusToBackend(selectedDate, newStatus, reason, selectedBranch, forAll);
+      // If switching to CLASS and records are empty, initialize enrolled cadets as PRESENT
+      if (newStatus === 'CLASS') {
+        setAttendanceRecords(prev => {
+          if (prev && Object.keys(prev).length > 0) return prev;
+          const initial = {};
+          (students || []).forEach(s => {
+            initial[s.id || s.admissionNo] = 'PRESENT';
+          });
+          return initial;
+        });
+      }
+
+      saveDayStatusToBackend(selectedDate, newStatus, finalReason, selectedBranch, forAll);
       window.dispatchEvent(new Event('bama_data_updated'));
 
       const scopeName = forAll ? 'All Branches' : (selectedBranch === 'All' ? 'This Dojo' : selectedBranch);
       if (newStatus === 'HOLIDAY') {
-        setSaveSuccessMsg(`🏖️ ${scopeName} set as Holiday (${reason})!`);
+        setSaveSuccessMsg(`🏖️ ${scopeName} marked as Leave / Dojo Off Day!`);
         setTimeout(() => setSaveSuccessMsg(''), 4000);
       } else {
-        setSaveSuccessMsg(`🥋 ${scopeName} set as Class Day!`);
+        setSaveSuccessMsg(`🥋 ${scopeName} marked as Class Day! Roll call ready.`);
         setTimeout(() => setSaveSuccessMsg(''), 4000);
       }
     } catch (e) {}
   };
+
   // Helper to calculate Monthly Classes Conducted & Holidays count for current month
   const getMonthlyClassStats = () => {
     const monthPrefix = selectedDate.slice(0, 7); // "YYYY-MM"
@@ -172,18 +208,32 @@ export default function AttendanceManagement() {
       const dateStr = `${monthPrefix}-${dayFormatted}`;
       if (dateStr > new Date().toISOString().split('T')[0]) break;
 
-      const savedStatus = localStorage.getItem(`bama_day_status_${dateStr}`);
+      const bKey = getBranchStorageKey(selectedBranch);
+      const savedStatus = localStorage.getItem(`bama_day_status_${bKey}_${dateStr}`) || 
+                          localStorage.getItem(`bama_day_status_global_${dateStr}`) || 
+                          localStorage.getItem(`bama_day_status_${dateStr}`);
       if (savedStatus === 'HOLIDAY') {
         holidays++;
       } else if (savedStatus === 'CLASS') {
         conducted++;
       } else {
-        const savedAtt = localStorage.getItem(`bama_attendance_${dateStr}`);
-        const dateObj = new Date(dateStr);
-        if (dateObj.getDay() === 0) {
-          holidays++;
-        } else if (savedAtt) {
+        const savedAtt = localStorage.getItem(`bama_attendance_${bKey}_${dateStr}`) || 
+                         localStorage.getItem(`bama_attendance_${dateStr}`);
+        let hasRecords = false;
+        try {
+          if (savedAtt) {
+            const parsed = JSON.parse(savedAtt);
+            if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+              hasRecords = true;
+            }
+          }
+        } catch (e) {}
+
+        if (hasRecords) {
           conducted++;
+        } else {
+          // Unrecorded days automatically count as Leave / Off Day (No penalty to students)
+          holidays++;
         }
       }
     }
@@ -547,6 +597,45 @@ export default function AttendanceManagement() {
 
     return Array.from(shiftsSet);
   }, [students, selectedBranch, branchesList]);
+  // Selected Weekday Helpers for Intelligent Day-Specific Batch Filtering
+  const selectedDateObj = React.useMemo(() => {
+    return new Date(selectedDate + 'T00:00:00');
+  }, [selectedDate]);
+
+  const selectedWeekdayName = React.useMemo(() => {
+    if (isNaN(selectedDateObj.getTime())) return '';
+    return selectedDateObj.toLocaleDateString('en-US', { weekday: 'long' });
+  }, [selectedDateObj]);
+
+  const selectedWeekdayShort = React.useMemo(() => {
+    if (isNaN(selectedDateObj.getTime())) return '';
+    return selectedDateObj.toLocaleDateString('en-US', { weekday: 'short' });
+  }, [selectedDateObj]);
+
+  // Helper to determine if a shift conducts training on a given date's weekday
+  const isShiftActiveOnDay = (shiftStr, dateInput = selectedDate) => {
+    if (!shiftStr || shiftStr === 'All' || shiftStr === 'ALL') return true;
+    const dateObj = typeof dateInput === 'string' ? new Date(dateInput + 'T00:00:00') : new Date(dateInput);
+    if (isNaN(dateObj.getTime())) return true;
+    const dayOfWeek = dateObj.getDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
+
+    const s = String(shiftStr).toLowerCase();
+    const dayPatterns = [
+      { day: 0, test: /\b(sun|sunday)\b/i },
+      { day: 1, test: /\b(mon|monday)\b/i },
+      { day: 2, test: /\b(tue|tues|tuesday)\b/i },
+      { day: 3, test: /\b(wed|wednesday)\b/i },
+      { day: 4, test: /\b(thu|thur|thurs|thursday)\b/i },
+      { day: 5, test: /\b(fri|friday)\b/i },
+      { day: 6, test: /\b(sat|set|saturday)\b/i },
+    ];
+
+    const matchedDays = dayPatterns.filter(p => p.test.test(s)).map(p => p.day);
+    if (matchedDays.length === 0) {
+      return true; // General batch with no day restrictions in title
+    }
+    return matchedDays.includes(dayOfWeek);
+  };
 
   const baseBranchShiftStudents = students.filter(s => {
     const activeBranchFilter = selectedBranch;
@@ -876,9 +965,14 @@ export default function AttendanceManagement() {
             className="bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-gray-800 font-bold focus:outline-none focus:border-emerald-500 cursor-pointer shadow-2xs text-xs truncate max-w-[200px]"
           >
             <option value="All">All Batches</option>
-            {availableShifts.map((s, idx) => (
-              <option key={idx} value={s}>{s}</option>
-            ))}
+            {availableShifts.map((s, idx) => {
+              const isToday = isShiftActiveOnDay(s, selectedDate);
+              return (
+                <option key={idx} value={s}>
+                  {isToday ? `⚡ ${s} (Today - ${selectedWeekdayShort})` : `🗓️ ${s}`}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -920,6 +1014,49 @@ export default function AttendanceManagement() {
             );
           })}
         </div>
+        {/* ⏰ Quick Touch Batch / Shift Switcher with Real-time Weekday Badges */}
+        {availableShifts.length > 0 && (
+          <div className="pt-2 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <span className="text-[11px] font-black text-gray-500 uppercase flex-shrink-0 mr-1 flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-amber-600" /> Batch:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedShift('All')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 ${
+                selectedShift === 'All'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
+            >
+              🌐 All Batches
+            </button>
+            {availableShifts.map((sh, idx) => {
+              const isToday = isShiftActiveOnDay(sh, selectedDate);
+              const isSel = selectedShift === sh;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedShift(sh)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition cursor-pointer flex-shrink-0 flex items-center gap-1.5 ${
+                    isSel
+                      ? 'bg-gradient-to-r from-amber-600 to-red-600 text-white shadow-xs'
+                      : isToday
+                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {isToday && <span>⚡</span>}
+                  <span>{sh}</span>
+                  {isToday && (
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${isSel ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-900'}`}>{`Today (${selectedWeekdayShort})`}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Active Branch Confirmation Banner */}
         <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-900">
@@ -989,30 +1126,46 @@ export default function AttendanceManagement() {
 
       {/* Cadet Attendance List: Mobile Cards + Desktop Table */}
       {dayStatus === 'HOLIDAY' ? (
-        <div className="bg-gradient-to-b from-[#0F111D] to-[#0A0C14] border-2 border-amber-500/60 rounded-3xl p-10 text-center space-y-5 shadow-2xl my-4">
-          <div className="w-20 h-20 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto border border-amber-400/40 text-3xl shadow-xl animate-pulse">
+        <div className="bg-gradient-to-b from-[#0F111D] to-[#0A0C14] border-2 border-amber-500/60 rounded-3xl p-6 sm:p-10 text-center space-y-6 shadow-2xl my-4">
+          <div className="w-20 h-20 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto border border-amber-400/40 text-4xl shadow-xl animate-pulse">
             🏖️
           </div>
-          <div>
-            <span className="px-3 py-1 bg-amber-950 text-amber-400 border border-amber-800 rounded-full text-xs font-mono font-bold">
-              DOJO DAY STATUS: OFFICIAL HOLIDAY
+
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-amber-950/80 text-amber-400 border border-amber-700/80 rounded-full text-xs font-mono font-bold">
+              <span>DOJO STATUS: LEAVE / OFF DAY</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
             </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-wider mt-3">
-              OFFICIAL DOJO HOLIDAY - NO CLASS CONDUCTED TODAY
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide mt-2">
+              ക്ലാസ്സ് ഉണ്ടായിരുന്നില്ല / Dojo Off Day
             </h2>
-            <p className="text-gray-300 text-xs sm:text-sm max-w-lg mx-auto font-medium mt-2">
-              Date: <strong className="text-amber-400 font-mono">{selectedDate}</strong>. Attendance register is locked for this date. Absentee WhatsApp alerts are safely paused.
+            <p className="text-amber-200/90 text-xs sm:text-sm max-w-xl mx-auto font-medium">
+              അറ്റൻഡൻസ് രേഖപ്പെടുത്താത്ത ദിവസങ്ങൾ ഓട്ടോമാറ്റിക്കായി <strong>&quot;ക്ലാസ്സ് ലീവ് (No Class / Leave)&quot;</strong> ആയി പരിഗണിച്ചിരിക്കുന്നു. 
+              കുട്ടികൾക്ക് ആബ്സെൻ്റ് വീഴില്ല, അറ്റൻഡൻസ് ശതമാനവും കുറയില്ല.
             </p>
           </div>
 
+          {/* Prominent Action Button to Mark Class & Take Attendance */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <div className="inline-flex items-center gap-2 bg-black/80 px-4 py-2.5 rounded-2xl border border-amber-500/40 text-xs text-amber-300 font-bold shadow-lg">
-              <span>Select Holiday Reason:</span>
+            <button
+              type="button"
+              onClick={() => handleDayStatusChange('CLASS', '', applyAllBranches)}
+              className="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-black text-sm transition cursor-pointer shadow-xl shadow-emerald-900/40 flex items-center justify-center gap-2 transform active:scale-98"
+            >
+              <Check className="w-5 h-5" />
+              <span>🥋 Mark Class Conducted & Take Attendance (ഇന്ന് ക്ലാസ്സ് ഉണ്ട് - അറ്റൻഡൻസ് എടുക്കുക)</span>
+            </button>
+          </div>
+
+          <div className="pt-4 border-t border-gray-800/80 flex flex-wrap items-center justify-center gap-3 text-xs">
+            <div className="inline-flex items-center gap-2 bg-black/60 px-4 py-2 rounded-xl border border-amber-500/30 text-xs text-amber-300 font-bold">
+              <span>Status Reason:</span>
               <select
                 value={holidayReason}
                 onChange={(e) => handleDayStatusChange('HOLIDAY', e.target.value, applyAllBranches)}
                 className="bg-transparent text-white font-black focus:outline-none cursor-pointer"
               >
+                <option value="No Class Conducted / Off Day" className="bg-gray-900 text-white">No Class Conducted / Off Day</option>
                 <option value="Weekly Dojo Off Day" className="bg-gray-900 text-white">Weekly Dojo Off Day</option>
                 <option value="School Function / Hall Unavailable" className="bg-gray-900 text-white">School Function / Hall Unavailable</option>
                 <option value="Heavy Rain / Emergency Weather" className="bg-gray-900 text-white">Heavy Rain / Emergency Weather</option>
@@ -1022,7 +1175,7 @@ export default function AttendanceManagement() {
             </div>
 
             {/* Scope Toggle: This Branch Only vs All Branches */}
-            <div className="inline-flex items-center gap-3 bg-gray-900/90 px-3.5 py-2.5 rounded-2xl border border-gray-700 text-xs text-gray-300 font-bold">
+            <div className="inline-flex items-center gap-3 bg-gray-900/80 px-3.5 py-2 rounded-xl border border-gray-700 text-xs text-gray-300 font-bold">
               <span className="text-gray-400">Apply:</span>
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
@@ -1050,14 +1203,11 @@ export default function AttendanceManagement() {
                 </span>
               </label>
             </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => handleDayStatusChange('CLASS', holidayReason, applyAllBranches)}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black text-xs transition cursor-pointer shadow-lg flex items-center gap-1.5"
-            >
-              <span>🥋 Switch to Class Conducted Today</span>
-            </button>
+          {/* Roster Preview Info (Cadets Exempted) */}
+          <div className="pt-2 text-[11px] text-gray-400 font-mono">
+            👥 {totalCount} Cadets Enrolled in {selectedShift === 'All' ? 'All Batches' : selectedShift} • 100% Rate Preserved
           </div>
         </div>
       ) : filteredStudents.length === 0 ? (

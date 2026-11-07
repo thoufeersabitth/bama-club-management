@@ -205,11 +205,24 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 'status': status_obj.status,
                 'reason': status_obj.reason
             })
+
+        # Check if attendance records were actually recorded for this date/branch
+        att_qs = AttendanceRecord.objects.filter(date=date_str)
+        if target_b:
+            att_qs = att_qs.filter(branch=target_b)
+        if att_qs.exists():
+            return Response({
+                'date': date_str,
+                'branch': target_b.name if target_b else 'All Branches',
+                'status': 'CLASS',
+                'reason': ''
+            })
+
         return Response({
             'date': date_str,
             'branch': target_b.name if target_b else 'All Branches',
-            'status': 'CLASS',
-            'reason': ''
+            'status': 'HOLIDAY',
+            'reason': 'No Class Conducted / Off Day'
         })
 
     @action(detail=False, methods=['get'], url_path='monthly-statuses')
