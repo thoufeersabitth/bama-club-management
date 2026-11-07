@@ -287,18 +287,38 @@ export default function ReportsAnalytics() {
     const startObj = new Date(startStr);
     const endObj = new Date(endStr);
 
+    const bKey = selectedBranch && selectedBranch !== 'All' 
+      ? String(selectedBranch).toLowerCase().replace(/[^a-z0-9]/g, '_') 
+      : null;
+
     for (let d = new Date(startObj); d <= endObj; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
-      const savedStatus = localStorage.getItem(`bama_day_status_${dateStr}`);
-      if (savedStatus === 'HOLIDAY') {
-        holidays++;
-      } else if (savedStatus === 'CLASS') {
-        conducted++;
-      } else {
-        const savedAtt = localStorage.getItem(`bama_attendance_${dateStr}`);
+
+      // Check branch-specific status first, then global
+      const savedStatus = (bKey ? localStorage.getItem(`bama_day_status_${bKey}_${dateStr}`) : null) || 
+                          localStorage.getItem(`bama_day_status_global_${dateStr}`) || 
+                          localStorage.getItem(`bama_day_status_${dateStr}`);
+
+      const savedAtt = (bKey ? localStorage.getItem(`bama_attendance_${bKey}_${dateStr}`) : null) || 
+                       localStorage.getItem(`bama_attendance_${dateStr}`);
+
+      let hasAtt = false;
+      try {
         if (savedAtt) {
-          conducted++;
+          const parsed = JSON.parse(savedAtt);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            hasAtt = true;
+          }
         }
+      } catch (e) {}
+
+      if (savedStatus === 'CLASS' || hasAtt) {
+        conducted++;
+      } else if (savedStatus === 'HOLIDAY') {
+        holidays++;
+      } else {
+        // Automatic default: unrecorded day = Dojo Off / Holiday
+        holidays++;
       }
     }
 
@@ -307,36 +327,56 @@ export default function ReportsAnalytics() {
 
   const { conducted: periodConductedClasses, holidays: periodDojoHolidays } = getMonthlyClassAndHolidayStats();
 
+  // Precise Per-Cadet Attendance & Leave Stats Calculator
+  const getCadetStatsInPeriod = (cadet) => {
+    const possibleKeys = [
+      cadet.id,
+      cadet.admissionNo,
+      cadet.admission_no,
+      cadet.name
+    ].filter(Boolean).map(k => String(k).trim().toLowerCase());
+
+    let present = 0;
+    let absent = 0;
+    let markedDates = new Set();
+
+    Object.entries(attendanceData).forEach(([recKey, attObj]) => {
+      const cleanRecKey = String(recKey).trim().toLowerCase();
+      if (possibleKeys.includes(cleanRecKey)) {
+        Object.entries(attObj.recordsByDate || {}).forEach(([dateStr, status]) => {
+          if (isDateInRange(dateStr) && !markedDates.has(dateStr)) {
+            markedDates.add(dateStr);
+            if (status === 'PRESENT') present++;
+            if (status === 'ABSENT') absent++;
+          }
+        });
+      }
+    });
+
+    const totalMarked = present + absent;
+    let finalConducted = totalMarked > 0 ? totalMarked : periodConductedClasses;
+    let finalPresent = totalMarked > 0 ? present : (periodConductedClasses > 0 ? periodConductedClasses : 0);
+    let finalAbsent = absent;
+    let pct = finalConducted > 0 ? ((finalPresent / finalConducted) * 100).toFixed(1) : '100.0';
+
+    return {
+      conducted: finalConducted,
+      present: finalPresent,
+      absent: finalAbsent,
+      pct: pct
+    };
+  };
+
   // Dynamic Attendance Calculations strictly from conducted sessions
   let totalPresentDays = 0;
   let totalAbsentDays = 0;
   let totalSessionRecords = 0;
 
   filteredStudents.forEach(s => {
-    const stdKey = s.id || s.admissionNo || s.admission_no;
-    const attObj = attendanceData[stdKey] || { recordsByDate: {} };
-    const recordsByDate = attObj.recordsByDate || {};
-
-    let studentPresentInPeriod = 0;
-    let studentAbsentInPeriod = 0;
-    let studentTotalInPeriod = 0;
-
-    Object.entries(recordsByDate).forEach(([dateStr, status]) => {
-      if (isDateInRange(dateStr)) {
-        studentTotalInPeriod += 1;
-        if (status === 'PRESENT') studentPresentInPeriod += 1;
-        if (status === 'ABSENT') studentAbsentInPeriod += 1;
-      }
-    });
-
-    if (studentTotalInPeriod > 0) {
-      totalPresentDays += studentPresentInPeriod;
-      totalAbsentDays += studentAbsentInPeriod;
-      totalSessionRecords += studentTotalInPeriod;
-    } else if (periodConductedClasses > 0) {
-      totalPresentDays += periodConductedClasses;
-      totalSessionRecords += periodConductedClasses;
-    }
+    const st = getCadetStatsInPeriod(s);
+    totalPresentDays += st.present;
+    totalAbsentDays += st.absent;
+    totalSessionRecords += st.conducted;
   });
 
   const avgAttendancePct = totalSessionRecords > 0 ? ((totalPresentDays / totalSessionRecords) * 100).toFixed(1) : '100.0';
@@ -369,19 +409,21 @@ export default function ReportsAnalytics() {
     let csvRows = [];
 
     if (activeTab === 'ATTENDANCE') {
-      csvHeaders = ['Admission No', 'Cadet Name', 'Belt Rank', 'Branch Dojo', 'Shift Batch', 'Present Days', 'Total Sessions', 'Attendance %'];
+      csvHeaders = ['Admission No', 'Cadet Name', 'Belt Rank', 'Branch Dojo', 'Shift Batch', 'Classes Conducted', 'Present Days', 'Absent Leave Days', 'Dojo Off Days', 'Attendance %'];
       csvRows = filteredStudents.map(s => {
-        const att = attendanceData[s.id || s.admissionNo] || { present: 0, total: 0 };
-        const pct = att.total > 0 ? ((att.present / att.total) * 100).toFixed(1) + '%' : '100%';
+        const stats = getCadetStatsInPeriod(s);
+        const bName = s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : null) || getStandardBranchName(s.branch, branchesList) || s.branch || 'Head Office';
         return [
           s.admissionNo || s.admission_no,
           s.name,
           s.beltRank || s.current_belt || 'White Belt',
-          typeof s.branch === 'object' ? s.branch?.name : s.branch,
-          s.shift || 'Evening Batch',
-          att.present,
-          att.total,
-          pct
+          bName,
+          s.shift || s.batch || 'Regular',
+          stats.conducted,
+          stats.present,
+          stats.absent,
+          periodDojoHolidays,
+          stats.pct + '%'
         ];
       });
     } else if (activeTab === 'STAFF') {
@@ -855,87 +897,102 @@ export default function ReportsAnalytics() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-gray-50 text-[11px] font-black text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                  <th className="py-3 px-4">Cadet Name</th>
-                  <th className="py-3 px-4">Admission No</th>
-                  <th className="py-3 px-4">Belt Rank</th>
-                  <th className="py-3 px-4">Branch Dojo</th>
-                  <th className="py-3 px-4">Batch / Shift</th>
-                  <th className="py-3 px-4 text-center">Total Dojo Classes</th>
-                  <th className="py-3 px-4 text-center">Attended / Total</th>
-                  <th className="py-3 px-4 text-right">Attendance %</th>
+                <tr className="bg-gray-50 text-[11px] font-black text-gray-600 uppercase tracking-wider border-b border-gray-200">
+                  <th className="py-3.5 px-4">Cadet Name</th>
+                  <th className="py-3.5 px-3">Adm No</th>
+                  <th className="py-3.5 px-3">Belt Rank</th>
+                  <th className="py-3.5 px-3">Branch Dojo</th>
+                  <th className="py-3.5 px-3">Batch / Shift</th>
+                  <th className="py-3.5 px-3 text-center">Classes Conducted</th>
+                  <th className="py-3.5 px-3 text-center">Present (ഹാജർ)</th>
+                  <th className="py-3.5 px-3 text-center">Leave / Absent</th>
+                  <th className="py-3.5 px-3 text-center">Dojo Off Days</th>
+                  <th className="py-3.5 px-4 text-right">Attendance %</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredStudents.map((s) => {
-                  const stdKey = s.id || s.admissionNo || s.admission_no;
-                  const attObj = attendanceData[stdKey] || { recordsByDate: {} };
-                  const recordsByDate = attObj.recordsByDate || {};
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan="10" className="py-12 text-center text-gray-500 font-medium">
+                      <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="font-bold text-gray-700">No Cadets Found</p>
+                      <p className="text-xs text-gray-400 mt-1">No cadets match the selected branch ({selectedBranch}) or batch ({selectedShift}).</p>
+                      <button
+                        onClick={() => { setSelectedBranch('All'); setSelectedShift('All'); }}
+                        className="mt-3 px-3 py-1 bg-red-50 text-red-700 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100"
+                      >
+                        Reset to All Branches & Batches
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStudents.map((s) => {
+                    const stats = getCadetStatsInPeriod(s);
+                    const bName = s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : null) || getStandardBranchName(s.branch, branchesList) || s.branch || 'Head Office';
+                    const sShift = s.shift || s.batch || s.dojoShift || 'Regular';
 
-                  let presentInPeriod = 0;
-                  let absentInPeriod = 0;
-                  let totalMarkedInPeriod = 0;
-
-                  Object.entries(recordsByDate).forEach(([dateStr, status]) => {
-                    if (isDateInRange(dateStr)) {
-                      totalMarkedInPeriod += 1;
-                      if (status === 'PRESENT') presentInPeriod += 1;
-                      if (status === 'ABSENT') absentInPeriod += 1;
-                    }
-                  });
-
-                  let finalPresent = 0;
-                  let finalTotal = 0;
-                  let pct = '100.0';
-
-                  if (totalMarkedInPeriod > 0) {
-                    finalPresent = presentInPeriod;
-                    finalTotal = totalMarkedInPeriod;
-                    pct = ((finalPresent / finalTotal) * 100).toFixed(1);
-                  } else if (periodConductedClasses > 0) {
-                    finalPresent = periodConductedClasses;
-                    finalTotal = periodConductedClasses;
-                    pct = '100.0';
-                  } else {
-                    finalPresent = 0;
-                    finalTotal = 0;
-                    pct = '100.0';
-                  }
-
-                  return (
-                    <tr key={s.id || s.admissionNo} className="hover:bg-gray-50 transition-colors font-sans">
-                      <td className="py-3 px-4 font-bold text-gray-900 flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-red-100 text-red-700 font-black flex items-center justify-center text-xs flex-shrink-0">
-                          {s.name?.charAt(0)}
-                        </div>
-                        <span className="whitespace-nowrap">{s.name}</span>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-gray-600 whitespace-nowrap">{s.admissionNo || s.admission_no}</td>
-                      <td className="py-3 px-4 font-bold text-amber-700 whitespace-nowrap">{s.beltRank || s.current_belt || 'White Belt'}</td>
-                      <td className="py-3 px-4 text-gray-700 font-medium whitespace-nowrap">
-                        {s.branch_name || s.branchName || (typeof s.branch === 'object' ? s.branch?.name : null) || getStandardBranchName(s.branch, branchesList) || s.branch || 'Head Office'}
-                      </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 font-bold text-[10px]">
-                          {s.shift || s.batch || s.dojoShift || 'Regular'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-bold text-gray-900 whitespace-nowrap">
-                        {finalTotal === 0 ? '0 (Holiday / Leave)' : `${finalTotal} Classes`}
-                      </td>
-                      <td className="py-3 px-4 text-center font-bold text-emerald-700 whitespace-nowrap">
-                        {finalTotal === 0 ? '🏖️ Exempt / 100%' : `${finalPresent} / ${finalTotal} Attended`}
-                      </td>
-                      <td className="py-3 px-4 text-right font-black whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                          parseFloat(pct) >= 75 ? 'bg-emerald-100 text-emerald-800' : parseFloat(pct) >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                        }`}>
-                          {pct}%
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                    return (
+                      <tr key={s.id || s.admissionNo} className="hover:bg-red-50/20 transition-colors font-sans">
+                        <td className="py-3 px-4 font-bold text-gray-900 flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-rose-800 text-white font-black flex items-center justify-center text-xs flex-shrink-0 shadow-xs border border-red-300">
+                            {s.name?.charAt(0)?.toUpperCase() || 'C'}
+                          </div>
+                          <div>
+                            <span className="whitespace-nowrap font-black block text-gray-900">{s.name}</span>
+                            <span className="text-[10px] text-gray-400 font-mono block sm:hidden">{s.admissionNo || s.admission_no}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 font-mono font-bold text-gray-600 whitespace-nowrap">{s.admissionNo || s.admission_no}</td>
+                        <td className="py-3 px-3 font-bold text-amber-700 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                            {s.beltRank || s.current_belt || 'White Belt'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-gray-700 font-medium whitespace-nowrap text-xs">{bName}</td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-200/80 font-bold text-[10px] shadow-2xs">
+                            {sShift}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span className="px-2.5 py-1 rounded-xl bg-blue-50 text-blue-700 font-mono font-bold border border-blue-200 text-xs shadow-2xs">
+                            {stats.conducted} Classes
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span className="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 font-mono font-bold border border-emerald-200 text-xs shadow-2xs">
+                            ✅ {stats.present} Present
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded-xl font-mono font-bold border text-xs shadow-2xs ${
+                            stats.absent > 0 
+                              ? 'bg-rose-50 text-rose-700 border-rose-300 font-black' 
+                              : 'bg-gray-50 text-gray-400 border-gray-200'
+                          }`}>
+                            ❌ {stats.absent} Leave
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
+                          <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 font-bold border border-amber-200/80 text-[11px] shadow-2xs">
+                            🏖️ {periodDojoHolidays} Days Off
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded-xl text-xs font-black shadow-2xs ${
+                            parseFloat(stats.pct) >= 75 
+                              ? 'bg-emerald-600 text-white' 
+                              : parseFloat(stats.pct) >= 60 
+                              ? 'bg-amber-500 text-white' 
+                              : 'bg-rose-600 text-white'
+                          }`}>
+                            {stats.pct}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
