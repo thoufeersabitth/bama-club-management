@@ -876,7 +876,7 @@ export default function BranchManagement() {
     setRosterModal({
       isOpen: true,
       title: b.name,
-      subtitle: `Chief Sensei: ${b.branch_head || 'Sensei Abdul Rahman (5th Dan)'} • Total Enrolled: ${list.length} Cadets`,
+      subtitle: `Chief Sensei: ${b.branch_head || 'Sensei Abdul nafih.p (2th Dan)'} • Total Enrolled: ${list.length} Cadets`,
       branchName: b.name,
       cadets: list
     });
@@ -1333,7 +1333,7 @@ export default function BranchManagement() {
                     </h3>
                     <p className="text-xs text-gray-500 font-bold flex items-center gap-1 mt-1">
                       <Shield className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                      <span>Chief Instructor: {b.branch_head || 'Sensei Abdul Rahman (5th Dan)'}</span>
+                      <span>Chief Instructor: {b.branch_head || 'Sensei Abdul nafih.p (2th Dan)'}</span>
                     </p>
                     {(() => {
                       const feeInfo = getBranchFeeSettings(b.id || b.name, branches);
@@ -1563,7 +1563,7 @@ export default function BranchManagement() {
                     program: 'Karate (Shotokan)',
                     days: 'Mon, Wed, Fri',
                     time: '5:00 PM - 7:00 PM',
-                    instructor: branches.find(b => b.name === scheduleBranchFilter)?.branch_head || 'Sensei Abdul Rahman (5th Dan)',
+                    instructor: branches.find(b => b.name === scheduleBranchFilter)?.branch_head || 'Sensei Abdul nafih.p (2th Dan)',
                     targetGroup: 'All Belts & Cadets'
                   });
                   setShowShiftModal(true);
@@ -1599,7 +1599,7 @@ export default function BranchManagement() {
                     branch: scheduleBranchFilter !== 'ALL' ? scheduleBranchFilter : (branches[0]?.name || 'Pulikkal Branch (Head Office)'),
                     days: 'Mon, Wed, Fri',
                     time: '5:00 PM - 7:00 PM',
-                    instructor: (scheduleBranchFilter !== 'ALL' && branches.find(b => b.name === scheduleBranchFilter)?.branch_head) || 'Sensei Abdul Rahman (5th Dan)',
+                    instructor: (scheduleBranchFilter !== 'ALL' && branches.find(b => b.name === scheduleBranchFilter)?.branch_head) || 'Sensei Abdul nafih.p (2th Dan)',
                     targetGroup: 'All Belts & Cadets'
                   });
                   setShowShiftModal(true);

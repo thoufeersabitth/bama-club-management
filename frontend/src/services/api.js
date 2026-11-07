@@ -2774,7 +2774,7 @@ export const fetchTrainingSchedules = async (forceRefresh = false) => {
     console.error('Error auto-populating branch schedules from timings:', err);
   }
 
-  const finalSchedules = deduplicateSchedules(Array.from(scheduleMap.values()));
+  const finalSchedules = filterOutDummyShifts(Array.from(scheduleMap.values()));
   
   if (finalSchedules.length > 0) {
     try {
