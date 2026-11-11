@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Search, DollarSign, Printer, CheckCircle2, FileText, X, AlertCircle, MessageSquare, Calendar, Filter, CheckSquare, Square, Send, Check, Zap, ExternalLink, Clock, Settings } from 'lucide-react';
-import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
+import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, resolveStudentWhatsAppRecipient, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
 import { ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions, INITIAL_BRANCHES } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 
@@ -71,14 +71,6 @@ export default function FeeManagement() {
   const [queueIndex, setQueueIndex] = useState(0);
   const [sentFeeIds, setSentFeeIds] = useState([]);
 
-  // Format phone number for WhatsApp
-  const formatWhatsAppPhone = (phoneStr) => {
-    let clean = (phoneStr || '').replace(/[^0-9]/g, '');
-    if (!clean) return '919544085442';
-    if (clean.length === 10) return '91' + clean;
-    if (clean.startsWith('0')) return '91' + clean.slice(1);
-    return clean;
-  };
 
   const getPendingDuesAmount = (f) => {
     const totalFee = parseFloat(f.amount ?? f.student_detail?.feeAmount ?? f.student_detail?.fee_amount ?? 500);
@@ -501,10 +493,18 @@ export default function FeeManagement() {
 
   const sendFeeWhatsAppReminder = (fee) => {
     const std = fee.student_detail || {};
+    const recipient = resolveStudentWhatsAppRecipient(std);
+    if (!recipient.ok) {
+      alert(recipient.message);
+      return;
+    }
+
     const totalAmt = fee.amount || std.feeAmount || std.fee_amount || 500;
     const pendingAmt = getPendingDuesAmount(fee);
     const admPendingAmt = getAdmissionPendingAmount(fee);
-    const parentName = std.guardianName || std.guardian_name || 'Parent';
+    const rawParent = String(std.guardianName || std.guardian_name || '').trim();
+    const hasRealParent = rawParent && !['parent', 'paren', 'guardian', 'father', 'mother'].includes(rawParent.toLowerCase());
+    const parentGreeting = hasRealParent ? `Dear Parent (${rawParent})` : 'Dear Parent';
     const cadetName = std.name || std.student_name || 'Cadet';
     const activeMonthName = resolveFeeMonth(fee);
     const isAdmFree = (std.admissionFee === 0 || std.admission_fee === 0 || String(std.admissionFee) === '0' || String(std.admission_fee) === '0');
@@ -530,7 +530,7 @@ export default function FeeManagement() {
         `Payment Status: *CLEARED / PAID*\n` +
         `Remaining Dues: *₹0*\n` +
         `----------------------------------------\n\n` +
-        `Dear Parent (${parentName}), fee payment for ${isQuarterlyCadet ? '3-month term' : '1 month(s)'} has been successfully recorded. Thank you! OSS 🥋`;
+        `${parentGreeting}, fee payment for ${isQuarterlyCadet ? '3-month term' : '1 month(s)'} has been successfully recorded. Thank you! OSS 🥋`;
     } else if (selectedStatus === 'AdmissionPending' || (admPendingAmt > 0 && pendingAmt === 0)) {
       text = 
         `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
@@ -540,7 +540,7 @@ export default function FeeManagement() {
         `Shift: *${std.shift || 'Regular Batch'}*\n` +
         `Admission Fee: *${isAdmFree ? '🎁 FREE / WAIVED (₹0)' : `₹${std.admissionFee || 1000}`}*\n` +
         (isAdmFree ? '' : `Admission Fee Dues: *₹${admPendingAmt}*\n\n`) +
-        `Dear Parent (${parentName}), kindly settle the pending admission/registration fee at the academy office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
+        `${parentGreeting}, kindly settle the pending admission/registration fee at the academy office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
     } else {
       text = 
         `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
@@ -553,12 +553,12 @@ export default function FeeManagement() {
         `Total ${isQuarterlyCadet ? 'Term Fee (3 Months)' : 'Monthly Fee'}: *₹${totalAmt}*\n` +
         `Pending Dues: *₹${pendingAmt}*` +
         (!isAdmFree && admPendingAmt > 0 ? `\nAdmission Fee Dues: *₹${admPendingAmt}*` : isAdmFree ? `\nAdmission Fee: *🎁 FREE / WAIVED*` : '') +
-        `\n\nDear Parent (${parentName}), kindly settle the fee dues at office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
+        `\n\n${parentGreeting}, kindly settle the fee dues at office or via GooglePay to +91 95440 85442. Thank you! OSS 🥋`;
     }
 
     setSentFeeIds(prev => Array.from(new Set([...prev, fee.id])));
     openWhatsApp({
-      phone: std.whatsapp || std.phone,
+      phone: recipient.phone,
       message: text
     });
   };

@@ -9,8 +9,13 @@ PLACEHOLDER_EXACT_VALUES = {
     'na', 'n/a', 'none', 'null', 'nil', 'unknown', 'tbd', 'todo', 'pending',
     'test', 'testing', 'dummy', 'sample', 'asdf', 'sdfg', 'dfgh', 'fghj',
     'ghjk', 'qwerty', 'qwert', 'zxcv', 'zxcvb', 'xxx', 'xxxx',
-    'full address', 'parent/guardian',
+    'full address', 'parent/guardian', 'paren', 'parent', 'father', 'mother',
+    'guardian', 'pulikkal, malappuram, kerala',
 }
+
+ACADEMY_FALLBACK_PHONES = {'9544085442'}
+
+DUMMY_PHONE_DIGITS = {'1234567890', '0123456789', '9876543210'}
 
 KEYBOARD_SEQUENCES = (
     'qwertyuiop', 'poiuytrewq',
@@ -116,6 +121,57 @@ def is_placeholder_text(value) -> bool:
     # Flag if ALL >=4-char alphabetic tokens are gibberish (so multi-word addresses
     # containing an acronym like "NEAR GHSS PULIKKAL" remain accepted).
     return all(_is_gibberish_token(tok) for tok in long_tokens)
+
+
+def normalize_phone_digits(value) -> str:
+    """
+    Extracts digits from a phone/WhatsApp string and strips Indian country code (91)
+    or trunk prefix (0) when normalizing 11/12-digit domestic numbers to 10 digits.
+    """
+    if not value:
+        return ''
+    digits = re.sub(r'\D', '', str(value))
+    if len(digits) == 12 and digits.startswith('91'):
+        return digits[2:]
+    if len(digits) == 11 and digits.startswith('0'):
+        return digits[1:]
+    return digits
+
+
+def is_invalid_or_academy_phone(value) -> str | None:
+    """
+    Validates a non-empty student phone/WhatsApp number.
+    Returns an error message string if invalid/dummy/academy fallback, or None if valid.
+    Empty values return None (callers decide whether blank is allowed).
+    """
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    all_digits = re.sub(r'\D', '', raw)
+    if not all_digits:
+        return 'Please enter a valid mobile number.'
+
+    norm = normalize_phone_digits(raw)
+    if norm in ACADEMY_FALLBACK_PHONES or all_digits in ACADEMY_FALLBACK_PHONES:
+        return "Academy contact number (+91 9544085442) cannot be used as a student's parent number."
+
+    if norm in DUMMY_PHONE_DIGITS or len(set(norm)) == 1:
+        return 'Dummy or repeated phone numbers are not allowed.'
+
+    # International +numbers (non-India) are typically 10-15 digits
+    is_intl_non_india = raw.startswith('+') and not all_digits.startswith('91')
+    if is_intl_non_india:
+        if len(all_digits) < 10 or len(all_digits) > 15:
+            return 'Please enter a valid international phone number (10 to 15 digits).'
+        return None
+
+    if len(norm) != 10:
+        return 'Please enter a valid 10-digit mobile number.'
+
+    return None
 
 
 def parse_valid_dob(value, today=None) -> datetime.date | None:

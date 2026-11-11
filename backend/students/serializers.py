@@ -2,7 +2,12 @@ import uuid
 import random
 from rest_framework import serializers
 from .models import Student
-from .validators import calculate_age_from_dob, is_placeholder_text, parse_valid_dob
+from .validators import (
+    calculate_age_from_dob,
+    is_invalid_or_academy_phone,
+    is_placeholder_text,
+    parse_valid_dob,
+)
 from branches.models import Branch
 
 class StudentBranchSerializer(serializers.ModelSerializer):
@@ -110,6 +115,16 @@ class StudentSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         text_field: 'Please enter real information; dummy or keyboard-mash text is not allowed.'
                     })
+
+        # Prevent academy fallback phone, repeated digits, or broken partial/11-digit typos
+        for phone_field in ('phone', 'whatsapp'):
+            if phone_field in data and data[phone_field] is not None:
+                val_str = str(data[phone_field]).strip()
+                existing_val = (getattr(self.instance, phone_field, None) or '').strip() if self.instance else ''
+                if not self.instance or val_str != existing_val:
+                    phone_err = is_invalid_or_academy_phone(val_str)
+                    if phone_err:
+                        raise serializers.ValidationError({phone_field: phone_err})
 
         branch_val = data.get('branch') or data.get('branch_id') or data.get('branch_name')
         if branch_val:

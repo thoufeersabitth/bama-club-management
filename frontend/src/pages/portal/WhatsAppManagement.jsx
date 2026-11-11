@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, Calendar, Bell, Zap, CheckSquare, Square, Check, X, ExternalLink, Users, Shield, Award, Settings, Smartphone, Trash2, Building2, Filter } from 'lucide-react';
 import { WHATSAPP_TEMPLATES, INITIAL_BRANCHES, isStudentInBranch } from '../../services/initialData';
-import { fetchStudents, fetchBranches, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
+import { fetchStudents, fetchBranches, openWhatsApp, resolveStudentWhatsAppRecipient, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 export default function WhatsAppManagement() {
@@ -84,13 +84,7 @@ export default function WhatsAppManagement() {
     setPreferredWhatsAppChannel(newChan);
   };
 
-  const formatWhatsAppPhone = (phoneStr) => {
-    let clean = (phoneStr || '').replace(/[^0-9]/g, '');
-    if (!clean) return '919544085442';
-    if (clean.length === 10) return '91' + clean;
-    if (clean.startsWith('0')) return '91' + clean.slice(1);
-    return clean;
-  };
+  // Phone formatting delegates to shared resolveStudentWhatsAppRecipient helper in api.js
 
   useEffect(() => {
     const loadWhatsAppCadets = () => {
@@ -194,10 +188,18 @@ export default function WhatsAppManagement() {
   };
 
   const sendIndividualWhatsApp = (std, channelOverride) => {
+    const recipient = resolveStudentWhatsAppRecipient(std);
+    if (!recipient.ok) {
+      alert(recipient.message);
+      return;
+    }
+
     const branchToUse = selectedBranch !== 'ALL' ? selectedBranch : (std.branch?.name || (typeof std.branch === 'object' ? std.branch?.name : std.branch) || 'BAMA Dojo');
     let body = selectedTemplate.body;
     body = body.replace('{STUDENT_NAME}', std.name || 'Cadet');
-    body = body.replace('{GUARDIAN_NAME}', std.guardianName || std.guardian_name || 'Parent');
+    const rawParent = String(std.guardianName || std.guardian_name || '').trim();
+    const displayParent = rawParent && !['parent', 'paren', 'guardian'].includes(rawParent.toLowerCase()) ? rawParent : 'Parent';
+    body = body.replace('{GUARDIAN_NAME}', displayParent);
     body = body.replace('{AMOUNT}', std.feeAmount || '1500');
     body = body.replace('{BRANCH_NAME}', branchToUse);
     body = body.replace('{DATE}', new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }));
@@ -214,7 +216,7 @@ export default function WhatsAppManagement() {
 
     setSentStudentIds(prev => Array.from(new Set([...prev, std.id])));
     openWhatsApp({
-      phone: std.whatsapp || std.phone,
+      phone: recipient.phone,
       message: body,
       channel: channelOverride || activeChannel
     });
@@ -222,7 +224,7 @@ export default function WhatsAppManagement() {
     const newLog = {
       id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       student: std.name || 'Cadet',
-      phone: std.whatsapp || std.phone || 'N/A',
+      phone: `+${recipient.phone}`,
       template: selectedTemplate?.name || 'Custom Message',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' Today',
       status: 'Delivered'
@@ -588,7 +590,7 @@ export default function WhatsAppManagement() {
               {selectedStudentsList.map((s, idx) => {
                 const isSent = sentStudentIds.includes(s.id);
                 const isCurrent = idx === queueIndex && !isSent;
-                const formattedPhone = formatWhatsAppPhone(s.whatsapp || s.phone);
+                const recipient = resolveStudentWhatsAppRecipient(s);
 
                 return (
                   <div
@@ -615,7 +617,9 @@ export default function WhatsAppManagement() {
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-gray-600 font-medium block mt-0.5">Parent: {s.guardianName || s.guardian_name} (+{formattedPhone})</span>
+                      <span className="text-[11px] text-gray-600 font-medium block mt-0.5">
+                        Parent: {s.guardianName || s.guardian_name || 'Not Entered'} ({recipient.ok ? `+${recipient.phone}` : 'Valid Phone Missing'})
+                      </span>
                     </div>
 
                     <div className="text-right">

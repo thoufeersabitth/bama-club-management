@@ -7,17 +7,20 @@ import {
   AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, FileSpreadsheet, Building2
 } from 'lucide-react';
-import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName, updateBranchFeeSettings, getBranchFeeSettings, fetchAdmissionInquiriesBackend, saveAdmissionInquiriesListBackend } from '../../services/api';
+import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, resolveStudentWhatsAppRecipient, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName, updateBranchFeeSettings, getBranchFeeSettings, fetchAdmissionInquiriesBackend, saveAdmissionInquiriesListBackend } from '../../services/api';
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
 import {
   calculateAgeFromDOB,
   getTodayISO,
+  isAcademyFallbackPhone,
+  isPlaceholderAddress,
   isPlaceholderText,
   isValidStudentDOB,
   needsProfileUpdate,
-  normalizeDobToISO
+  normalizeDobToISO,
+  validateStudentPhone
 } from '../../utils/studentValidation';
 
 const FIXED_AVATAR_DIM = 300;
@@ -652,6 +655,24 @@ export default function StudentManagement() {
       return;
     }
 
+    const approvedGuard = String(approvalData.guardianName || '').trim();
+    if (!approvedGuard || approvedGuard.length < 2 || isPlaceholderText(approvedGuard)) {
+      alert('⚠️ Valid Parent / Guardian Name is required before approving admission.');
+      return;
+    }
+
+    const approvedPhoneErr = validateStudentPhone(approvalData.phone, { required: true });
+    if (approvedPhoneErr) {
+      alert(`⚠️ ${approvedPhoneErr}`);
+      return;
+    }
+
+    const approvedAddr = String(approvalData.address || '').trim();
+    if (!approvedAddr || approvedAddr.length < 3 || isPlaceholderText(approvedAddr)) {
+      alert('⚠️ Valid Residential Address is required before approving admission.');
+      return;
+    }
+
     const admFee = Math.max(0, parseInt(approvalData.admissionFee) || 0);
     const admFeePaid = approvalData.admissionFeePaid ? Math.max(0, parseInt(approvalData.admissionFeePaidAmount) || 0) : 0;
     const monFee = Math.max(0, parseInt(approvalData.monthlyFee) || 0);
@@ -677,8 +698,8 @@ export default function StudentManagement() {
 
     const approvedCadet = {
       name: approvalData.cadetName.trim(),
-      guardianName: approvalData.guardianName.trim() || 'Parent',
-      guardian_name: approvalData.guardianName.trim() || 'Parent',
+      guardianName: approvedGuard,
+      guardian_name: approvedGuard,
       relationship: approvalData.relationship || 'Father',
       phone: approvalData.phone.replace(/[^0-9]/g, ''),
       whatsapp: (approvalData.whatsapp || approvalData.phone).replace(/[^0-9]/g, ''),
@@ -816,9 +837,15 @@ export default function StudentManagement() {
       return;
     }
 
-    const cleanPhone = (formData.phone || '').replace(/[^0-9]/g, '');
-    if (!cleanPhone || cleanPhone.length < 10) {
-      alert('⚠️ Valid 10-digit Phone Number is required! ദയവായി 10 അക്ക മൊബൈൽ നമ്പർ നൽകുക.');
+    const phoneErr = validateStudentPhone(formData.phone, { required: true });
+    if (phoneErr) {
+      alert(`⚠️ ${phoneErr}`);
+      return;
+    }
+
+    const waErr = validateStudentPhone(formData.whatsapp, { required: false });
+    if (waErr) {
+      alert(`⚠️ WhatsApp: ${waErr}`);
       return;
     }
 
@@ -832,8 +859,8 @@ export default function StudentManagement() {
       return;
     }
 
-    if (!formData.address || formData.address.trim().length < 3 || isPlaceholderText(formData.address)) {
-      alert('⚠️ Valid Residential Address is required! Dummy/keyboard-mash text is not allowed.');
+    if (!formData.address || formData.address.trim().length < 3 || isPlaceholderAddress(formData.address)) {
+      alert('⚠️ Valid Residential Address (House Name & Place) is required! Generic/dummy text is not allowed.');
       return;
     }
 
@@ -1286,6 +1313,10 @@ export default function StudentManagement() {
     const computedAge = cleanDob ? calculateAgeFromDOB(cleanDob) : null;
     const rawAddr = String(student.address || '').trim();
     const rawGuard = String(student.guardianName || student.guardian_name || '').trim();
+    const rawPhone = String(student.phone || '').trim();
+    const rawWa = String(student.whatsapp || '').trim();
+    const safePhone = isAcademyFallbackPhone(rawPhone) ? '' : rawPhone;
+    const safeWa = isAcademyFallbackPhone(rawWa) ? safePhone : (rawWa || safePhone);
 
     setEditingStudent({
       ...student,
@@ -1296,8 +1327,8 @@ export default function StudentManagement() {
       guardianName: isPlaceholderText(rawGuard) ? '' : rawGuard,
       guardian_name: isPlaceholderText(rawGuard) ? '' : rawGuard,
       occupation: student.occupation || student.guardian_occupation || '',
-      phone: student.phone || '',
-      whatsapp: student.whatsapp || student.phone || '',
+      phone: safePhone,
+      whatsapp: safeWa,
       dob: cleanDob,
       age: computedAge !== null ? computedAge : (cleanDob ? student.age || '' : ''),
       gender: student.gender || 'Male',
@@ -1335,7 +1366,19 @@ export default function StudentManagement() {
 
     const editGuard = String(editingStudent.guardianName || editingStudent.guardian_name || '').trim();
     if (editGuard && isPlaceholderText(editGuard)) {
-      alert('⚠️ Dummy or keyboard-mash text is not allowed for Parent / Guardian Name.');
+      alert('⚠️ Dummy or generic text (like "Parent" or "Paren") is not allowed for Parent / Guardian Name.');
+      return;
+    }
+
+    const editPhoneErr = validateStudentPhone(editingStudent.phone, { required: true });
+    if (editPhoneErr) {
+      alert(`⚠️ ${editPhoneErr}`);
+      return;
+    }
+
+    const editWaErr = validateStudentPhone(editingStudent.whatsapp, { required: false });
+    if (editWaErr) {
+      alert(`⚠️ WhatsApp: ${editWaErr}`);
       return;
     }
 
@@ -3439,14 +3482,27 @@ export default function StudentManagement() {
                               🩸 {std.bloodGroup || std.blood_group}
                             </span>
                           )}
-                          {needsProfileUpdate(std).needsAttention && (
-                            <span className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-300 rounded font-black flex items-center gap-0.5 shadow-2xs" title="Missing valid DOB or residential address">
-                              ⚠️ Needs Info
-                            </span>
-                          )}
+                          {(() => {
+                            const ps = needsProfileUpdate(std);
+                            if (!ps.needsAttention) return null;
+                            const missingParts = [
+                              ps.missingPhone && (ps.isAcademyPhone ? 'Real Parent Phone (Academy No. found)' : 'Phone'),
+                              ps.missingGuardian && 'Parent Name',
+                              ps.missingAddress && 'Address',
+                              ps.missingDob && 'DOB',
+                            ].filter(Boolean);
+                            return (
+                              <span
+                                className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-300 rounded font-black flex items-center gap-0.5 shadow-2xs"
+                                title={`Needs update: ${missingParts.join(', ')}`}
+                              >
+                                ⚠️ Needs Info
+                              </span>
+                            );
+                          })()}
                         </strong>
                         <span className="text-[11px] text-gray-500 font-medium block">
-                          Parent: {std.guardianName || std.guardian_name} ({std.phone})
+                          Parent: {std.guardianName || std.guardian_name || 'Not Entered'} ({std.phone || 'Phone Missing'})
                           {(std.occupation || std.guardian_occupation) && (
                             <span className="text-red-600 font-bold ml-1.5">• {std.occupation || std.guardian_occupation}</span>
                           )}
@@ -3748,6 +3804,15 @@ export default function StudentManagement() {
               <button
                 type="button"
                 onClick={() => {
+                  const recipient = resolveStudentWhatsAppRecipient({
+                    name: studentActiveReceipt.student_detail?.name,
+                    phone: studentActiveReceipt.parent_phone,
+                    whatsapp: studentActiveReceipt.parent_phone
+                  });
+                  if (!recipient.ok) {
+                    alert(recipient.message);
+                    return;
+                  }
                   const receiptMsg = 
                     `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\n` +
                     `🧾 *OFFICIAL FEE PAYMENT RECEIPT / ഫീസ് രസീത്*\n` +
@@ -3762,7 +3827,7 @@ export default function StudentManagement() {
                     `----------------------------------------\n\n` +
                     `Dear Parent (${studentActiveReceipt.parent_name}), we have successfully received and recorded your fee payment. Thank you! OSS 🥋`;
                   openWhatsApp({
-                    phone: studentActiveReceipt.parent_phone,
+                    phone: recipient.phone,
                     message: receiptMsg
                   });
                 }}
@@ -6151,8 +6216,11 @@ export default function StudentManagement() {
                 type="button"
                 onClick={() => {
                   const c = approvedSuccessData.cadet;
-                  const cleanP = (c.phone || '').replace(/[^0-9]/g, '');
-                  const waPhone = cleanP.length === 10 ? '91' + cleanP : cleanP;
+                  const recipient = resolveStudentWhatsAppRecipient(c);
+                  if (!recipient.ok) {
+                    alert(recipient.message);
+                    return;
+                  }
                   const text = 
                     '🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A)* 🥋\n\n' +
                     'Dear Parent (' + (c.guardianName || 'Parent') + '),\n\n' +
@@ -6166,7 +6234,7 @@ export default function StudentManagement() {
                     '• Amount Collected Now: *₹' + approvedSuccessData.totalCollected + '*\n\n' +
                     '🥋 OSS! Welcome to the B.A.M.A Dojo family. We look forward to seeing the cadet on the tatami.';
                   
-                  openWhatsApp({ phone: waPhone, message: text });
+                  openWhatsApp({ phone: recipient.phone, message: text });
                 }}
                 className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
               >

@@ -59,7 +59,7 @@ class StudentBranchTestCase(TestCase):
             'admission_no': 'BAMA-2026-CH02',
             'name': 'Fathima',
             'guardian_name': 'Ali',
-            'phone': '9544085442',
+            'phone': '9847055566',
             'branch': 'Chungam Branch',
             'fee_amount': 750.00
         }
@@ -122,7 +122,7 @@ class StudentBranchTestCase(TestCase):
         res_create = self.client.post('/api/students/', {
             'admission_no': 'BAMA-2026-CH03',
             'name': 'Superadmin Added Chungam Cadet',
-            'guardian_name': 'Parent',
+            'guardian_name': 'Karim P',
             'phone': '9847111222',
             'branch': str(self.chungam.id)
         }, format='json')
@@ -151,7 +151,7 @@ class StudentBranchTestCase(TestCase):
         res_ch_create = self.client.post('/api/students/', {
             'admission_no': 'BAMA-2026-CH04',
             'name': 'Chungam Staff Added Cadet',
-            'guardian_name': 'Parent',
+            'guardian_name': 'Salma K',
             'phone': '9847333444'
         }, format='json')
         self.assertEqual(res_ch_create.status_code, status.HTTP_201_CREATED)
@@ -291,6 +291,38 @@ class StudentBranchTestCase(TestCase):
                 'guardian_name': good_guard
             }, format='json')
             self.assertEqual(ok_res.status_code, status.HTTP_200_OK, msg=f'Should accept {good_addr} / {good_guard}')
+
+    def test_phone_and_generic_guardian_protection(self):
+        cadet = Student.objects.create(
+            admission_no='BAMA-2026-PH01',
+            name='Phone Protection Cadet',
+            branch=self.pulikkal,
+            phone='9847123456',
+            guardian_name='Kareem P'
+        )
+        for bad_phone in ['+91 9544085442', '9544085442', '9', '99388559290', '0000000000', '1234567890']:
+            res = self.client.patch(f'/api/students/{cadet.id}/', {'phone': bad_phone}, format='json')
+            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, msg=f'Should reject phone {bad_phone}')
+
+        res_wa = self.client.patch(f'/api/students/{cadet.id}/', {'whatsapp': '9'}, format='json')
+        self.assertEqual(res_wa.status_code, status.HTTP_400_BAD_REQUEST)
+
+        for bad_guard in ['Paren', 'Parent', 'Father', 'Mother', 'Guardian']:
+            res_g = self.client.patch(f'/api/students/{cadet.id}/', {'guardian_name': bad_guard}, format='json')
+            self.assertEqual(res_g.status_code, status.HTTP_400_BAD_REQUEST, msg=f'Should reject guardian {bad_guard}')
+
+        # Clearing stale corrupt values and setting valid domestic/international phones must succeed
+        res_clear = self.client.patch(f'/api/students/{cadet.id}/', {
+            'phone': '',
+            'whatsapp': '',
+            'guardian_name': '',
+            'address': ''
+        }, format='json')
+        self.assertEqual(res_clear.status_code, status.HTTP_200_OK)
+
+        for ok_phone in ['9847012345', '+91 98470 12345', '09847012345', '+971501234567']:
+            ok_res = self.client.patch(f'/api/students/{cadet.id}/', {'phone': ok_phone}, format='json')
+            self.assertEqual(ok_res.status_code, status.HTTP_200_OK, msg=f'Should accept {ok_phone}')
 
 
 

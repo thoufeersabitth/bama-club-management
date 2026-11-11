@@ -683,9 +683,9 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           target_belt: targetBelt,
           form_type: formCat,
           branch_name: String(bName).length > 20 ? 'Pulikkal Main Dojo' : bName,
-          phone: st.phone || st.whatsapp || '9544085442',
-          whatsapp: st.whatsapp || st.phone,
-          guardian_name: st.guardianName || st.guardian_name || 'Parent',
+          phone: st.phone || st.whatsapp || '',
+          whatsapp: st.whatsapp || st.phone || '',
+          guardian_name: st.guardianName || st.guardian_name || '',
           payment_status: customPayment,
           registration_status: 'Eligible Cadet',
           exam_status: 'Eligible Cadet',
@@ -1488,7 +1488,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 {/* Dojo Branch & Contact Info */}
                 <div className="text-[11px] text-gray-500 flex items-center justify-between px-1">
                   <span>🏢 {r.branch_name}</span>
-                  <span>📞 {r.phone || '9544085442'}</span>
+                  <span>📞 {r.phone || 'Not Entered'}</span>
                 </div>
 
                 {/* Action Buttons Bar */}

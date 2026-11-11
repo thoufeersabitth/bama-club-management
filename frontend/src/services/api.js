@@ -1,7 +1,13 @@
 import React from 'react';
 import axios from 'axios';
 import { SAMPLE_STUDENTS, INITIAL_BRANCHES, BELT_LEVELS, WHATSAPP_TEMPLATES, INITIAL_STAFF, getBranchKeyFromStr } from './initialData';
-import { calculateAgeFromDOB, normalizeDobToISO } from '../utils/studentValidation';
+import {
+  calculateAgeFromDOB,
+  isAcademyFallbackPhone,
+  normalizeDobToISO,
+  normalizePhoneDigits,
+  validateStudentPhone
+} from '../utils/studentValidation';
 
 const API_BASE = 'https://bama-club-backend.fly.dev/api';
 
@@ -1344,10 +1350,10 @@ export const createStudent = async (data) => {
   const payload = {
     admission_no: data.admissionNo || data.admission_no || `BAMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
     name: data.name || data.student_name || 'Cadet Student',
-    guardian_name: data.guardianName || data.guardian_name || 'Parent',
+    guardian_name: (data.guardianName || data.guardian_name || '').trim(),
     relationship: data.relationship || 'Father',
-    phone: data.phone || '+91 9544085442',
-    whatsapp: data.whatsapp || data.phone || '+91 9544085442',
+    phone: (data.phone || '').trim(),
+    whatsapp: (data.whatsapp || data.phone || '').trim(),
     age: parseInt(data.age) || 12,
     dob: data.dob || null,
     gender: data.gender || 'Male',
@@ -1369,7 +1375,7 @@ export const createStudent = async (data) => {
     fee_status: status,
     paid_months: cadetPaidMonths,
     joining_date: data.joiningDate || data.joining_date || new Date().toISOString().split('T')[0],
-    address: data.address || 'Pulikkal, Malappuram, Kerala',
+    address: (data.address || '').trim(),
     photo: data.photo || '',
     status: data.status || 'Active'
   };
@@ -3308,11 +3314,41 @@ export const setPreferredWhatsAppChannel = (channel) => {
 };
 
 export const formatWhatsAppNumber = (rawPhone) => {
-  if (!rawPhone) return '919544085442';
-  let clean = String(rawPhone).replace(/[^0-9]/g, '');
-  if (clean.length === 10) clean = '91' + clean;
-  if (clean.startsWith('0')) clean = '91' + clean.slice(1);
-  return clean;
+  if (!rawPhone) return '';
+  const clean = String(rawPhone).replace(/[^0-9]/g, '');
+  if (clean.length === 10) return '91' + clean;
+  if (clean.length === 11 && clean.startsWith('0')) return '91' + clean.slice(1);
+  if (clean.length >= 10) return clean;
+  return '';
+};
+
+export const resolveStudentWhatsAppRecipient = (student) => {
+  if (!student) {
+    return { ok: false, phone: '', isAcademyPhone: false, message: 'No cadet record found.' };
+  }
+  const candidates = [student.whatsapp, student.phone].filter(Boolean);
+  let sawAcademy = false;
+  for (const candidate of candidates) {
+    if (isAcademyFallbackPhone(candidate)) {
+      sawAcademy = true;
+      continue;
+    }
+    if (validateStudentPhone(candidate, { required: true }) === '') {
+      const wa = formatWhatsAppNumber(candidate);
+      if (wa) {
+        return { ok: true, phone: wa, isAcademyPhone: false, message: '' };
+      }
+    }
+  }
+  const name = student.name || student.student_name || 'Cadet';
+  return {
+    ok: false,
+    phone: '',
+    isAcademyPhone: sawAcademy,
+    message: sawAcademy
+      ? `⚠️ ${name} has Academy phone (+91 9544085442) saved instead of parent mobile! Please update parent's real phone in Student Management first.`
+      : `⚠️ Valid 10-digit parent Phone / WhatsApp number is missing for ${name}. Please update it in Student Management first.`,
+  };
 };
 
 export const isMobileDevice = () => {
@@ -3630,15 +3666,20 @@ export default api;
 
 // Student & Parent Portal Authentication & Password Management
 export const getStudentPortalAuth = async (phone, selectedStudentId = null) => {
-  const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
-  if (!cleanPhone) return { success: false, message: 'Invalid phone number' };
+  const cleanPhone = normalizePhoneDigits(phone);
+  if (!cleanPhone || cleanPhone.length < 10) return { success: false, message: 'Invalid phone number' };
+
+  const matchesDigits = (candidate) => {
+    const d = normalizePhoneDigits(candidate);
+    if (!d || d.length < 10) return false;
+    return d === cleanPhone || d.endsWith(cleanPhone) || cleanPhone.endsWith(d);
+  };
 
   try {
     const students = await fetchStudents();
-    const matches = (students || []).filter(s => {
-      const sP = String(s.phone || s.mobile || s.whatsapp || '').replace(/[^0-9]/g, '');
-      return sP.includes(cleanPhone) || cleanPhone.includes(sP);
-    });
+    const matches = (students || []).filter(s =>
+      matchesDigits(s.phone || s.mobile) || matchesDigits(s.whatsapp)
+    );
 
     if (!matches || matches.length === 0) {
       return { success: false, notFound: true, message: 'No student found registered with this mobile number.' };

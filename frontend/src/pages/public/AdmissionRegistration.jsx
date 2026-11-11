@@ -7,7 +7,13 @@ import {
 } from 'lucide-react';
 import { fetchBranches, getBranchFeeSettings, saveAdmissionInquiryBackend } from '../../services/api';
 import { INITIAL_BRANCHES, PROGRAM_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
-import { calculateAgeFromDOB, getTodayISO, isPlaceholderText, normalizeDobToISO } from '../../utils/studentValidation';
+import {
+  calculateAgeFromDOB,
+  getTodayISO,
+  isPlaceholderText,
+  normalizeDobToISO,
+  validateStudentPhone
+} from '../../utils/studentValidation';
 
 export default function AdmissionRegistration() {
   const [branchesList, setBranchesList] = useState(INITIAL_BRANCHES);
@@ -97,6 +103,18 @@ export default function AdmissionRegistration() {
 
     if (!String(formData.guardian_name || '').trim() || isPlaceholderText(formData.guardian_name)) {
       setErrorMsg('Please enter real Parent / Guardian full name.');
+      return;
+    }
+
+    const phoneErr = validateStudentPhone(formData.phone, { required: true });
+    if (phoneErr) {
+      setErrorMsg(phoneErr);
+      return;
+    }
+
+    const waErr = validateStudentPhone(formData.whatsapp, { required: false });
+    if (waErr) {
+      setErrorMsg(`WhatsApp Number: ${waErr}`);
       return;
     }
 

@@ -4,7 +4,15 @@ const PLACEHOLDER_EXACT_VALUES = new Set([
   'na', 'n/a', 'none', 'null', 'nil', 'unknown', 'tbd', 'todo', 'pending',
   'test', 'testing', 'dummy', 'sample', 'asdf', 'sdfg', 'dfgh', 'fghj',
   'ghjk', 'qwerty', 'qwert', 'zxcv', 'zxcvb', 'xxx', 'xxxx',
-  'full address', 'parent/guardian',
+  'full address', 'parent/guardian', 'paren', 'parent', 'father', 'mother',
+  'guardian', 'pulikkal, malappuram, kerala',
+]);
+
+const ACADEMY_FALLBACK_PHONES = new Set(['9544085442']);
+const DUMMY_PHONE_DIGITS = new Set(['1234567890', '0123456789', '9876543210']);
+const GENERIC_LOCATION_ONLY = new Set([
+  'pulikkal', 'pulikkal, malappuram', 'pulikkal, malappuram, kerala',
+  'malappuram', 'kerala', 'kondotty', 'feroke', 'chungam', 'mongam',
 ]);
 
 const KEYBOARD_SEQUENCES = [
@@ -174,19 +182,89 @@ export function calculateAgeFromDOB(dobString) {
   return age;
 }
 
+export function normalizePhoneDigits(value) {
+  if (!value) return '';
+  const digits = String(value).replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+  return digits;
+}
+
+export function isAcademyFallbackPhone(value) {
+  if (!value) return false;
+  const rawDigits = String(value).replace(/\D/g, '');
+  const norm = normalizePhoneDigits(value);
+  return ACADEMY_FALLBACK_PHONES.has(norm) || ACADEMY_FALLBACK_PHONES.has(rawDigits);
+}
+
+/**
+ * Validates a student phone / WhatsApp number.
+ * Returns empty string if valid, or a human-readable error message.
+ */
+export function validateStudentPhone(value, { required = false } = {}) {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return required ? 'Valid 10-digit parent mobile number is required.' : '';
+  }
+
+  const allDigits = raw.replace(/\D/g, '');
+  if (!allDigits) return 'Please enter a valid mobile number.';
+
+  const norm = normalizePhoneDigits(raw);
+  if (isAcademyFallbackPhone(raw)) {
+    return 'Academy number (+91 9544085442) cannot be saved as a student parent number.';
+  }
+
+  if (DUMMY_PHONE_DIGITS.has(norm) || new Set(norm).size === 1) {
+    return 'Dummy or repeated phone numbers are not allowed.';
+  }
+
+  const isIntlNonIndia = raw.startsWith('+') && !allDigits.startsWith('91');
+  if (isIntlNonIndia) {
+    if (allDigits.length < 10 || allDigits.length > 15) {
+      return 'Please enter a valid international number (10 to 15 digits).';
+    }
+    return '';
+  }
+
+  if (norm.length !== 10) {
+    return 'Please enter a valid 10-digit mobile number.';
+  }
+  return '';
+}
+
+export function isPlaceholderAddress(value) {
+  if (!value) return false;
+  if (isPlaceholderText(value)) return true;
+  return GENERIC_LOCATION_ONLY.has(String(value).trim().toLowerCase());
+}
+
 export function needsProfileUpdate(student) {
   if (!student) {
-    return { missingDob: false, missingAddress: false, missingGuardian: false, needsAttention: false };
+    return {
+      missingDob: false,
+      missingAddress: false,
+      missingGuardian: false,
+      missingPhone: false,
+      isAcademyPhone: false,
+      needsAttention: false,
+    };
   }
   const missingDob = !isValidStudentDOB(student.dob);
   const addr = String(student.address || '').trim();
-  const missingAddress = !addr || isPlaceholderText(addr);
+  const missingAddress = !addr || isPlaceholderAddress(addr);
   const guard = String(student.guardianName || student.guardian_name || '').trim();
   const missingGuardian = !guard || isPlaceholderText(guard);
+  const phoneRaw = String(student.phone || '').trim();
+  const waRaw = String(student.whatsapp || '').trim();
+  const isAcademyPhone = isAcademyFallbackPhone(phoneRaw) || isAcademyFallbackPhone(waRaw);
+  const missingPhone = !phoneRaw || Boolean(validateStudentPhone(phoneRaw, { required: true }));
   return {
     missingDob,
     missingAddress,
     missingGuardian,
-    needsAttention: missingDob || missingAddress,
+    missingPhone,
+    isAcademyPhone,
+    needsAttention: missingDob || missingAddress || missingGuardian || missingPhone,
   };
 }
