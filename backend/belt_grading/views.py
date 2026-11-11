@@ -8,6 +8,72 @@ from .models import BeltGrading, ExamSchedule, GradingRegistration, ExamFormType
 from .serializers import BeltGradingSerializer, ExamScheduleSerializer, GradingRegistrationSerializer
 from .services import get_exam_form_type, get_eligible_students, validate_exam_eligibility, calculate_exam_fee
 from students.models import Student
+from students.validators import calculate_age_from_dob, is_placeholder_text, parse_valid_dob
+
+
+def _safe_valid_dob(val):
+    if not val:
+        return None
+    try:
+        return parse_valid_dob(val)
+    except ValueError:
+        return None
+
+
+def _clean_text_for_prefill(val):
+    if not val:
+        return ''
+    text = str(val).strip()
+    return '' if is_placeholder_text(text) else text
+
+
+def _heal_student_profile_from_reg(student, reg):
+    """
+    Safely populates missing or placeholder/invalid fields (dob, age, address,
+    guardian_name) on Student from a valid GradingRegistration without ever
+    overwriting existing valid student data.
+    """
+    if not student or not reg:
+        return
+
+    updated_fields = []
+    if _safe_valid_dob(student.dob) is None:
+        reg_dob = _safe_valid_dob(reg.dob)
+        if reg_dob is not None:
+            student.dob = reg_dob
+            updated_fields.append('dob')
+            computed_age = calculate_age_from_dob(reg_dob)
+            if computed_age is not None:
+                student.age = computed_age
+                updated_fields.append('age')
+
+    for field in ('address', 'guardian_name'):
+        curr = (getattr(student, field, None) or '').strip()
+        candidate = (getattr(reg, field, None) or '').strip()
+        if (not curr or is_placeholder_text(curr)) and candidate and not is_placeholder_text(candidate):
+            setattr(student, field, candidate)
+            updated_fields.append(field)
+
+    if updated_fields:
+        student.save(update_fields=updated_fields)
+
+
+def _normalize_registration_dob(data):
+    if 'dob' not in data:
+        return None
+    raw_dob = data.get('dob')
+    if raw_dob is None or str(raw_dob).strip() == '':
+        data['dob'] = None
+        return None
+    try:
+        parsed_dob = parse_valid_dob(raw_dob)
+    except ValueError as exc:
+        return str(exc)
+    data['dob'] = parsed_dob.isoformat()
+    computed_age = calculate_age_from_dob(parsed_dob)
+    if computed_age is not None:
+        data['age'] = computed_age
+    return None
 
 class BeltGradingViewSet(viewsets.ModelViewSet):
     queryset = BeltGrading.objects.all().order_by('-exam_date')
@@ -92,8 +158,8 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
         
         # Resilient student resolution
         student_val = data.get('student')
+        st_obj = None
         if student_val:
-            st_obj = None
             try:
                 st_obj = Student.objects.filter(id=student_val).first()
             except Exception:
@@ -102,9 +168,13 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
                 st_obj = Student.objects.filter(admission_no__iexact=str(student_val)).first()
             if not st_obj:
                 st_obj = Student.objects.filter(name__icontains=str(student_val)).first()
-            data['student'] = str(st_obj.id) if st_obj else None
-        else:
-            data['student'] = None
+        if not st_obj and data.get('admission_no'):
+            st_obj = Student.objects.filter(admission_no__iexact=str(data.get('admission_no')).strip()).first()
+        data['student'] = str(st_obj.id) if st_obj else None
+
+        dob_err = _normalize_registration_dob(data)
+        if dob_err:
+            return Response({'dob': [dob_err], 'error': dob_err}, status=status.HTTP_400_BAD_REQUEST)
 
         # Determine form_type automatically based on target or current belt
         target_belt = data.get('target_belt') or data.get('current_belt') or 'Yellow Belt'
@@ -136,6 +206,7 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        _heal_student_profile_from_reg(serializer.instance.student, serializer.instance)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
@@ -158,12 +229,16 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
             data['student'] = str(student.id)
             data['admission_no'] = student.admission_no
             data['student_name'] = data.get('student_name') or student.name
-            data['guardian_name'] = data.get('guardian_name') or student.guardian_name
+            data['guardian_name'] = data.get('guardian_name') or _clean_text_for_prefill(student.guardian_name)
             data['phone'] = data.get('phone') or student.phone
             data['whatsapp'] = data.get('whatsapp') or student.whatsapp or student.phone
-            data['address'] = data.get('address') or student.address
+            data['address'] = data.get('address') or _clean_text_for_prefill(student.address)
             data['branch_name'] = data.get('branch_name') or (student.branch.name if student.branch else 'Pulikkal Dojo')
             data['current_belt'] = student.current_belt
+
+        dob_err = _normalize_registration_dob(data)
+        if dob_err:
+            return Response({'dob': [dob_err], 'error': dob_err}, status=status.HTTP_400_BAD_REQUEST)
 
         exam_id = data.get('exam_schedule') or data.get('exam_id')
         exam = None
@@ -189,6 +264,7 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        _heal_student_profile_from_reg(serializer.instance.student, serializer.instance)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'], url_path='form-category-lists')
@@ -324,19 +400,20 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
             if reg:
                 target = reg.target_belt or reg.current_belt or 'Yellow Belt'
                 form_type = get_exam_form_type(target)
+                clean_reg_dob = _safe_valid_dob(reg.dob)
                 return Response({
                     'found': True,
                     'student_id': str(reg.student.id) if reg.student else '',
                     'admission_no': reg.admission_no,
                     'student_name': reg.student_name,
                     'gender': reg.gender or 'Male',
-                    'dob': str(reg.dob) if reg.dob else '',
-                    'age': reg.age or 10,
-                    'guardian_name': reg.guardian_name,
+                    'dob': clean_reg_dob.isoformat() if clean_reg_dob else '',
+                    'age': calculate_age_from_dob(clean_reg_dob) if clean_reg_dob else (reg.age or ''),
+                    'guardian_name': _clean_text_for_prefill(reg.guardian_name),
                     'relationship': reg.guardian_relationship or 'Father',
                     'phone': reg.phone,
                     'whatsapp': reg.whatsapp or reg.phone,
-                    'address': reg.address,
+                    'address': _clean_text_for_prefill(reg.address),
                     'branch_name': reg.branch_name or 'Pulikkal Dojo',
                     'current_belt': reg.current_belt or 'White Belt',
                     'target_belt': target,
@@ -362,19 +439,21 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
 
         form_type = get_exam_form_type(next_belt)
 
+        clean_dob = _safe_valid_dob(student.dob)
+        computed_age = calculate_age_from_dob(clean_dob) if clean_dob else student.age
         return Response({
             'found': True,
             'student_id': str(student.id),
             'admission_no': student.admission_no,
             'student_name': student.name,
             'gender': student.gender,
-            'dob': student.dob,
-            'age': student.age,
-            'guardian_name': student.guardian_name,
+            'dob': clean_dob.isoformat() if clean_dob else '',
+            'age': computed_age if computed_age is not None else '',
+            'guardian_name': _clean_text_for_prefill(student.guardian_name),
             'relationship': student.relationship,
             'phone': student.phone,
             'whatsapp': student.whatsapp or student.phone,
-            'address': student.address,
+            'address': _clean_text_for_prefill(student.address),
             'branch_name': student.branch.name if student.branch else 'Pulikkal Dojo',
             'current_belt': student.current_belt,
             'target_belt': next_belt,

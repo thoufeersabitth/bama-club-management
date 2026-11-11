@@ -1,6 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import { SAMPLE_STUDENTS, INITIAL_BRANCHES, BELT_LEVELS, WHATSAPP_TEMPLATES, INITIAL_STAFF, getBranchKeyFromStr } from './initialData';
+import { calculateAgeFromDOB, normalizeDobToISO } from '../utils/studentValidation';
 
 const API_BASE = 'https://bama-club-backend.fly.dev/api';
 
@@ -1514,6 +1515,26 @@ export const updateStudent = async (id, data) => {
     bloodGroup: data.bloodGroup || data.blood_group || existing.bloodGroup || existing.blood_group || 'O+',
     gender: data.gender || existing.gender || 'Male'
   };
+
+  const preservedAdm = data.admission_no || data.admissionNo || existing.admission_no || existing.admissionNo;
+  if (preservedAdm) {
+    payload.admission_no = preservedAdm;
+  }
+
+  if ('dob' in payload) {
+    if (!payload.dob || String(payload.dob).trim() === '') {
+      payload.dob = null;
+    } else {
+      const normalizedDob = normalizeDobToISO(payload.dob);
+      if (normalizedDob) {
+        payload.dob = normalizedDob;
+        const computedAge = calculateAgeFromDOB(normalizedDob);
+        if (computedAge !== null) {
+          payload.age = computedAge;
+        }
+      }
+    }
+  }
 
   // Automatically compress & upload photo to Supabase CDN if base64
   if (payload.photo && typeof payload.photo === 'string' && payload.photo.startsWith('data:image')) {
@@ -3724,8 +3745,8 @@ export const verifyStudentPasswordLogin = async (studentId, passwordInput) => {
 export const verifyStudentDOBLogin = async (studentId, dobInput) => {
   try {
     const students = await fetchStudents();
-    const st = (students || []).find(s => 
-      String(s.id) === String(studentId) || 
+    const st = (students || []).find(s =>
+      String(s.id) === String(studentId) ||
       String(s.admission_no || s.admissionNo) === String(studentId)
     );
     if (!st) return { success: false, message: 'Cadet record not found.' };
@@ -3735,37 +3756,53 @@ export const verifyStudentDOBLogin = async (studentId, dobInput) => {
       return { success: false, message: 'Please select or enter Date of Birth.' };
     }
 
-    const stDOB = String(st.dob || st.dateOfBirth || st.birth_date || '').trim();
-
-    // Helper to normalize dates into YYYY-MM-DD
-    const normalizeDate = (dStr) => {
-      if (!dStr) return '';
-      const raw = dStr.split('T')[0].trim();
-      const parts = raw.split(/[-/.]/);
-      if (parts.length === 3) {
-        if (parts[0].length === 4) {
-          return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-        } else if (parts[2].length === 4) {
-          return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
-      }
-      try {
-        const parsed = new Date(dStr);
-        if (!isNaN(parsed.getTime())) {
-          return parsed.toISOString().split('T')[0];
-        }
-      } catch (e) {}
-      return raw;
-    };
-
-    const d1 = normalizeDate(stDOB);
-    const d2 = normalizeDate(cleanInput);
-
-    if (d1 && d2 && d1 !== d2) {
-      return { success: false, message: 'Date of Birth does not match official cadet record. Please check or contact Sensei.' };
+    const d2 = normalizeDobToISO(cleanInput);
+    if (!d2) {
+      return {
+        success: false,
+        message: 'Invalid Date of Birth. Please enter a real birth date (year 1940 or later, not in the future).'
+      };
     }
 
-    return { success: true, student: st };
+    const stDOB = String(st.dob || st.dateOfBirth || st.birth_date || '').trim();
+    const d1 = normalizeDobToISO(stDOB);
+
+    if (d1 && d1 !== d2) {
+      return {
+        success: false,
+        message: 'Date of Birth does not match official cadet record. Please check your entry or contact your Dojo Sensei to update it.'
+      };
+    }
+
+    let finalStudent = st;
+    if (!d1) {
+      const computedAge = calculateAgeFromDOB(d2);
+      try {
+        const updated = await updateStudent(st.id, {
+          admission_no: st.admission_no || st.admissionNo,
+          branch: st.branch || st.branch_id || st.branch_name,
+          branch_id: st.branch_id || (typeof st.branch === 'object' ? st.branch?.id : st.branch),
+          branch_name: st.branch_name || st.branchName,
+          shift: st.shift,
+          dob: d2,
+          ...(computedAge !== null ? { age: computedAge } : {})
+        });
+        finalStudent = {
+          ...st,
+          ...(updated && typeof updated === 'object' ? updated : {}),
+          dob: d2,
+          ...(computedAge !== null ? { age: computedAge } : {})
+        };
+      } catch (e) {
+        finalStudent = {
+          ...st,
+          dob: d2,
+          ...(computedAge !== null ? { age: computedAge } : {})
+        };
+      }
+    }
+
+    return { success: true, student: finalStudent };
   } catch (err) {
     return { success: false, message: 'Verification error. Please try again.' };
   }

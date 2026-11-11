@@ -3,13 +3,22 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Shield, User, Lock, Calendar, Phone, ArrowRight, AlertCircle,
   Loader2, CheckCircle2, Users, KeyRound, QrCode, FileText, Download,
-  Check, Sparkles, Building2
+  Check, Sparkles, Building2, MapPin, Award
 } from 'lucide-react';
 import {
   getStudentPortalAuth,
   verifyStudentDOBLogin,
-  verifyStudentPasswordLogin
+  verifyStudentPasswordLogin,
+  updateStudent
 } from '../../services/api';
+import {
+  calculateAgeFromDOB,
+  getTodayISO,
+  isPlaceholderText,
+  isValidStudentDOB,
+  needsProfileUpdate,
+  normalizeDobToISO
+} from '../../utils/studentValidation';
 
 export default function StudentPortalLogin() {
   const navigate = useNavigate();
@@ -42,6 +51,71 @@ export default function StudentPortalLogin() {
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [profileForm, setProfileForm] = useState({ dob: '', address: '', guardianName: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
+
+  const handleCompleteProfile = async (e) => {
+    e.preventDefault();
+    if (!activeStudent) return;
+    setProfileMessage({ type: '', text: '' });
+
+    const status = needsProfileUpdate(activeStudent);
+    const updatePayload = {
+      admission_no: activeStudent.admission_no || activeStudent.admissionNo,
+      branch: activeStudent.branch || activeStudent.branch_id || activeStudent.branch_name,
+      branch_id: activeStudent.branch_id || (typeof activeStudent.branch === 'object' ? activeStudent.branch?.id : activeStudent.branch),
+      branch_name: activeStudent.branch_name || activeStudent.branchName,
+      shift: activeStudent.shift
+    };
+
+    if (status.missingDob) {
+      const normalized = normalizeDobToISO(profileForm.dob);
+      if (!normalized) {
+        setProfileMessage({ type: 'error', text: 'Please select a valid Date of Birth (year 1940 or later, not future).' });
+        return;
+      }
+      updatePayload.dob = normalized;
+      const calcAge = calculateAgeFromDOB(normalized);
+      if (calcAge !== null) updatePayload.age = calcAge;
+    }
+
+    if (status.missingAddress) {
+      const addr = profileForm.address.trim();
+      if (addr.length < 5 || isPlaceholderText(addr)) {
+        setProfileMessage({ type: 'error', text: 'Please enter a real residential address (house name, place, post office).' });
+        return;
+      }
+      updatePayload.address = addr;
+    }
+
+    if (status.missingGuardian && profileForm.guardianName.trim()) {
+      const guard = profileForm.guardianName.trim();
+      if (isPlaceholderText(guard)) {
+        setProfileMessage({ type: 'error', text: 'Please enter real Parent/Guardian name.' });
+        return;
+      }
+      updatePayload.guardian_name = guard;
+      updatePayload.guardianName = guard;
+    }
+
+    setProfileSaving(true);
+    try {
+      const updated = await updateStudent(activeStudent.id, updatePayload);
+      const merged = { ...activeStudent, ...updatePayload, ...(updated && typeof updated === 'object' ? updated : {}) };
+      setActiveStudent(merged);
+      try {
+        sessionStorage.setItem('bama_active_portal_cadet', JSON.stringify(merged));
+      } catch (err) {}
+      setProfileForm({ dob: '', address: '', guardianName: '' });
+      setProfileMessage({ type: 'success', text: 'Official cadet profile updated and synced cleanly!' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: 'Could not save details right now. Please try again.' });
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   // Step 1: Submit Phone Number
   const handlePhoneSubmit = async (e) => {
@@ -317,12 +391,24 @@ export default function StudentPortalLogin() {
                 type="date"
                 required
                 autoFocus
+                min="1940-01-01"
+                max={getTodayISO()}
                 value={dob}
                 onChange={(e) => setDob(e.target.value)}
                 className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-3 text-white font-bold text-sm focus:border-red-500 focus:outline-none"
               />
               <p className="text-[10px] text-gray-400">
-                Enter official DOB submitted during academy admission to unlock portal instantly.
+                Enter official DOB submitted during academy admission to unlock portal instantly.{' '}
+                {error && (
+                  <a
+                    href={`https://wa.me/919544085442?text=${encodeURIComponent(`Hello Sensei, my child ${activeStudent?.name || ''} (${activeStudent?.admission_no || activeStudent?.admissionNo || ''}) needs official Date of Birth corrected in Student Portal.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-emerald-400 font-bold underline ml-1"
+                  >
+                    Ask Sensei on WhatsApp to fix DOB
+                  </a>
+                )}
               </p>
             </div>
 
@@ -486,10 +572,107 @@ export default function StudentPortalLogin() {
                   {activeStudent.program || activeStudent.course || 'Karate'}
                 </strong>
                 <p className="text-[9px] text-gray-400 mt-0.5">
-                  Age: {activeStudent.age || 10} Yrs • Blood: {activeStudent.bloodGroup || activeStudent.blood_group || 'O+'}
+                  {(() => {
+                    const liveAge = calculateAgeFromDOB(activeStudent.dob);
+                    if (liveAge !== null) return `Age: ${liveAge} Yrs`;
+                    if (isValidStudentDOB(activeStudent.dob) && activeStudent.age) return `Age: ${activeStudent.age} Yrs`;
+                    return 'DOB Pending';
+                  })()} • Blood: {activeStudent.bloodGroup || activeStudent.blood_group || 'O+'}
                 </p>
               </div>
             </div>
+
+            {needsProfileUpdate(activeStudent).needsAttention && (
+              <form
+                onSubmit={handleCompleteProfile}
+                className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2.5 text-left"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-200 font-black text-xs">
+                      Complete Official Cadet Profile
+                    </p>
+                    <p className="text-[10px] text-amber-100/80">
+                      Please enter missing Date of Birth / residential address so exam forms & certificates stay accurate.
+                    </p>
+                  </div>
+                </div>
+
+                {profileMessage.text && (
+                  <div className={`px-3 py-2 rounded-xl text-[11px] font-bold ${
+                    profileMessage.type === 'success'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  }`}>
+                    {profileMessage.text}
+                  </div>
+                )}
+
+                {needsProfileUpdate(activeStudent).missingDob && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-amber-400" /> Official Date of Birth *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      min="1940-01-01"
+                      max={getTodayISO()}
+                      value={profileForm.dob}
+                      onChange={(e) => setProfileForm({ ...profileForm, dob: e.target.value })}
+                      className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {needsProfileUpdate(activeStudent).missingAddress && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-amber-400" /> Full Residential Address *
+                    </label>
+                    <textarea
+                      rows={2}
+                      required
+                      placeholder="House Name, Place, Post Office, Pin Code..."
+                      value={profileForm.address}
+                      onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                      className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {needsProfileUpdate(activeStudent).missingGuardian && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-300">Parent / Guardian Name</label>
+                    <input
+                      type="text"
+                      placeholder="Father / Mother / Guardian full name"
+                      value={profileForm.guardianName}
+                      onChange={(e) => setProfileForm({ ...profileForm, guardianName: e.target.value })}
+                      className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={profileSaving}
+                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {profileSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>Save & Update Official Record</span>
+                </button>
+              </form>
+            )}
+
+            <Link
+              to={`/grading-registration?admission_no=${encodeURIComponent(activeStudent.admission_no || activeStudent.admissionNo || '')}`}
+              className="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+            >
+              <Award className="w-4 h-4" />
+              <span>Apply for Belt Grading Exam →</span>
+            </Link>
 
             {/* WhatsApp Sensei direct communication */}
             <a

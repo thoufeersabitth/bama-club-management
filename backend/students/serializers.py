@@ -2,6 +2,7 @@ import uuid
 import random
 from rest_framework import serializers
 from .models import Student
+from .validators import calculate_age_from_dob, is_placeholder_text, parse_valid_dob
 from branches.models import Branch
 
 class StudentBranchSerializer(serializers.ModelSerializer):
@@ -72,15 +73,43 @@ class StudentSerializer(serializers.ModelSerializer):
             except (ValueError, TypeError):
                 data.pop('id', None)
 
-        # Ensure admission_no is present and unique
-        import random
+        # Ensure admission_no is present on creation; NEVER regenerate on partial PATCH/PUT
         adm_no = data.get('admission_no')
-        if not adm_no:
-            data['admission_no'] = f"BAMA-2026-{random.randint(1000, 9999)}"
-        elif not self.instance:
-            # When creating, if admission_no is duplicate, generate unique
-            if Student.objects.filter(admission_no__iexact=str(adm_no).strip()).exists():
+        if not self.instance:
+            if not adm_no:
                 data['admission_no'] = f"BAMA-2026-{random.randint(1000, 9999)}"
+            elif Student.objects.filter(admission_no__iexact=str(adm_no).strip()).exists():
+                data['admission_no'] = f"BAMA-2026-{random.randint(1000, 9999)}"
+        elif 'admission_no' in data and not adm_no:
+            data.pop('admission_no', None)
+
+        # Normalize and validate Date of Birth + keep age aligned
+        if 'dob' in data:
+            raw_dob = data.get('dob')
+            if raw_dob is None or str(raw_dob).strip() == '':
+                data['dob'] = None
+            else:
+                try:
+                    parsed_dob = parse_valid_dob(raw_dob)
+                except ValueError as exc:
+                    raise serializers.ValidationError({'dob': str(exc)})
+                data['dob'] = parsed_dob.isoformat()
+                computed_age = calculate_age_from_dob(parsed_dob)
+                if computed_age is not None:
+                    data['age'] = computed_age
+
+        if 'age' in data and data.get('age') == '':
+            data['age'] = None
+
+        # Prevent saving placeholder / keyboard-mash strings into text fields
+        for text_field in ('address', 'guardian_name'):
+            if text_field in data and data[text_field] is not None:
+                val_str = str(data[text_field]).strip()
+                existing_val = (getattr(self.instance, text_field, None) or '').strip() if self.instance else ''
+                if is_placeholder_text(val_str) and (not self.instance or val_str != existing_val):
+                    raise serializers.ValidationError({
+                        text_field: 'Please enter real information; dummy or keyboard-mash text is not allowed.'
+                    })
 
         branch_val = data.get('branch') or data.get('branch_id') or data.get('branch_name')
         if branch_val:

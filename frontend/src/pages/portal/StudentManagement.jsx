@@ -11,23 +11,17 @@ import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStuden
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
+import {
+  calculateAgeFromDOB,
+  getTodayISO,
+  isPlaceholderText,
+  isValidStudentDOB,
+  needsProfileUpdate,
+  normalizeDobToISO
+} from '../../utils/studentValidation';
 
 const FIXED_AVATAR_DIM = 300;
 const BLOOD_GROUP_OPTIONS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
-
-// Helper to calculate exact Age automatically from Date of Birth
-const calculateAgeFromDOB = (dobString) => {
-  if (!dobString) return 12;
-  const birthDate = new Date(dobString);
-  if (isNaN(birthDate.getTime())) return 12;
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  return Math.max(4, Math.min(age, 75));
-};
 
 export const resolveStudentProgram = (st) => {
   if (!st) return 'Karate (Shotokan)';
@@ -817,8 +811,8 @@ export default function StudentManagement() {
     }
 
     const trimmedGuardian = (formData.guardianName || '').trim();
-    if (!trimmedGuardian || trimmedGuardian.length < 2) {
-      alert('⚠️ Parent / Guardian Name is required! ദയവായി രക്ഷാകർത്താവിന്റെ പേര് നൽകുക.');
+    if (!trimmedGuardian || trimmedGuardian.length < 2 || isPlaceholderText(trimmedGuardian)) {
+      alert('⚠️ Valid Parent / Guardian Name is required! Dummy/keyboard-mash text is not allowed.');
       return;
     }
 
@@ -838,8 +832,13 @@ export default function StudentManagement() {
       return;
     }
 
-    if (!formData.address || formData.address.trim().length < 3) {
-      alert('⚠️ Residential Address is required! ദയവായി മേൽവിലാസം നൽകുക.');
+    if (!formData.address || formData.address.trim().length < 3 || isPlaceholderText(formData.address)) {
+      alert('⚠️ Valid Residential Address is required! Dummy/keyboard-mash text is not allowed.');
+      return;
+    }
+
+    if (!formData.dob || !normalizeDobToISO(formData.dob)) {
+      alert('⚠️ Valid Date of Birth (year 1940 or later, not future) is required!');
       return;
     }
 
@@ -1283,18 +1282,24 @@ export default function StudentManagement() {
     const branchShifts = getDynamicShiftOptions(exactBranchName, courseProg, branchesList);
     const resolvedShift = student.shift || (branchShifts.length > 0 ? branchShifts[0] : 'Evening Batch (5:00 PM - 7:00 PM)');
 
+    const cleanDob = normalizeDobToISO(student.dob || student.dateOfBirth) || '';
+    const computedAge = cleanDob ? calculateAgeFromDOB(cleanDob) : null;
+    const rawAddr = String(student.address || '').trim();
+    const rawGuard = String(student.guardianName || student.guardian_name || '').trim();
+
     setEditingStudent({
       ...student,
       program: courseProg,
       course: courseProg,
       discipline: courseProg,
       name: student.name || student.student_name || '',
-      guardianName: student.guardianName || student.guardian_name || '',
-      guardian_name: student.guardianName || student.guardian_name || '',
+      guardianName: isPlaceholderText(rawGuard) ? '' : rawGuard,
+      guardian_name: isPlaceholderText(rawGuard) ? '' : rawGuard,
       occupation: student.occupation || student.guardian_occupation || '',
       phone: student.phone || '',
       whatsapp: student.whatsapp || student.phone || '',
-      age: student.age || 10,
+      dob: cleanDob,
+      age: computedAge !== null ? computedAge : (cleanDob ? student.age || '' : ''),
       gender: student.gender || 'Male',
       bloodGroup: student.bloodGroup || student.blood_group || 'O+',
       currentBelt: resolvedBelt,
@@ -1320,9 +1325,32 @@ export default function StudentManagement() {
   const handleUpdate = async (e) => {
     e.preventDefault();
     if (!editingStudent) return;
+
+    const rawDob = String(editingStudent.dob || '').trim();
+    const normalizedDob = rawDob ? normalizeDobToISO(rawDob) : null;
+    if (rawDob && !normalizedDob) {
+      alert('⚠️ Invalid Date of Birth. Please enter a real date (year 1940 or later, not future), or leave DOB blank.');
+      return;
+    }
+
+    const editGuard = String(editingStudent.guardianName || editingStudent.guardian_name || '').trim();
+    if (editGuard && isPlaceholderText(editGuard)) {
+      alert('⚠️ Dummy or keyboard-mash text is not allowed for Parent / Guardian Name.');
+      return;
+    }
+
+    const editAddr = String(editingStudent.address || '').trim();
+    if (editAddr && isPlaceholderText(editAddr)) {
+      alert('⚠️ Dummy or keyboard-mash text is not allowed for Address.');
+      return;
+    }
+
     setIsSavingCadet(true);
 
     try {
+      const resolvedAge = normalizedDob
+        ? calculateAgeFromDOB(normalizedDob)
+        : (editingStudent.age ? parseInt(editingStudent.age, 10) || null : null);
       const finalPhoto = editPhotoState.rawSrc ? (getCanvasDataUrl(editCanvasRef, editPhotoState.rawSrc) || editPhotoState.rawSrc) : editingStudent.photo;
       const initialPaid = parseInt(editingStudent.initialPaidAmount || editingStudent.initial_paid_amount || 0);
       const feeAmt = parseInt(editingStudent.feeAmount || editingStudent.fee_amount || 500);
@@ -1362,13 +1390,14 @@ export default function StudentManagement() {
         has_custom_fee: true,
         photo: finalPhoto,
         name: editingStudent.name,
-        guardianName: editingStudent.guardianName || editingStudent.guardian_name,
-        guardian_name: editingStudent.guardianName || editingStudent.guardian_name,
+        guardianName: editGuard,
+        guardian_name: editGuard,
         occupation: editingStudent.occupation || '',
         guardian_occupation: editingStudent.occupation || '',
         phone: editingStudent.phone,
         whatsapp: editingStudent.whatsapp || editingStudent.phone,
-        age: parseInt(editingStudent.age) || 10,
+        dob: normalizedDob,
+        age: resolvedAge,
         gender: editingStudent.gender || 'Male',
         bloodGroup: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
         blood_group: editingStudent.bloodGroup || editingStudent.blood_group || 'O+',
@@ -1592,6 +1621,7 @@ export default function StudentManagement() {
     if (selectedTab === 'Active') matchesTab = !isInactive;
     if (selectedTab === 'Inactive') matchesTab = isInactive;
     if (selectedTab === 'AdmissionFeePending') matchesTab = isAdmissionFeePending;
+    if (selectedTab === 'MissingInfo') matchesTab = needsProfileUpdate(s).needsAttention;
 
     return matchesSearch && matchesBelt && matchesBranch && matchesProgram && matchesShiftFilter && matchesCategory && matchesPlan && matchesTab;
   });
@@ -2265,12 +2295,21 @@ export default function StudentManagement() {
 
                 <div className="flex justify-between border-b border-gray-50 pb-2">
                   <span className="text-gray-500">Age & Gender:</span>
-                  <span className="text-gray-800">{std.age || 12} Yrs • {std.gender || 'Male'}</span>
+                  <span className="text-gray-800">
+                    {(() => {
+                      const liveAge = calculateAgeFromDOB(std.dob);
+                      if (liveAge !== null) return `${liveAge} Yrs`;
+                      if (isValidStudentDOB(std.dob) && std.age) return `${std.age} Yrs`;
+                      return 'Age N/A';
+                    })()} • {std.gender || 'Male'}
+                  </span>
                 </div>
 
                 <div className="flex justify-between border-b border-gray-50 pb-2">
                   <span className="text-gray-500">Date of Birth:</span>
-                  <span className="text-gray-800 font-mono">{std.dob || 'N/A'}</span>
+                  <span className="text-gray-800 font-mono">
+                    {isValidStudentDOB(std.dob) ? normalizeDobToISO(std.dob) : 'Pending / Unverified'}
+                  </span>
                 </div>
 
                 <div className="flex justify-between border-b border-gray-50 pb-2 items-center">
@@ -3338,6 +3377,20 @@ export default function StudentManagement() {
                 ))}
               </select>
             </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedTab(prev => (prev === 'MissingInfo' ? 'All' : 'MissingInfo'))}
+            className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black border transition cursor-pointer whitespace-nowrap flex items-center gap-1 shadow-xs ${
+              selectedTab === 'MissingInfo'
+                ? 'bg-amber-500 text-black border-amber-600'
+                : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+            }`}
+            title="Show only cadets missing valid Date of Birth or Residential Address"
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Needs DOB/Addr ({students.filter(s => needsProfileUpdate(s).needsAttention).length})</span>
+          </button>
         </div>
       </div>
 
@@ -3384,6 +3437,11 @@ export default function StudentManagement() {
                           {(std.bloodGroup || std.blood_group) && (
                             <span className="text-[9px] px-1.5 py-0.2 bg-rose-50 text-rose-700 border border-rose-200 rounded font-black flex items-center gap-0.5 shadow-2xs">
                               🩸 {std.bloodGroup || std.blood_group}
+                            </span>
+                          )}
+                          {needsProfileUpdate(std).needsAttention && (
+                            <span className="text-[9px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-300 rounded font-black flex items-center gap-0.5 shadow-2xs" title="Missing valid DOB or residential address">
+                              ⚠️ Needs Info
                             </span>
                           )}
                         </strong>
@@ -3940,11 +3998,13 @@ export default function StudentManagement() {
                   <input
                     type="date"
                     required
+                    min="1940-01-01"
+                    max={getTodayISO()}
                     value={formData.dob || ''}
                     onChange={(e) => {
                       const dobVal = e.target.value;
                       const calculatedAge = calculateAgeFromDOB(dobVal);
-                      setFormData({ ...formData, dob: dobVal, age: calculatedAge });
+                      setFormData({ ...formData, dob: dobVal, ...(calculatedAge !== null ? { age: calculatedAge } : {}) });
                     }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-red-500 transition cursor-pointer"
                   />
@@ -3956,11 +4016,11 @@ export default function StudentManagement() {
                   </label>
                   <input
                     type="number"
-                    min="1"
-                    max="80"
+                    min="2"
+                    max="90"
                     required
                     value={formData.age}
-                    onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) || 12 })}
+                    onChange={(e) => setFormData({ ...formData, age: e.target.value ? parseInt(e.target.value, 10) : '' })}
                     className="w-full bg-emerald-50/80 border border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 transition"
                   />
                 </div>
@@ -4535,10 +4595,10 @@ export default function StudentManagement() {
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-bold mb-1">Parent / Guardian Name *</label>
+                  <label className="block text-gray-700 font-bold mb-1">Parent / Guardian Name</label>
                   <input
                     type="text"
-                    required
+                    placeholder="Father / Mother / Guardian name..."
                     value={editingStudent.guardianName || editingStudent.guardian_name || ''}
                     onChange={(e) => setEditingStudent({ ...editingStudent, guardianName: e.target.value, guardian_name: e.target.value })}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 focus:bg-white focus:outline-none focus:border-blue-500 transition"
@@ -4639,16 +4699,21 @@ export default function StudentManagement() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date of Birth *
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" /> Date of Birth
                   </label>
                   <input
                     type="date"
-                    required
+                    min="1940-01-01"
+                    max={getTodayISO()}
                     value={editingStudent.dob || ''}
                     onChange={(e) => {
                       const dobVal = e.target.value;
                       const calculatedAge = calculateAgeFromDOB(dobVal);
-                      setEditingStudent({ ...editingStudent, dob: dobVal, age: calculatedAge });
+                      setEditingStudent({
+                        ...editingStudent,
+                        dob: dobVal,
+                        ...(dobVal ? (calculatedAge !== null ? { age: calculatedAge } : {}) : {})
+                      });
                     }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-gray-900 font-bold text-xs focus:bg-white focus:outline-none focus:border-blue-500 transition cursor-pointer"
                   />
@@ -4656,15 +4721,14 @@ export default function StudentManagement() {
 
                 <div>
                   <label className="block text-gray-700 font-bold mb-1 flex items-center gap-1">
-                    <UserCheck className="w-3.5 h-3.5 text-emerald-600" /> Age (Auto) *
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-600" /> Age (Auto)
                   </label>
                   <input
                     type="number"
-                    min="1"
-                    max="80"
-                    required
-                    value={editingStudent.age || 10}
-                    onChange={(e) => setEditingStudent({ ...editingStudent, age: parseInt(e.target.value) || 10 })}
+                    min="2"
+                    max="90"
+                    value={editingStudent.age ?? ''}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, age: e.target.value ? parseInt(e.target.value, 10) : '' })}
                     className="w-full bg-emerald-50/80 border border-emerald-300 rounded-xl px-3 py-2.5 text-emerald-900 font-black text-xs focus:bg-white focus:outline-none focus:border-emerald-500 transition"
                   />
                 </div>

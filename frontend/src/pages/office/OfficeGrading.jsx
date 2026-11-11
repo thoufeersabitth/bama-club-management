@@ -5,7 +5,8 @@ import {
   Share2, Copy, Send, QrCode, Trash2, Trophy
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
-import { fetchStudents, saveStoredStudents, openWhatsApp, fetchBeltExamFeesBackend, saveBeltExamFeesBackend } from '../../services/api';
+import { fetchStudents, updateStudent, invalidateStudentsCache, saveStoredStudents, openWhatsApp, fetchBeltExamFeesBackend, saveBeltExamFeesBackend } from '../../services/api';
+import { calculateAgeFromDOB, isPlaceholderText, normalizeDobToISO } from '../../utils/studentValidation';
 import { useAuth } from '../../context/AuthContext';
 
 const API_ROOT = 'https://bama-club-backend.fly.dev/api';
@@ -2222,6 +2223,58 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                     <Printer className="w-4 h-4 text-gray-700" />
                     <span>🖨️ Print Form</span>
                   </button>
+
+                  {(normalizeDobToISO(c.dob) || (c.address && !isPlaceholderText(c.address))) && (c.student || c.admission_no) && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const target = viewFormCandidate;
+                        try {
+                          const allStudents = await fetchStudents({ force: true });
+                          const matched = (allStudents || []).find(s =>
+                            (target.student && String(s.id) === String(target.student)) ||
+                            (target.admission_no && String(s.admission_no || s.admissionNo || '').toLowerCase() === String(target.admission_no).toLowerCase())
+                          );
+                          if (!matched) {
+                            alert('Matching cadet record not found in Student Roster.');
+                            return;
+                          }
+                          const validDob = normalizeDobToISO(target.dob);
+                          const cleanAddr = String(target.address || '').trim();
+                          const cleanGuard = String(target.guardian_name || '').trim();
+                          const syncPayload = {
+                            admission_no: matched.admission_no || matched.admissionNo,
+                            branch: matched.branch || matched.branch_id || matched.branch_name,
+                            branch_id: matched.branch_id || (typeof matched.branch === 'object' ? matched.branch?.id : matched.branch),
+                            branch_name: matched.branch_name || matched.branchName,
+                            shift: matched.shift
+                          };
+                          if (validDob) {
+                            syncPayload.dob = validDob;
+                            const calcAge = calculateAgeFromDOB(validDob);
+                            if (calcAge !== null) syncPayload.age = calcAge;
+                          }
+                          if (cleanAddr && !isPlaceholderText(cleanAddr)) {
+                            syncPayload.address = cleanAddr;
+                          }
+                          if (cleanGuard && !isPlaceholderText(cleanGuard)) {
+                            syncPayload.guardian_name = cleanGuard;
+                            syncPayload.guardianName = cleanGuard;
+                          }
+                          await updateStudent(matched.id, syncPayload);
+                          invalidateStudentsCache();
+                          alert(`✅ Synced DOB & address to ${matched.name} (${matched.admission_no || matched.admissionNo})!`);
+                        } catch (err) {
+                          alert('Failed to sync profile details. Please try again.');
+                        }
+                      }}
+                      className="px-3.5 py-2.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white font-bold text-xs rounded-xl border border-blue-200 transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      title="Copy valid DOB, address, and guardian from this exam form to the Student Roster profile"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Sync to Profile</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">

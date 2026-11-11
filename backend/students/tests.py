@@ -199,5 +199,98 @@ class StudentBranchTestCase(TestCase):
         self.assertEqual(grading.target_belt, 'Yellow Belt')
         self.assertEqual(grading.result, 'Pass')
 
+    def test_partial_patch_preserves_admission_no_and_branch(self):
+        cadet = Student.objects.create(
+            admission_no='BAMA-2026-KEEP',
+            name='Shift Change Cadet',
+            branch=self.chungam,
+            phone='9847000111',
+            shift='Evening Batch',
+            address='Real House, Chungam'
+        )
+        res = self.client.patch(f'/api/students/{cadet.id}/', {
+            'shift': 'Morning Batch'
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        cadet.refresh_from_db()
+        self.assertEqual(cadet.admission_no, 'BAMA-2026-KEEP')
+        self.assertEqual(cadet.branch_id, self.chungam.id)
+        self.assertEqual(cadet.shift, 'Morning Batch')
+        self.assertEqual(cadet.address, 'Real House, Chungam')
+
+    def test_dob_validation_and_auto_age(self):
+        import datetime
+        cadet = Student.objects.create(
+            admission_no='BAMA-2026-DOB1',
+            name='DOB Guard Cadet',
+            branch=self.pulikkal,
+            phone='9847000222',
+            age=15
+        )
+        # Out-of-range year like 0011-06-05 must be rejected
+        bad_res = self.client.patch(f'/api/students/{cadet.id}/', {
+            'dob': '0011-06-05'
+        }, format='json')
+        self.assertEqual(bad_res.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Future DOB must be rejected
+        future_dob = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+        future_res = self.client.patch(f'/api/students/{cadet.id}/', {
+            'dob': future_dob
+        }, format='json')
+        self.assertEqual(future_res.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # DD/MM/YYYY format works and recalculates age automatically
+        good_res = self.client.patch(f'/api/students/{cadet.id}/', {
+            'dob': '01/05/2020'
+        }, format='json')
+        self.assertEqual(good_res.status_code, status.HTTP_200_OK)
+        cadet.refresh_from_db()
+        self.assertEqual(cadet.dob, datetime.date(2020, 5, 1))
+        expected_age = datetime.date.today().year - 2020 - (
+            (datetime.date.today().month, datetime.date.today().day) < (5, 1)
+        )
+        self.assertEqual(cadet.age, expected_age)
+
+        # Clearing DOB with empty string converts cleanly to None
+        clear_res = self.client.patch(f'/api/students/{cadet.id}/', {
+            'dob': ''
+        }, format='json')
+        self.assertEqual(clear_res.status_code, status.HTTP_200_OK)
+        cadet.refresh_from_db()
+        self.assertIsNone(cadet.dob)
+
+    def test_placeholder_keyboard_mash_protection(self):
+        cadet = Student.objects.create(
+            admission_no='BAMA-2026-ADDR1',
+            name='Address Protection Cadet',
+            branch=self.pulikkal,
+            phone='9847000333',
+            address='Aramthodi(H) kottappuram, Andiyoor kunnu (po)',
+            guardian_name='Abdu Rafeeq TA'
+        )
+        for bad_val in ['SDFGHJK', 'TYWEYGYFYYG', 'FRDDUYJHILYYURTRED', 'Chvchcccy', 'N/A', 'FGHJ']:
+            res = self.client.patch(f'/api/students/{cadet.id}/', {
+                'address': bad_val
+            }, format='json')
+            self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST, msg=f'Should reject {bad_val}')
+
+        res_bad_guard = self.client.patch(f'/api/students/{cadet.id}/', {
+            'guardian_name': 'DFGHJK'
+        }, format='json')
+        self.assertEqual(res_bad_guard.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Valid Kerala names, initials, and addresses with acronyms must succeed
+        for good_addr, good_guard in [
+            ('NEAR GHSS PULIKKAL, Malappuram', 'Vyshnav K.P'),
+            ('Cheruthadathil (H) Muthuvallur PO', 'Prashanthi k'),
+            ('Pulikkal House, Kondotty', 'ASHWJITH T.A'),
+        ]:
+            ok_res = self.client.patch(f'/api/students/{cadet.id}/', {
+                'address': good_addr,
+                'guardian_name': good_guard
+            }, format='json')
+            self.assertEqual(ok_res.status_code, status.HTTP_200_OK, msg=f'Should accept {good_addr} / {good_guard}')
+
 
 

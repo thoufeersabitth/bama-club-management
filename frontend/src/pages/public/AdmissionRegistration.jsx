@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { fetchBranches, getBranchFeeSettings, saveAdmissionInquiryBackend } from '../../services/api';
 import { INITIAL_BRANCHES, PROGRAM_OPTIONS, getDynamicShiftOptions } from '../../services/initialData';
+import { calculateAgeFromDOB, getTodayISO, isPlaceholderText, normalizeDobToISO } from '../../utils/studentValidation';
 
 export default function AdmissionRegistration() {
   const [branchesList, setBranchesList] = useState(INITIAL_BRANCHES);
@@ -25,7 +26,7 @@ export default function AdmissionRegistration() {
     relationship: 'Father',
     phone: '',
     whatsapp: '',
-    address: 'Pulikkal, Malappuram',
+    address: '',
     branch: 'Pulikkal Branch (Head Office)',
     program: 'Karate (Shotokan)',
     shift: 'Evening Batch (5:00 PM - 7:00 PM)',
@@ -48,15 +49,7 @@ export default function AdmissionRegistration() {
     }).catch(() => {});
   }, []);
 
-  const calculateAge = (dobStr) => {
-    if (!dobStr) return 10;
-    const birth = new Date(dobStr);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return Math.max(4, Math.min(age, 75));
-  };
+  const calculateAge = (dobStr) => calculateAgeFromDOB(dobStr) ?? '';
 
   const handleBranchChange = (branchName) => {
     const shifts = getDynamicShiftOptions(branchName, formData.program, branchesList);
@@ -91,6 +84,22 @@ export default function AdmissionRegistration() {
     e.preventDefault();
     setErrorMsg('');
 
+    const validDob = normalizeDobToISO(formData.dob);
+    if (!validDob) {
+      setErrorMsg('Please enter a valid Date of Birth (year 1940 or later, not in the future).');
+      return;
+    }
+
+    if (!String(formData.address || '').trim() || isPlaceholderText(formData.address)) {
+      setErrorMsg('Please enter real residential address (dummy/keyboard-mash text is not allowed).');
+      return;
+    }
+
+    if (!String(formData.guardian_name || '').trim() || isPlaceholderText(formData.guardian_name)) {
+      setErrorMsg('Please enter real Parent / Guardian full name.');
+      return;
+    }
+
     if (formData.password && formData.password !== formData.confirm_password) {
       setErrorMsg('Passwords do not match. Please re-enter.');
       return;
@@ -112,8 +121,8 @@ export default function AdmissionRegistration() {
         name: formData.name,
         photo: formData.photo || '',
         gender: formData.gender,
-        dob: formData.dob || '2016-01-01',
-        age: parseInt(formData.age) || calculateAge(formData.dob),
+        dob: validDob,
+        age: parseInt(formData.age, 10) || calculateAgeFromDOB(validDob) || 10,
         blood_group: formData.blood_group,
         bloodGroup: formData.blood_group,
         guardian_name: formData.guardian_name,
@@ -329,10 +338,13 @@ export default function AdmissionRegistration() {
                   <input
                     type="date"
                     required
+                    min="1940-01-01"
+                    max={getTodayISO()}
                     value={formData.dob}
                     onChange={(e) => {
                       const dobVal = e.target.value;
-                      setFormData({ ...formData, dob: dobVal, age: calculateAge(dobVal) });
+                      const calc = calculateAge(dobVal);
+                      setFormData({ ...formData, dob: dobVal, ...(calc !== '' ? { age: calc } : {}) });
                     }}
                     className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2.5 text-white font-bold focus:border-red-500 focus:outline-none"
                   />

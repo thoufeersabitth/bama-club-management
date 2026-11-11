@@ -305,3 +305,96 @@ class BeltGradingAndExamSystemTests(TestCase):
         self.assertIn('total_candidates', res.data)
         self.assertIn('category_breakdown', res.data)
         self.assertIn('payment_summary', res.data)
+
+    # Test 21: Auto-heal missing/placeholder student info on exam registration without overwriting valid data
+    def test_21_auto_heal_missing_or_placeholder_profile(self):
+        dirty_student = Student.objects.create(
+            admission_no='BAMA-TEST-HEAL',
+            name='Corrupt Cadet',
+            current_belt='White Belt',
+            branch=self.branch,
+            phone='9846077777',
+            dob=None,
+            age=15,
+            address='SDFGHJK',
+            guardian_name='DFGHJK'
+        )
+        intact_student = Student.objects.create(
+            admission_no='BAMA-TEST-INTACT',
+            name='Intact Cadet',
+            current_belt='White Belt',
+            branch=self.branch,
+            phone='9846088888',
+            dob=date(2016, 4, 10),
+            age=10,
+            address='Original Real House, Pulikkal',
+            guardian_name='Real Father Name'
+        )
+
+        # Public registration with real values heals the corrupt student
+        res_heal = self.client.post('/api/grading-registrations/public-register/', {
+            'admission_no': dirty_student.admission_no,
+            'student_name': dirty_student.name,
+            'dob': '2020-05-01',
+            'guardian_name': 'Prashanthi k',
+            'address': 'Cheruthadathil House, Muthuvallur PO',
+            'phone': '9846077777',
+            'target_belt': 'Yellow Belt'
+        }, format='json')
+        self.assertEqual(res_heal.status_code, status.HTTP_201_CREATED)
+
+        dirty_student.refresh_from_db()
+        self.assertEqual(dirty_student.dob, date(2020, 5, 1))
+        self.assertEqual(dirty_student.address, 'Cheruthadathil House, Muthuvallur PO')
+        self.assertEqual(dirty_student.guardian_name, 'Prashanthi k')
+        expected_age = date.today().year - 2020 - (
+            (date.today().month, date.today().day) < (5, 1)
+        )
+        self.assertEqual(dirty_student.age, expected_age)
+
+        # Standard create endpoint with student omitted (matched by admission_no) heals too,
+        # and does NOT overwrite already valid student fields
+        res_intact = self.client.post('/api/grading-registrations/', {
+            'admission_no': intact_student.admission_no,
+            'student_name': intact_student.name,
+            'dob': '2018-01-01',
+            'guardian_name': 'Another Guardian',
+            'address': 'Different Address Text',
+            'phone': '9846088888',
+            'target_belt': 'Yellow Belt'
+        }, format='json')
+        self.assertEqual(res_intact.status_code, status.HTTP_201_CREATED)
+
+        intact_student.refresh_from_db()
+        self.assertEqual(intact_student.dob, date(2016, 4, 10))
+        self.assertEqual(intact_student.address, 'Original Real House, Pulikkal')
+        self.assertEqual(intact_student.guardian_name, 'Real Father Name')
+
+    # Test 22: Lookup endpoint strips corrupt placeholder text and rejects invalid registration DOB
+    def test_22_lookup_strips_placeholder_and_rejects_bad_dob(self):
+        dirty = Student.objects.create(
+            admission_no='BAMA-TEST-LKUP',
+            name='Lookup Guard Cadet',
+            current_belt='White Belt',
+            branch=self.branch,
+            phone='9846099999',
+            dob=date(11, 6, 5),
+            age=75,
+            address='TYWEYGYFYYG',
+            guardian_name='FGHJ'
+        )
+        res_lk = self.client.get(f'/api/grading-registrations/lookup-student/?query={dirty.admission_no}')
+        self.assertEqual(res_lk.status_code, status.HTTP_200_OK)
+        self.assertTrue(res_lk.data['found'])
+        self.assertEqual(res_lk.data['dob'], '')
+        self.assertEqual(res_lk.data['address'], '')
+        self.assertEqual(res_lk.data['guardian_name'], '')
+
+        res_bad = self.client.post('/api/grading-registrations/public-register/', {
+            'admission_no': dirty.admission_no,
+            'student_name': dirty.name,
+            'dob': '0011-06-05',
+            'phone': '9846099999',
+            'target_belt': 'Yellow Belt'
+        }, format='json')
+        self.assertEqual(res_bad.status_code, status.HTTP_400_BAD_REQUEST)

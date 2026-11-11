@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { fetchStudents, fetchBeltExamFeesBackend } from '../../services/api';
+import { fetchStudents, fetchBranches, fetchBeltExamFeesBackend } from '../../services/api';
+import { INITIAL_BRANCHES } from '../../services/initialData';
+import { calculateAgeFromDOB, getTodayISO, isPlaceholderText, normalizeDobToISO } from '../../utils/studentValidation';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Award, Shield, Search, CheckCircle2, User, MapPin, Phone, Calendar,
@@ -60,15 +62,21 @@ export default function GradingRegistration() {
   const [multipleMatches, setMultipleMatches] = useState([]);
   const [beltFeeMap, setBeltFeeMap] = useState(getStoredBeltFees());
   const [allStudentsCache, setAllStudentsCache] = useState([]);
+  const [branchesList, setBranchesList] = useState(INITIAL_BRANCHES);
   const searchDebounceRef = useRef(null);
   const currentSearchQueryRef = useRef('');
 
-  // Pre-load all students from backend on mount for 0ms instant search
+  // Pre-load all students & live branches from backend on mount for 0ms instant search
   useEffect(() => {
     let isMounted = true;
     fetchStudents().then(list => {
       if (isMounted && list && list.length > 0) {
         setAllStudentsCache(list);
+      }
+    }).catch(() => {});
+    fetchBranches(false).then(bList => {
+      if (isMounted && Array.isArray(bList) && bList.length > 0) {
+        setBranchesList(bList);
       }
     }).catch(() => {});
     return () => { isMounted = false; };
@@ -106,14 +114,14 @@ export default function GradingRegistration() {
     gender: 'Male',
     height_cm: '145',
     weight_kg: '38',
-    branch_name: 'Pulikkal Main Dojo',
+    branch_name: 'Pulikkal Branch (Head Office)',
     school_or_employer: '',
     class_or_occupation: '',
     guardian_name: '',
     guardian_relationship: 'Father',
     phone: '',
     whatsapp: '',
-    address: 'Pulikkal, Malappuram',
+    address: '',
     current_belt: 'White Belt',
     target_belt: 'Yellow Belt',
     belt_size: 'Size 3 (160 cm)',
@@ -180,6 +188,15 @@ export default function GradingRegistration() {
     setVerifiedStudent(data);
     setLookupMessage(null);
 
+    const cleanDob = normalizeDobToISO(data.dob || data.dateOfBirth) || '';
+    const calcAge = cleanDob ? calculateAgeFromDOB(cleanDob) : (data.age && data.age > 0 && data.age <= 90 ? data.age : '');
+    const rawGuard = String(data.guardian_name || data.guardianName || data.parent_name || '').trim();
+    const rawAddr = String(data.address || '').trim();
+    const safeBranchName =
+      data.branch_name ||
+      (typeof data.branch === 'object' ? data.branch?.name : data.branch) ||
+      'Pulikkal Branch (Head Office)';
+
     setFormData(prev => ({
       ...prev,
       student_id: data.student_id || data.id || '',
@@ -187,14 +204,14 @@ export default function GradingRegistration() {
       student_name: data.student_name || data.name || '',
       gender: data.gender || 'Male',
       photo: data.photo || data.profile_photo || data.image || '',
-      dob: data.dob || data.dateOfBirth || '',
-      age: data.age || 10,
-      guardian_name: data.guardian_name || data.guardianName || data.parent_name || '',
+      dob: cleanDob,
+      age: calcAge,
+      guardian_name: isPlaceholderText(rawGuard) ? '' : rawGuard,
       guardian_relationship: data.relationship || 'Father',
       phone: data.phone || data.mobile || '',
       whatsapp: data.whatsapp || data.phone || data.mobile || '',
-      address: data.address || '',
-      branch_name: data.branch_name || data.branch || (typeof data.branch === 'object' ? data.branch?.name : data.branch) || 'Pulikkal Branch (Head Office)',
+      address: isPlaceholderText(rawAddr) ? '' : rawAddr,
+      branch_name: safeBranchName,
       current_belt: currentBelt,
       target_belt: nextTarget,
       exam_fee: calcFee,
@@ -399,19 +416,14 @@ export default function GradingRegistration() {
       return;
     }
 
-    if (name === 'dob' && value) {
-      const birthDate = new Date(value);
-      if (!isNaN(birthDate.getTime())) {
-        const today = new Date();
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-          age--;
-        }
-        const calcAge = Math.max(1, age);
-        setFormData(prev => ({ ...prev, dob: value, age: calcAge }));
-        return;
-      }
+    if (name === 'dob') {
+      const calcAge = calculateAgeFromDOB(value);
+      setFormData(prev => ({
+        ...prev,
+        dob: value,
+        ...(calcAge !== null ? { age: calcAge } : {})
+      }));
+      return;
     }
 
     setFormData(prev => ({
@@ -428,11 +440,30 @@ export default function GradingRegistration() {
       return;
     }
 
+    const validDob = normalizeDobToISO(formData.dob);
+    if (!validDob) {
+      alert('Please enter a valid Date of Birth (year 1940 or later, not in the future).');
+      return;
+    }
+
+    if (!String(formData.address || '').trim() || isPlaceholderText(formData.address)) {
+      alert('Please enter full residential address (dummy or keyboard-mash text is not allowed).');
+      return;
+    }
+
+    if (String(formData.guardian_name || '').trim() && isPlaceholderText(formData.guardian_name)) {
+      alert('Please enter real Parent/Guardian name.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const regNum = `EXAM-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const computedAge = calculateAgeFromDOB(validDob) || formData.age || 10;
     const submissionPayload = {
       ...formData,
+      dob: validDob,
+      age: computedAge,
       registration_no: formData.registration_no || regNum,
       qr_code: `BAMA-EXAM-QR-${regNum}`
     };
@@ -466,6 +497,16 @@ export default function GradingRegistration() {
       } else {
         const errData = await res.json().catch(() => ({}));
         console.warn('Server registration response:', errData);
+        if (res.status >= 400 && res.status < 500) {
+          const errMsg =
+            errData.error ||
+            (Array.isArray(errData.dob) ? errData.dob[0] : errData.dob) ||
+            errData.detail ||
+            'Please check your registration details and try again.';
+          alert(errMsg);
+          setIsSubmitting(false);
+          return;
+        }
       }
     } catch (err) {
       console.error('Submission failed on backend, proceeding with verified registration:', err);
@@ -478,7 +519,7 @@ export default function GradingRegistration() {
       registration_no: regNum,
       qr_code: `BAMA-EXAM-QR-${regNum}`,
       registration_status: 'SUBMITTED',
-      payment_status: formData.payment_mode === 'Pay Cash directly at Dojo / School Club' ? 'PENDING' : 'VERIFIED',
+      payment_status: String(formData.payment_mode || '').toLowerCase().includes('cash') ? 'PENDING' : 'VERIFIED',
       exam_date: new Date().toISOString().split('T')[0]
     };
 
@@ -800,6 +841,8 @@ export default function GradingRegistration() {
                 <input
                   type="date"
                   name="dob"
+                  min="1940-01-01"
+                  max={getTodayISO()}
                   value={formData.dob}
                   onChange={handleChange}
                   required
@@ -815,8 +858,8 @@ export default function GradingRegistration() {
                   value={formData.age}
                   onChange={handleChange}
                   required
-                  min="4"
-                  max="70"
+                  min="2"
+                  max="90"
                   className="w-full px-3.5 py-2.5 bg-black/80 border border-gray-800 rounded-xl text-white text-xs focus:border-amber-400 focus:outline-none"
                 />
               </div>
@@ -842,10 +885,16 @@ export default function GradingRegistration() {
                   onChange={handleChange}
                   className="w-full px-3.5 py-2.5 bg-black/80 border border-gray-800 rounded-xl text-white text-xs focus:border-amber-400 focus:outline-none"
                 >
-                  <option value="Pulikkal Main Dojo">Pulikkal Main Dojo</option>
-                  <option value="Chungam Branch Dojo">Chungam Branch Dojo</option>
-                  <option value="Mongam Branch Dojo">Mongam Branch Dojo</option>
-                  <option value="School Training Club">School Training Club</option>
+                  {Array.from(new Set([
+                    ...branchesList.map(b => b.name),
+                    formData.branch_name,
+                    'Pulikkal Branch (Head Office)',
+                    'Chungam Branch Dojo',
+                    'Mongam Branch Dojo',
+                    'School Training Club'
+                  ].filter(Boolean))).map(bName => (
+                    <option key={bName} value={bName}>{bName}</option>
+                  ))}
                 </select>
               </div>
 
