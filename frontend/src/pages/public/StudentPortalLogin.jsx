@@ -24,6 +24,19 @@ import {
 } from '../../utils/studentValidation';
 import { buildCadetFeeSummary } from '../../utils/feeLedger';
 
+const getBeltBadgeClasses = (rank = '') => {
+  const r = String(rank).toLowerCase();
+  if (r.includes('black')) return 'bg-gradient-to-r from-zinc-900 via-black to-zinc-900 text-amber-300 border-amber-400/70 shadow-md shadow-amber-500/20';
+  if (r.includes('brown')) return 'bg-amber-950/90 text-amber-200 border-amber-600/60 shadow-sm';
+  if (r.includes('blue')) return 'bg-blue-950/80 text-blue-200 border-blue-400/50 shadow-sm';
+  if (r.includes('green')) return 'bg-emerald-950/80 text-emerald-200 border-emerald-400/50 shadow-sm';
+  if (r.includes('purple')) return 'bg-purple-950/80 text-purple-200 border-purple-400/50 shadow-sm';
+  if (r.includes('orange')) return 'bg-orange-950/80 text-orange-200 border-orange-400/50 shadow-sm';
+  if (r.includes('yellow')) return 'bg-yellow-500/20 text-yellow-200 border-yellow-400/50 shadow-sm';
+  if (r.includes('white')) return 'bg-white/15 text-gray-100 border-white/30';
+  return 'bg-amber-400/15 text-amber-200 border-amber-400/40';
+};
+
 export default function StudentPortalLogin() {
   // Restore saved session if user reloads page
   const [activeStudent, setActiveStudent] = useState(() => {
@@ -313,21 +326,32 @@ export default function StudentPortalLogin() {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-3 sm:px-6 py-8 sm:py-12 relative overflow-hidden">
-      <div className={`w-full ${step === 'LOGGED_IN' ? 'max-w-4xl' : 'max-w-md'} glass-card rounded-3xl p-5 sm:p-8 border border-white/10 shadow-2xl relative z-10 backdrop-blur-md transition-all duration-200`}>
+    <div className="min-h-[85vh] bg-[#06070B] flex items-center justify-center px-3 sm:px-6 py-8 sm:py-12 relative overflow-hidden">
+      {/* Ambient Dojo Radial Spotlights */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-28 left-1/4 w-[440px] h-[440px] rounded-full bg-red-600/15 blur-[130px]" />
+        <div className="absolute -bottom-32 right-1/4 w-[420px] h-[420px] rounded-full bg-amber-500/10 blur-[130px]" />
+      </div>
+
+      <div className={`w-full ${step === 'LOGGED_IN' ? 'max-w-4xl' : 'max-w-md'} bg-[#0B0D13]/90 rounded-3xl p-5 sm:p-8 border border-white/10 shadow-[0_24px_80px_-15px_rgba(0,0,0,0.85)] relative z-10 backdrop-blur-xl transition-all duration-200 overflow-hidden`}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-amber-400/70 to-transparent" />
+
         {/* Header */}
-        <div className="text-center space-y-2 mb-6">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 via-amber-500 to-black p-0.5 shadow-xl mx-auto border border-amber-500/40 overflow-hidden">
+        <div className="text-center space-y-2 mb-6 relative">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 via-amber-400 to-black p-[2px] shadow-xl shadow-red-600/25 mx-auto overflow-hidden animate-sun-pulse">
             <img
               src="/logo bama_240616_200739.jpg.jpeg"
               alt="B.A.M.A. Official Logo"
               className="w-full h-full object-cover rounded-full"
             />
           </div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/[0.04] border border-white/10 text-[9px] font-black uppercase tracking-[0.2em] text-amber-300/90">
+            <Shield className="w-2.5 h-2.5 text-red-500" /> Official Cadet Access
+          </div>
           <h1 className="text-xl sm:text-2xl font-black text-white tracking-wider">
             CADET & PARENT PORTAL
           </h1>
-          <p className="text-[11px] text-amber-400 font-semibold uppercase tracking-widest">
+          <p className="text-[11px] text-amber-400/90 font-semibold uppercase tracking-widest">
             Brave Academy of Martial Arts
           </p>
         </div>
@@ -610,6 +634,10 @@ export default function StudentPortalLogin() {
 
           const profileCheck = needsProfileUpdate(activeStudent);
           const examCount = portalDetails.gradingRegistrations.length + portalDetails.beltGradings.length;
+          const totalAccountVolume = feeSummary.totalPaid + feeSummary.totalPending;
+          const feeClearedPct = totalAccountVolume > 0
+            ? Math.round((feeSummary.totalPaid / totalAccountVolume) * 100)
+            : (feeSummary.totalPending === 0 ? 100 : 0);
           const sectionTabs = [
             { id: 'OVERVIEW', label: 'Overview', icon: LayoutGrid },
             {
@@ -637,34 +665,44 @@ export default function StudentPortalLogin() {
 
           return (
             <div className="space-y-5 text-xs animate-in fade-in duration-200">
-              {/* Top Cadet Hero & Action Bar */}
-              <div className="bg-gradient-to-br from-red-950/90 via-gray-900 to-black p-5 rounded-2xl border border-red-500/40 text-white space-y-4 shadow-xl">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3.5">
+              {/* Top Cadet VIP Identity Card & Action Bar */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-[#23090E] via-[#0F1117] to-[#080A0E] p-5 sm:p-6 rounded-2xl border border-amber-500/25 text-white space-y-4 shadow-[0_16px_45px_-12px_rgba(220,38,38,0.28)]">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
+                <div className="pointer-events-none absolute -right-12 -top-12 w-40 h-40 rounded-full bg-amber-500/10 blur-3xl" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                  <div className="flex items-center gap-4">
                     {activeStudent.photo ? (
-                      <img
-                        src={activeStudent.photo}
-                        alt={activeStudent.name}
-                        className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-md flex-shrink-0"
-                      />
+                      <div className="p-0.5 rounded-2xl bg-gradient-to-br from-amber-400 via-red-500 to-amber-600 shadow-lg shadow-amber-500/20 flex-shrink-0">
+                        <img
+                          src={activeStudent.photo}
+                          alt={activeStudent.name}
+                          className="w-16 h-16 sm:w-[70px] sm:h-[70px] rounded-[14px] object-cover bg-black"
+                        />
+                      </div>
                     ) : (
-                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-2xl shadow-md border-2 border-amber-400 flex-shrink-0">
+                      <div className="w-16 h-16 sm:w-[70px] sm:h-[70px] rounded-2xl bg-gradient-to-br from-red-600 via-rose-600 to-amber-500 text-white font-black flex items-center justify-center text-2xl shadow-lg border-2 border-amber-400/70 flex-shrink-0">
                         {activeStudent.name ? activeStudent.name.charAt(0).toUpperCase() : 'C'}
                       </div>
                     )}
-                    <div className="min-w-0 space-y-1">
+                    <div className="min-w-0 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[9px] uppercase font-mono tracking-widest text-amber-400 font-bold">
-                          B.A.M.A. Cadet • {activeStudent.status || 'Active'}
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-400/30 text-[9px] uppercase font-mono tracking-widest text-emerald-300 font-black inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          {activeStudent.status || 'Active'} Cadet
                         </span>
-                        <span className="px-2 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/40 rounded-full font-black text-[10px]">
-                          {beltRank}
+                        <span className={`px-2.5 py-0.5 border rounded-full font-black text-[10px] tracking-wide ${getBeltBadgeClasses(beltRank)}`}>
+                          🥋 {beltRank}
                         </span>
                       </div>
-                      <h3 className="text-lg sm:text-xl font-black text-white leading-tight truncate">{activeStudent.name}</h3>
-                      <p className="text-[11px] text-gray-300 font-mono">
-                        Adm: <strong className="text-white">{admNo}</strong> • {programName}
-                      </p>
+                      <h3 className="text-lg sm:text-2xl font-black text-white leading-tight tracking-tight truncate">{activeStudent.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-300">
+                        <span className="font-mono px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/10 text-amber-200 font-bold">
+                          {admNo}
+                        </span>
+                        <span className="text-gray-400">•</span>
+                        <span className="font-bold text-gray-200">{programName}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -674,7 +712,7 @@ export default function StudentPortalLogin() {
                       type="button"
                       onClick={() => refreshActiveStudentData(activeStudent)}
                       disabled={portalRefreshing}
-                      className="px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-200 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                      className="px-3 py-2 bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-gray-200 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
                       title="Refresh latest fees & profile from dojo server"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${portalRefreshing ? 'animate-spin' : ''}`} />
@@ -684,10 +722,10 @@ export default function StudentPortalLogin() {
                     <button
                       type="button"
                       onClick={() => setShowReceiptModal(true)}
-                      className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                      className="px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 border border-amber-400/35 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      <span>Fee Statement</span>
+                      <span>Statement</span>
                     </button>
 
                     {studentOptions.length > 1 && (
@@ -697,7 +735,7 @@ export default function StudentPortalLogin() {
                           setError('');
                           setStep('SIBLING_SELECT');
                         }}
-                        className="px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/30 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                        className="px-3 py-2 bg-blue-500/15 hover:bg-blue-500/25 text-blue-200 border border-blue-400/35 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
                       >
                         <Users className="w-3.5 h-3.5" />
                         <span>Switch ({studentOptions.length})</span>
@@ -707,7 +745,7 @@ export default function StudentPortalLogin() {
                     <button
                       type="button"
                       onClick={handleSignOut}
-                      className="px-3 py-2 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-200 border border-white/10 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                      className="px-3 py-2 bg-white/[0.04] hover:bg-red-500/20 text-gray-300 hover:text-red-200 border border-white/10 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
                     >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Sign Out</span>
@@ -715,28 +753,28 @@ export default function StudentPortalLogin() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px] border-t border-white/10 pt-3">
-                  <div>
-                    <span className="text-gray-400 text-[10px] block">Branch Dojo</span>
-                    <strong className="text-white">{branchName}</strong>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-[11px] border-t border-white/10 pt-3.5 relative z-10">
+                  <div className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+                    <span className="text-gray-400 text-[9px] uppercase tracking-wider font-bold block">Branch Dojo</span>
+                    <strong className="text-white block truncate">{branchName}</strong>
                   </div>
-                  <div>
-                    <span className="text-gray-400 text-[10px] block">Training Shift</span>
-                    <strong className="text-white">{activeStudent.shift || 'Regular Shift'}</strong>
+                  <div className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+                    <span className="text-gray-400 text-[9px] uppercase tracking-wider font-bold block">Training Shift</span>
+                    <strong className="text-white block truncate">{activeStudent.shift || 'Regular Shift'}</strong>
                   </div>
-                  <div>
-                    <span className="text-gray-400 text-[10px] block">Instructor</span>
-                    <strong className="text-amber-300">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong>
+                  <div className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+                    <span className="text-gray-400 text-[9px] uppercase tracking-wider font-bold block">Instructor</span>
+                    <strong className="text-amber-300 block truncate">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong>
                   </div>
-                  <div>
-                    <span className="text-gray-400 text-[10px] block">Joined Date</span>
-                    <strong className="text-white font-mono">{feeSummary.joiningDate || activeStudent.joining_date || 'N/A'}</strong>
+                  <div className="px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+                    <span className="text-gray-400 text-[9px] uppercase tracking-wider font-bold block">Joined Date</span>
+                    <strong className="text-white font-mono block">{feeSummary.joiningDate || activeStudent.joining_date || 'N/A'}</strong>
                   </div>
                 </div>
               </div>
 
-              {/* SECTION TABS NAVIGATION BAR */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-black/60 border border-white/10">
+              {/* SECTION TABS NAVIGATION DOCK */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-inner">
                 {sectionTabs.map((tab) => {
                   const IconComp = tab.icon;
                   const isActive = activeSection === tab.id;
@@ -745,10 +783,10 @@ export default function StudentPortalLogin() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveSection(tab.id)}
-                      className={`px-3 py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                      className={`px-3 py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer ${
                         isActive
-                          ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg'
-                          : 'text-gray-300 hover:text-white hover:bg-white/5'
+                          ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white shadow-lg shadow-red-600/25'
+                          : 'text-gray-300 hover:text-white hover:bg-white/[0.06]'
                       }`}
                     >
                       <IconComp className="w-3.5 h-3.5 flex-shrink-0" />
@@ -768,59 +806,79 @@ export default function StudentPortalLogin() {
               {/* SECTION 1: OVERVIEW */}
               {activeSection === 'OVERVIEW' && (
                 <div className="space-y-4 animate-in fade-in duration-150">
-                  <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  <div className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border space-y-3 ${
                     feeSummary.totalPending === 0
-                      ? 'bg-emerald-950/50 border-emerald-500/40'
-                      : 'bg-rose-950/40 border-rose-500/40'
+                      ? 'bg-gradient-to-br from-emerald-950/60 via-emerald-950/30 to-black border-emerald-500/40'
+                      : 'bg-gradient-to-br from-rose-950/50 via-[#180A0E] to-black border-rose-500/40'
                   }`}>
-                    <div>
-                      <span className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 ${
-                        feeSummary.totalPending === 0 ? 'text-emerald-300' : 'text-rose-300'
-                      }`}>
-                        {feeSummary.totalPending === 0
-                          ? <><CheckCircle2 className="w-3.5 h-3.5" /> Account Status — Fully Cleared</>
-                          : <><AlertCircle className="w-3.5 h-3.5" /> Fee Balance Due</>}
-                      </span>
-                      <div className="text-2xl font-black font-mono text-white mt-0.5">
-                        {feeSummary.totalPending === 0
-                          ? '✓ ₹0 Pending'
-                          : `₹${feeSummary.totalPending.toLocaleString()} Pending`}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 ${
+                          feeSummary.totalPending === 0 ? 'text-emerald-300' : 'text-rose-300'
+                        }`}>
+                          {feeSummary.totalPending === 0
+                            ? <><CheckCircle2 className="w-3.5 h-3.5" /> Account Status — Fully Cleared</>
+                            : <><AlertCircle className="w-3.5 h-3.5" /> Fee Balance Due</>}
+                        </span>
+                        <div className="text-2xl sm:text-3xl font-black font-mono text-white mt-0.5 tracking-tight">
+                          {feeSummary.totalPending === 0
+                            ? '✓ ₹0 Pending'
+                            : `₹${feeSummary.totalPending.toLocaleString()} Pending`}
+                        </div>
+                        <p className="text-[11px] text-gray-300 mt-0.5">
+                          {feeSummary.planLabel} • Paid: <strong className="text-emerald-300 font-mono">₹{feeSummary.totalPaid.toLocaleString()}</strong>
+                        </p>
                       </div>
-                      <p className="text-[11px] text-gray-300 mt-0.5">
-                        {feeSummary.planLabel} • Paid: <strong className="text-emerald-300 font-mono">₹{feeSummary.totalPaid.toLocaleString()}</strong>
-                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSection('FEES')}
+                        className="shimmer-btn-wrapper px-4 py-2.5 bg-white/15 hover:bg-white/25 border border-white/15 text-white font-black text-xs rounded-xl transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-lg"
+                      >
+                        <CreditCard className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Open Full Fee Ledger →</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSection('FEES')}
-                      className="px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white font-black text-xs rounded-xl transition inline-flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <CreditCard className="w-3.5 h-3.5 text-amber-300" />
-                      <span>Open Full Fee Ledger →</span>
-                    </button>
+
+                    {/* Fee Clearance Progress Bar */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-gray-300">
+                        <span>Fee Clearance Progress</span>
+                        <span className="font-mono text-white">{feeClearedPct}%</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            feeClearedPct === 100
+                              ? 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                              : 'bg-gradient-to-r from-amber-500 to-emerald-400'
+                          }`}
+                          style={{ width: `${Math.max(4, feeClearedPct)}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Fee Rate & Cleared</span>
-                      <strong className="text-sm font-black text-white block">
-                        ₹{feeSummary.feeRate.toLocaleString()} {feeSummary.isQuarterly ? '/ 3 Mos' : '/ Month'}
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-amber-400/30 transition space-y-1">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Fee Rate & Status</span>
+                      <strong className="text-base font-black text-white font-mono block">
+                        ₹{feeSummary.feeRate.toLocaleString()} <span className="text-[11px] font-sans text-gray-400">{feeSummary.isQuarterly ? '/ 3 Mos' : '/ Mo'}</span>
                       </strong>
                       <p className="text-[10px] text-gray-400">
                         {feeSummary.duePeriods.length === 0
-                          ? `${feeSummary.paidPeriods.length} period(s) cleared`
-                          : `${feeSummary.duePeriods.length} period(s) due`}
+                          ? `✓ ${feeSummary.paidPeriods.length} period(s) cleared`
+                          : `⚠ ${feeSummary.duePeriods.length} period(s) pending`}
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Discipline & Rank</span>
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-blue-400/30 transition space-y-1">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Discipline & Rank</span>
                       <strong className="text-sm font-black text-blue-300 block">{programName}</strong>
-                      <p className="text-[10px] text-gray-400">{beltRank} • {ageLabel}</p>
+                      <p className="text-[10px] text-gray-300">{beltRank} • {ageLabel}</p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Guardian & Contact</span>
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-emerald-400/30 transition space-y-1">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Guardian & Contact</span>
                       <strong className="text-sm font-black text-white block truncate">
                         {activeStudent.guardianName || activeStudent.guardian_name || 'Not Entered'}
                       </strong>
@@ -847,7 +905,7 @@ export default function StudentPortalLogin() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <Link
                       to={`/grading-registration?admission_no=${encodeURIComponent(admNo)}`}
-                      className="py-3 px-4 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                      className="shimmer-btn-wrapper py-3 px-4 bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs rounded-xl shadow-lg shadow-red-600/20 transition flex items-center justify-center gap-2"
                     >
                       <Award className="w-4 h-4" />
                       <span>Apply Belt Exam</span>
@@ -855,7 +913,7 @@ export default function StudentPortalLogin() {
                     <button
                       type="button"
                       onClick={() => setShowReceiptModal(true)}
-                      className="py-3 px-4 bg-white/10 hover:bg-white/15 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                      className="py-3 px-4 bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Printer className="w-4 h-4 text-amber-300" />
                       <span>Fee Statement</span>
@@ -864,7 +922,7 @@ export default function StudentPortalLogin() {
                       href={`https://wa.me/919544085442?text=${encodeURIComponent(feeQueryText)}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                      className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2"
                     >
                       <MessageSquare className="w-4 h-4" />
                       <span>Chat with Sensei</span>
@@ -1349,25 +1407,32 @@ export default function StudentPortalLogin() {
 
               {/* PRINTABLE OFFICIAL FEE STATEMENT / RECEIPT MODAL */}
               {showReceiptModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-                  <div className="w-full max-w-lg bg-white text-gray-900 rounded-2xl shadow-2xl p-6 space-y-4 relative print:shadow-none">
-                    <button
-                      type="button"
-                      onClick={() => setShowReceiptModal(false)}
-                      className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer print:hidden"
-                      aria-label="Close fee statement"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
+                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="w-full max-w-lg bg-white text-gray-900 rounded-2xl shadow-2xl overflow-hidden relative print:shadow-none">
+                    <div className="h-2 bg-gradient-to-r from-red-700 via-amber-500 to-black" />
+                    <div className="p-6 space-y-4 relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowReceiptModal(false)}
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer print:hidden"
+                        aria-label="Close fee statement"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
 
-                    <div className="text-center border-b border-gray-200 pb-3">
-                      <h3 className="text-base font-black text-red-700 tracking-wide">
-                        BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)
-                      </h3>
-                      <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
-                        Official Cadet Fee Statement
-                      </p>
-                    </div>
+                      <div className="text-center border-b border-gray-200 pb-3 space-y-1.5">
+                        <img
+                          src="/logo bama_240616_200739.jpg.jpeg"
+                          alt="B.A.M.A."
+                          className="w-11 h-11 rounded-full object-cover mx-auto border border-amber-500 shadow-sm"
+                        />
+                        <h3 className="text-base font-black text-red-700 tracking-wide">
+                          BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)
+                        </h3>
+                        <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                          Official Cadet Fee Statement
+                        </p>
+                      </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-3 rounded-xl border border-gray-200">
                       <div>
@@ -1440,6 +1505,7 @@ export default function StudentPortalLogin() {
                       >
                         Close
                       </button>
+                    </div>
                     </div>
                   </div>
                 </div>
