@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Shield, User, Lock, Calendar, Phone, ArrowRight, AlertCircle,
-  Loader2, CheckCircle2, Users, KeyRound, QrCode, FileText, Download,
-  Check, Sparkles, Building2, MapPin, Award
+  Shield, Lock, Calendar, Phone, ArrowRight, AlertCircle,
+  Loader2, CheckCircle2, Users, CreditCard, RefreshCw, Printer,
+  Check, Building2, MapPin, Award, Clock, MessageSquare, Heart, LogOut, X
 } from 'lucide-react';
 import {
   getStudentPortalAuth,
   verifyStudentDOBLogin,
   verifyStudentPasswordLogin,
-  updateStudent
+  updateStudent,
+  fetchStudentPortalDetails,
+  getGlobalFeeSettings
 } from '../../services/api';
 import {
   calculateAgeFromDOB,
@@ -19,10 +21,9 @@ import {
   needsProfileUpdate,
   normalizeDobToISO
 } from '../../utils/studentValidation';
+import { buildCadetFeeSummary } from '../../utils/feeLedger';
 
 export default function StudentPortalLogin() {
-  const navigate = useNavigate();
-
   // Restore saved session if user reloads page
   const [activeStudent, setActiveStudent] = useState(() => {
     try {
@@ -44,7 +45,14 @@ export default function StudentPortalLogin() {
   });
 
   const [phone, setPhone] = useState('');
-  const [studentOptions, setStudentOptions] = useState([]);
+  const [studentOptions, setStudentOptions] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('bama_portal_cadet_options');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const [dob, setDob] = useState('');
   const [password, setPassword] = useState('');
@@ -55,6 +63,63 @@ export default function StudentPortalLogin() {
   const [profileForm, setProfileForm] = useState({ dob: '', address: '', guardianName: '' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
+
+  const [portalDetails, setPortalDetails] = useState({
+    feeSettings: getGlobalFeeSettings(),
+    gradingRegistrations: [],
+    beltGradings: [],
+    attendanceRecords: []
+  });
+  const [portalRefreshing, setPortalRefreshing] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  const refreshActiveStudentData = async (studentObj) => {
+    if (!studentObj) return;
+    setPortalRefreshing(true);
+    try {
+      const details = await fetchStudentPortalDetails(studentObj);
+      if (details) {
+        if (details.student) {
+          setActiveStudent(details.student);
+          try {
+            sessionStorage.setItem('bama_active_portal_cadet', JSON.stringify(details.student));
+          } catch (err) {}
+        }
+        setPortalDetails({
+          feeSettings: details.feeSettings || getGlobalFeeSettings(),
+          gradingRegistrations: details.gradingRegistrations || [],
+          beltGradings: details.beltGradings || [],
+          attendanceRecords: details.attendanceRecords || []
+        });
+      }
+    } catch (err) {
+      // Non-fatal: keep cached student session visible
+    } finally {
+      setPortalRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step === 'LOGGED_IN' && activeStudent?.id) {
+      refreshActiveStudentData(activeStudent);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, activeStudent?.id]);
+
+  const feeSummary = useMemo(
+    () => buildCadetFeeSummary(activeStudent || {}, portalDetails.feeSettings),
+    [activeStudent, portalDetails.feeSettings]
+  );
+
+  const attendanceStats = useMemo(() => {
+    const recs = portalDetails.attendanceRecords || [];
+    if (!Array.isArray(recs) || recs.length === 0) return null;
+    const present = recs.filter((a) => ['present', 'late'].includes(String(a.status || '').toLowerCase())).length;
+    const absent = recs.filter((a) => String(a.status || '').toLowerCase() === 'absent').length;
+    const total = recs.length;
+    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
+    return { present, absent, total, pct };
+  }, [portalDetails.attendanceRecords]);
 
   const handleCompleteProfile = async (e) => {
     e.preventDefault();
@@ -136,10 +201,17 @@ export default function StudentPortalLogin() {
       }
 
       if (res.multiple && Array.isArray(res.students) && res.students.length > 1) {
-        // Siblings detected! Ask parent to pick cadet
+        // Siblings or multiple course enrollments detected! Ask parent to pick cadet
         setStudentOptions(res.students);
+        try {
+          sessionStorage.setItem('bama_portal_cadet_options', JSON.stringify(res.students));
+        } catch (err) {}
         setStep('SIBLING_SELECT');
       } else {
+        setStudentOptions([]);
+        try {
+          sessionStorage.removeItem('bama_portal_cadet_options');
+        } catch (err) {}
         const cadet = res.student || (res.students && res.students[0]);
         selectAndProceed(cadet);
       }
@@ -225,8 +297,11 @@ export default function StudentPortalLogin() {
   const handleSignOut = () => {
     try {
       sessionStorage.removeItem('bama_active_portal_cadet');
+      sessionStorage.removeItem('bama_portal_cadet_options');
     } catch (e) {}
     setActiveStudent(null);
+    setStudentOptions([]);
+    setShowReceiptModal(false);
     setDob('');
     setPassword('');
     setError('');
@@ -234,8 +309,8 @@ export default function StudentPortalLogin() {
   };
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 relative overflow-hidden">
-      <div className="w-full max-w-md glass-card rounded-3xl p-6 sm:p-9 border border-white/10 shadow-2xl relative z-10 backdrop-blur-md">
+    <div className="min-h-[85vh] flex items-center justify-center px-3 sm:px-6 py-8 sm:py-12 relative overflow-hidden">
+      <div className={`w-full ${step === 'LOGGED_IN' ? 'max-w-4xl' : 'max-w-md'} glass-card rounded-3xl p-5 sm:p-8 border border-white/10 shadow-2xl relative z-10 backdrop-blur-md transition-all duration-200`}>
         {/* Header */}
         <div className="text-center space-y-2 mb-6">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 via-amber-500 to-black p-0.5 shadow-xl mx-auto border border-amber-500/40 overflow-hidden">
@@ -339,6 +414,9 @@ export default function StudentPortalLogin() {
                     )}
                     <div>
                       <h4 className="text-white font-black text-xs group-hover:text-amber-400 transition">{st.name}</h4>
+                      <p className="text-[10px] text-amber-300/90 font-bold">
+                        {st.program || st.course || 'Karate'} • {st.admissionNo || st.admission_no}
+                      </p>
                       <p className="text-[10px] text-gray-400">
                         {st.currentBelt || st.current_belt || 'White Belt'} • {st.branch_name || st.branch || 'Head Office'}
                       </p>
@@ -511,187 +589,676 @@ export default function StudentPortalLogin() {
           </form>
         )}
 
-        {/* STEP 3: LOGGED IN - STUDENT DASHBOARD VIEW */}
-        {step === 'LOGGED_IN' && activeStudent && (
-          <div className="space-y-5 text-xs animate-in fade-in duration-200">
-            {/* Student ID Badge Card */}
-            <div className="bg-gradient-to-br from-red-950 via-gray-900 to-black p-5 rounded-2xl border border-red-500/40 text-white space-y-4 shadow-xl">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  {activeStudent.photo ? (
-                    <img
-                      src={activeStudent.photo}
-                      alt={activeStudent.name}
-                      className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow-md"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-xl shadow-md border-2 border-amber-400">
-                      {activeStudent.name ? activeStudent.name.charAt(0).toUpperCase() : 'C'}
+        {/* STEP 3: LOGGED IN - FULL CADET & PARENT FEE + PROFILE DASHBOARD */}
+        {step === 'LOGGED_IN' && activeStudent && (() => {
+          const admNo = activeStudent.admissionNo || activeStudent.admission_no || '';
+          const branchName = activeStudent.branch_name || activeStudent.branch_detail?.name || activeStudent.branch || 'Head Office';
+          const beltRank = activeStudent.currentBelt || activeStudent.current_belt || 'White Belt';
+          const programName = activeStudent.program || activeStudent.course || 'Karate (Shotokan)';
+          const liveAge = calculateAgeFromDOB(activeStudent.dob);
+          const ageLabel = liveAge !== null
+            ? `${liveAge} Yrs`
+            : (isValidStudentDOB(activeStudent.dob) && activeStudent.age ? `${activeStudent.age} Yrs` : 'DOB Pending');
+          const dueLabels = feeSummary.duePeriods.map((p) => `${p.label} (₹${p.pendingAmount})`).join(', ');
+          const feeQueryText = feeSummary.totalPending > 0
+            ? `Hello Sensei, this is parent of *${activeStudent.name}* (${admNo}, ${branchName}). Regarding pending fee balance of *₹${feeSummary.totalPending.toLocaleString()}*${dueLabels ? ` (${dueLabels})` : ''}${feeSummary.admissionPending > 0 ? ` + Admission ₹${feeSummary.admissionPending}` : ''}.`
+            : `Hello Sensei, this is parent of cadet *${activeStudent.name}* (${admNo}, ${branchName}).`;
+
+          return (
+            <div className="space-y-5 text-xs animate-in fade-in duration-200">
+              {/* Top Cadet Hero & Action Bar */}
+              <div className="bg-gradient-to-br from-red-950/90 via-gray-900 to-black p-5 rounded-2xl border border-red-500/40 text-white space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    {activeStudent.photo ? (
+                      <img
+                        src={activeStudent.photo}
+                        alt={activeStudent.name}
+                        className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400 shadow-md flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-amber-600 text-white font-black flex items-center justify-center text-2xl shadow-md border-2 border-amber-400 flex-shrink-0">
+                        {activeStudent.name ? activeStudent.name.charAt(0).toUpperCase() : 'C'}
+                      </div>
+                    )}
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[9px] uppercase font-mono tracking-widest text-amber-400 font-bold">
+                          B.A.M.A. Cadet • {activeStudent.status || 'Active'}
+                        </span>
+                        <span className="px-2 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/40 rounded-full font-black text-[10px]">
+                          {beltRank}
+                        </span>
+                      </div>
+                      <h3 className="text-lg sm:text-xl font-black text-white leading-tight truncate">{activeStudent.name}</h3>
+                      <p className="text-[11px] text-gray-300 font-mono">
+                        Adm: <strong className="text-white">{admNo}</strong> • {programName}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick Toolbar */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => refreshActiveStudentData(activeStudent)}
+                      disabled={portalRefreshing}
+                      className="px-3 py-2 bg-white/10 hover:bg-white/15 text-gray-200 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                      title="Refresh latest fees & profile from dojo server"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${portalRefreshing ? 'animate-spin' : ''}`} />
+                      <span>{portalRefreshing ? 'Syncing...' : 'Refresh'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowReceiptModal(true)}
+                      className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Fee Statement</span>
+                    </button>
+
+                    {studentOptions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError('');
+                          setStep('SIBLING_SELECT');
+                        }}
+                        className="px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/30 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Switch ({studentOptions.length})</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      className="px-3 py-2 bg-white/5 hover:bg-red-500/20 text-gray-300 hover:text-red-200 border border-white/10 rounded-xl font-bold text-[11px] flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px] border-t border-white/10 pt-3">
+                  <div>
+                    <span className="text-gray-400 text-[10px] block">Branch Dojo</span>
+                    <strong className="text-white">{branchName}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 text-[10px] block">Training Shift</span>
+                    <strong className="text-white">{activeStudent.shift || 'Regular Shift'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 text-[10px] block">Instructor</span>
+                    <strong className="text-amber-300">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 text-[10px] block">Joined Date</span>
+                    <strong className="text-white font-mono">{feeSummary.joiningDate || activeStudent.joining_date || 'N/A'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* FINANCIAL SUMMARY BANNER + 3 KPI CARDS */}
+              <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 ${
+                feeSummary.totalPending === 0
+                  ? 'bg-emerald-950/50 border-emerald-500/40'
+                  : 'bg-rose-950/40 border-rose-500/40'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 ${
+                      feeSummary.totalPending === 0 ? 'text-emerald-300' : 'text-rose-300'
+                    }`}>
+                      {feeSummary.totalPending === 0
+                        ? <><CheckCircle2 className="w-3.5 h-3.5" /> Account Status — All Dues Cleared</>
+                        : <><AlertCircle className="w-3.5 h-3.5" /> Fee Balance Due</>}
+                    </span>
+                    <div className="text-2xl sm:text-3xl font-black font-mono text-white mt-0.5">
+                      {feeSummary.totalPending === 0
+                        ? '✓ ₹0 Pending'
+                        : `₹${feeSummary.totalPending.toLocaleString()} Total Pending`}
+                    </div>
+                    <p className="text-[11px] text-gray-300 mt-0.5">
+                      {feeSummary.planLabel} • Rate: <strong className="text-white">₹{feeSummary.feeRate}</strong>
+                      {feeSummary.isQuarterly ? ' / 3-Month Term' : ' / Month'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={`https://wa.me/919544085442?text=${encodeURIComponent(feeQueryText)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition inline-flex items-center gap-1.5"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>{feeSummary.totalPending > 0 ? 'Send Payment / Query on WhatsApp' : 'WhatsApp Dojo Office'}</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-1">
+                    <span className="text-[10px] text-gray-400 uppercase font-bold flex items-center gap-1">
+                      <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+                      {feeSummary.isQuarterly ? 'Term Tuition Fee' : 'Monthly Tuition Fee'}
+                    </span>
+                    <div className="flex items-baseline justify-between">
+                      <strong className="text-base font-black text-white font-mono">₹{feeSummary.feeRate.toLocaleString()}</strong>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                        feeSummary.tuitionPendingTotal === 0
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-rose-500/20 text-rose-300'
+                      }`}>
+                        {feeSummary.tuitionPendingTotal === 0 ? '✓ Up to date' : `₹${feeSummary.tuitionPendingTotal.toLocaleString()} Due`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      Tuition Paid: <strong className="text-emerald-300 font-mono">₹{feeSummary.tuitionPaidTotal.toLocaleString()}</strong>
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-1">
+                    <span className="text-[10px] text-gray-400 uppercase font-bold flex items-center gap-1">
+                      <Award className="w-3.5 h-3.5 text-amber-400" />
+                      One-Time Admission Fee
+                    </span>
+                    <div className="flex items-baseline justify-between">
+                      <strong className="text-base font-black text-white font-mono">
+                        {feeSummary.isAdmissionWaived ? '₹0 (Waived)' : `₹${feeSummary.admissionFee.toLocaleString()}`}
+                      </strong>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                        feeSummary.admissionPending === 0
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-rose-500/20 text-rose-300'
+                      }`}>
+                        {feeSummary.isAdmissionWaived ? 'Free' : feeSummary.admissionPending === 0 ? '✓ Paid' : `₹${feeSummary.admissionPending.toLocaleString()} Due`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400">
+                      Paid: <strong className="text-emerald-300 font-mono">₹{feeSummary.admissionPaid.toLocaleString()}</strong>
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-black/50 border border-white/10 space-y-1">
+                    <span className="text-[10px] text-gray-400 uppercase font-bold flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      Cleared Months / Terms
+                    </span>
+                    <div className="flex items-baseline justify-between">
+                      <strong className="text-base font-black text-emerald-300 font-mono">
+                        ₹{feeSummary.totalPaid.toLocaleString()} Paid
+                      </strong>
+                      <span className="text-[10px] text-gray-300 font-bold">
+                        {feeSummary.paidPeriods.length} Cleared
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {feeSummary.paidMonthsList.length > 0
+                        ? `Months: ${feeSummary.paidMonthsList.join(', ')}`
+                        : 'No paid month recorded yet'}
+                    </p>
+                  </div>
+                </div>
+
+                {feeSummary.totalPending > 0 && (
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 text-[11px] text-amber-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span>
+                      💳 <strong>How to Pay:</strong> Pay at the Dojo Office or via Google Pay / PhonePe to <strong className="font-mono text-amber-300">+91 95440 85442</strong> and share screenshot with Sensei.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* DETAILED MONTH-BY-MONTH OR TERM-BY-TERM LEDGER */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-black/50 border border-white/10 space-y-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+                  <div>
+                    <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-amber-400" />
+                      {feeSummary.isQuarterly
+                        ? 'School Batch 3-Month Term Fee Ledger'
+                        : `Monthly Fee Ledger (${feeSummary.displayYear})`}
+                    </h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      {feeSummary.duePeriods.length === 0
+                        ? 'All active fee periods from your joining date are cleared.'
+                        : `${feeSummary.duePeriods.length} ${feeSummary.isQuarterly ? 'term(s)' : 'month(s)'} pending payment from your joining month.`}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 text-[10px] font-bold">
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Paid</span>
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">◑ Partial</span>
+                    <span className="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30">✕ Due</span>
+                    <span className="px-2 py-0.5 rounded-md bg-white/5 text-gray-400 border border-white/10">Upcoming</span>
+                  </div>
+                </div>
+
+                {feeSummary.isQuarterly ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {feeSummary.periods.map((term) => (
+                      <div
+                        key={term.id}
+                        className={`p-3.5 rounded-xl border ${
+                          term.status === 'PAID'
+                            ? 'bg-emerald-950/40 border-emerald-500/40'
+                            : term.status === 'PARTIAL'
+                              ? 'bg-amber-950/40 border-amber-500/40'
+                              : term.status === 'DUE'
+                                ? 'bg-rose-950/40 border-rose-500/40'
+                                : 'bg-white/5 border-white/10 opacity-75'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <div>
+                            <strong className="text-white text-xs">{term.label}</strong>
+                            <span className="block text-[10px] text-gray-300">{term.period}</span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            term.status === 'PAID'
+                              ? 'bg-emerald-600 text-white'
+                              : term.status === 'PARTIAL'
+                                ? 'bg-amber-500 text-black'
+                                : term.status === 'DUE'
+                                  ? 'bg-rose-600 text-white'
+                                  : 'bg-white/10 text-gray-300'
+                          }`}>
+                            {term.status === 'PAID'
+                              ? `✓ Paid (₹${term.rate})`
+                              : term.status === 'PARTIAL'
+                                ? `◑ Due ₹${term.pendingAmount}`
+                                : term.status === 'DUE'
+                                  ? `✕ Due ₹${term.pendingAmount}`
+                                  : `Upcoming (₹${term.rate})`}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 pt-2">
+                          Months: <span className="text-gray-200 font-mono">{term.months.map((m) => m.split(' ')[0]).join(' + ')}</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {feeSummary.periods.map((item) => {
+                      if (item.status === 'BEFORE_JOINING') {
+                        return (
+                          <div key={item.id} className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 text-center opacity-50">
+                            <span className="text-gray-400 font-bold block">{item.label}</span>
+                            <span className="text-[10px] text-gray-500">Before Joining</span>
+                          </div>
+                        );
+                      }
+                      if (item.status === 'PAID') {
+                        return (
+                          <div key={item.id} className="p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/40 text-center">
+                            <span className="text-white font-bold block">{item.label}</span>
+                            <span className="text-[10px] font-black text-emerald-300">✓ Paid (₹{item.rate})</span>
+                          </div>
+                        );
+                      }
+                      if (item.status === 'PARTIAL') {
+                        return (
+                          <div key={item.id} className="p-2.5 rounded-xl bg-amber-950/50 border border-amber-500/50 text-center">
+                            <span className="text-white font-bold block">{item.label}</span>
+                            <span className="text-[10px] font-black text-amber-300">
+                              ◑ Paid ₹{item.paidAmount} • Bal ₹{item.pendingAmount}
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (item.status === 'DUE') {
+                        return (
+                          <div key={item.id} className="p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/50 text-center">
+                            <span className="text-white font-bold block">{item.label}</span>
+                            <span className="text-[10px] font-black text-rose-300">✕ Due (₹{item.pendingAmount})</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={item.id} className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-center">
+                          <span className="text-gray-300 font-bold block">{item.label}</span>
+                          <span className="text-[10px] text-gray-400">🗓️ Upcoming (₹{item.rate})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* TWO-COLUMN DETAILS: CADET BIO & EXAMS / ACTIONS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* LEFT: CADET & GUARDIAN BIO + MISSING INFO UPDATE */}
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-2.5">
+                    <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
+                      <Users className="w-4 h-4 text-blue-400" /> Cadet & Guardian Details
+                    </h4>
+                    <div className="space-y-1.5 text-[11px]">
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Parent / Guardian:</span>
+                        <strong className="text-white text-right">{activeStudent.guardianName || activeStudent.guardian_name || 'Not Entered'}</strong>
+                      </div>
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Phone / WhatsApp:</span>
+                        <strong className="text-emerald-300 font-mono text-right">{activeStudent.phone || 'N/A'}</strong>
+                      </div>
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Date of Birth / Age:</span>
+                        <strong className="text-white font-mono text-right">
+                          {isValidStudentDOB(activeStudent.dob) ? `${normalizeDobToISO(activeStudent.dob)} (${ageLabel})` : ageLabel}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Gender & Blood:</span>
+                        <strong className="text-white inline-flex items-center gap-1 text-right">
+                          {activeStudent.gender || 'N/A'} • <Heart className="w-3 h-3 text-rose-400 inline" /> {activeStudent.bloodGroup || activeStudent.blood_group || 'O+'}
+                        </strong>
+                      </div>
+                      <div className="pt-1">
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold mb-0.5">
+                          <MapPin className="w-3 h-3 text-red-400 inline mr-1" /> Residential Address
+                        </span>
+                        <p className="text-gray-200 font-medium leading-relaxed">
+                          {activeStudent.address || 'Not Entered'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {needsProfileUpdate(activeStudent).needsAttention && (
+                    <form
+                      onSubmit={handleCompleteProfile}
+                      className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2.5 text-left"
+                    >
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-amber-200 font-black text-xs">
+                            Complete Official Cadet Profile
+                          </p>
+                          <p className="text-[10px] text-amber-100/80">
+                            Please enter missing Date of Birth / residential address / guardian name so exam forms & certificates stay accurate.
+                          </p>
+                        </div>
+                      </div>
+
+                      {profileMessage.text && (
+                        <div className={`px-3 py-2 rounded-xl text-[11px] font-bold ${
+                          profileMessage.type === 'success'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        }`}>
+                          {profileMessage.text}
+                        </div>
+                      )}
+
+                      {needsProfileUpdate(activeStudent).missingDob && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-amber-400" /> Official Date of Birth *
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            min="1940-01-01"
+                            max={getTodayISO()}
+                            value={profileForm.dob}
+                            onChange={(e) => setProfileForm({ ...profileForm, dob: e.target.value })}
+                            className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {needsProfileUpdate(activeStudent).missingAddress && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-amber-400" /> Full Residential Address *
+                          </label>
+                          <textarea
+                            rows={2}
+                            required
+                            placeholder="House Name, Place, Post Office, Pin Code..."
+                            value={profileForm.address}
+                            onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                            className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {needsProfileUpdate(activeStudent).missingGuardian && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-300">Parent / Guardian Name</label>
+                          <input
+                            type="text"
+                            placeholder="Father / Mother / Guardian full name"
+                            value={profileForm.guardianName}
+                            onChange={(e) => setProfileForm({ ...profileForm, guardianName: e.target.value })}
+                            className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={profileSaving}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {profileSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        <span>Save & Update Official Record</span>
+                      </button>
+                    </form>
+                  )}
+                </div>
+
+                {/* RIGHT: GRADING / EXAMS / ATTENDANCE / DOJO ACTIONS */}
+                <div className="space-y-4">
+                  {/* Belt Grading & Exam Status */}
+                  <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-3">
+                    <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
+                      <Award className="w-4 h-4 text-amber-400" /> Belt Grading & Exam Status
+                    </h4>
+
+                    {portalDetails.gradingRegistrations.length > 0 && (
+                      <div className="space-y-2">
+                        {portalDetails.gradingRegistrations.map((reg) => (
+                          <div key={reg.id || reg.registration_no} className="p-3 rounded-xl bg-amber-500/10 border border-amber-400/30 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <strong className="text-amber-300 font-mono text-[11px]">{reg.registration_no}</strong>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                String(reg.payment_status).toLowerCase() === 'paid'
+                                  ? 'bg-emerald-500/20 text-emerald-300'
+                                  : 'bg-amber-500/20 text-amber-200'
+                              }`}>
+                                Fee: {reg.payment_status || 'Pending'} • {reg.registration_status || 'Submitted'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-white font-bold">
+                              Target Belt: {reg.target_belt} {reg.applied_fee ? `(Exam Fee: ₹${reg.applied_fee})` : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {portalDetails.beltGradings.length > 0 && (
+                      <div className="space-y-2">
+                        {portalDetails.beltGradings.map((g) => (
+                          <div key={g.id || g.certificate_no} className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <strong className="text-emerald-300 text-[11px]">{g.previous_belt} → {g.target_belt}</strong>
+                              <span className="text-[10px] font-mono text-gray-300">{g.exam_date}</span>
+                            </div>
+                            <p className="text-[10px] text-gray-300">
+                              Result: <strong className="text-white">{g.result}</strong> {g.certificate_no ? `• Cert: ${g.certificate_no}` : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {portalDetails.gradingRegistrations.length === 0 && portalDetails.beltGradings.length === 0 && (
+                      <p className="text-[11px] text-gray-400">
+                        Current Rank: <strong className="text-white">{beltRank}</strong>. Ready to apply for the upcoming grading test?
+                      </p>
+                    )}
+
+                    <Link
+                      to={`/grading-registration?admission_no=${encodeURIComponent(admNo)}`}
+                      className="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                    >
+                      <Award className="w-4 h-4" />
+                      <span>Apply for Belt Grading Exam →</span>
+                    </Link>
+                  </div>
+
+                  {/* Attendance Summary (only displayed when real backend attendance records exist) */}
+                  {attendanceStats && (
+                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-2">
+                      <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
+                        <span className="flex items-center gap-1.5">
+                          <Shield className="w-4 h-4 text-emerald-400" /> Class Attendance
+                        </span>
+                        <strong className="text-emerald-300 font-mono">{attendanceStats.pct}%</strong>
+                      </h4>
+                      <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
+                        <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                          <strong className="block text-emerald-300 font-mono text-sm">{attendanceStats.present}</strong>
+                          <span className="text-[10px] text-gray-400">Present</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                          <strong className="block text-rose-300 font-mono text-sm">{attendanceStats.absent}</strong>
+                          <span className="text-[10px] text-gray-400">Absent</span>
+                        </div>
+                        <div className="p-2 rounded-lg bg-white/5 border border-white/10">
+                          <strong className="block text-white font-mono text-sm">{attendanceStats.total}</strong>
+                          <span className="text-[10px] text-gray-400">Total Classes</span>
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <div>
-                    <span className="text-[9px] uppercase font-mono tracking-widest text-amber-400">B.A.M.A. Cadet</span>
-                    <h3 className="text-base font-black text-white leading-tight">{activeStudent.name}</h3>
-                    <p className="text-[10px] text-gray-300 font-mono">Adm: {activeStudent.admissionNo || activeStudent.admission_no}</p>
+
+                  {/* Dojo Branch Info */}
+                  <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1.5 text-[11px]">
+                    <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
+                      <Building2 className="w-4 h-4 text-amber-400" /> Dojo Branch Info
+                    </h4>
+                    <p className="text-white font-bold">{branchName}</p>
+                    {activeStudent.branch_detail?.address && (
+                      <p className="text-gray-400">{activeStudent.branch_detail.address}</p>
+                    )}
+                    <p className="text-gray-300 font-mono">Dojo Helpline: +91 95440 85442</p>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 bg-amber-400/20 text-amber-300 border border-amber-400/40 rounded-full font-black text-[10px]">
-                  {activeStudent.currentBelt || activeStudent.current_belt || 'White Belt'}
-                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-white/10 pt-3">
-                <div>
-                  <span className="text-gray-400 text-[10px] block">Branch Dojo:</span>
-                  <strong className="text-white">{activeStudent.branch_name || activeStudent.branch || 'Head Office'}</strong>
+              {/* PRINTABLE OFFICIAL FEE STATEMENT / RECEIPT MODAL */}
+              {showReceiptModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="w-full max-w-lg bg-white text-gray-900 rounded-2xl shadow-2xl p-6 space-y-4 relative print:shadow-none">
+                    <button
+                      type="button"
+                      onClick={() => setShowReceiptModal(false)}
+                      className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer print:hidden"
+                      aria-label="Close fee statement"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+
+                    <div className="text-center border-b border-gray-200 pb-3">
+                      <h3 className="text-base font-black text-red-700 tracking-wide">
+                        BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)
+                      </h3>
+                      <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">
+                        Official Cadet Fee Statement
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs bg-gray-50 p-3 rounded-xl border border-gray-200">
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">Cadet Name</span>
+                        <strong className="font-black text-gray-900">{activeStudent.name}</strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">Admission No</span>
+                        <strong className="font-mono font-black text-gray-900">{admNo}</strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">Branch Dojo</span>
+                        <strong className="text-gray-800">{branchName}</strong>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-[10px]">Billing Plan</span>
+                        <strong className="text-gray-800">{feeSummary.planLabel}</strong>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 text-xs border-b border-gray-200 pb-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Admission Fee ({feeSummary.isAdmissionWaived ? 'Waived' : `₹${feeSummary.admissionFee}`}):</span>
+                        <strong className="font-mono">
+                          Paid ₹{feeSummary.admissionPaid} • Pending ₹{feeSummary.admissionPending}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Tuition Fee (₹{feeSummary.feeRate}):</span>
+                        <strong className="font-mono">
+                          Paid ₹{feeSummary.tuitionPaidTotal} • Pending ₹{feeSummary.tuitionPendingTotal}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-gray-100 text-sm">
+                        <strong className="text-gray-900">Total Outstanding Balance:</strong>
+                        <strong className={`font-mono font-black ${feeSummary.totalPending === 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {feeSummary.totalPending === 0 ? '₹0 (Cleared)' : `₹${feeSummary.totalPending}`}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 text-xs">
+                      <span className="text-[10px] font-bold uppercase text-gray-500 block">Cleared Periods:</span>
+                      <p className="text-emerald-800 font-bold">
+                        {feeSummary.paidMonthsList.length > 0 ? feeSummary.paidMonthsList.join(', ') : 'None yet'}
+                      </p>
+                      {feeSummary.duePeriods.length > 0 && (
+                        <>
+                          <span className="text-[10px] font-bold uppercase text-gray-500 block pt-1">Pending / Overdue Periods:</span>
+                          <p className="text-rose-700 font-bold">
+                            {feeSummary.duePeriods.map((p) => `${p.label} (₹${p.pendingAmount})`).join(', ')}
+                          </p>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2 print:hidden">
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-4 py-2 bg-gray-900 hover:bg-black text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Print / Save PDF</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowReceiptModal(false)}
+                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-400 text-[10px] block">Shift Batch:</span>
-                  <strong className="text-white">{activeStudent.shift || 'Regular Shift'}</strong>
-                </div>
-              </div>
+              )}
             </div>
-
-            {/* Quick Status Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl">
-                <span className="text-[10px] text-gray-400 uppercase font-bold block">Fee Status</span>
-                <strong className={`text-sm font-black ${
-                  (activeStudent.feeStatus || activeStudent.fee_status) === 'Paid' ? 'text-emerald-400' : 'text-rose-400'
-                }`}>
-                  {(activeStudent.feeStatus || activeStudent.fee_status) === 'Paid' ? '✓ Paid' : 'Pending Dues'}
-                </strong>
-                <p className="text-[9px] text-gray-400 mt-0.5">
-                  Monthly: ₹{activeStudent.feeAmount || activeStudent.fee_amount || 500}
-                </p>
-              </div>
-
-              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-2xl">
-                <span className="text-[10px] text-gray-400 uppercase font-bold block">Discipline</span>
-                <strong className="text-sm font-black text-blue-300">
-                  {activeStudent.program || activeStudent.course || 'Karate'}
-                </strong>
-                <p className="text-[9px] text-gray-400 mt-0.5">
-                  {(() => {
-                    const liveAge = calculateAgeFromDOB(activeStudent.dob);
-                    if (liveAge !== null) return `Age: ${liveAge} Yrs`;
-                    if (isValidStudentDOB(activeStudent.dob) && activeStudent.age) return `Age: ${activeStudent.age} Yrs`;
-                    return 'DOB Pending';
-                  })()} • Blood: {activeStudent.bloodGroup || activeStudent.blood_group || 'O+'}
-                </p>
-              </div>
-            </div>
-
-            {needsProfileUpdate(activeStudent).needsAttention && (
-              <form
-                onSubmit={handleCompleteProfile}
-                className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2.5 text-left"
-              >
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-amber-200 font-black text-xs">
-                      Complete Official Cadet Profile
-                    </p>
-                    <p className="text-[10px] text-amber-100/80">
-                      Please enter missing Date of Birth / residential address so exam forms & certificates stay accurate.
-                    </p>
-                  </div>
-                </div>
-
-                {profileMessage.text && (
-                  <div className={`px-3 py-2 rounded-xl text-[11px] font-bold ${
-                    profileMessage.type === 'success'
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                  }`}>
-                    {profileMessage.text}
-                  </div>
-                )}
-
-                {needsProfileUpdate(activeStudent).missingDob && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-amber-400" /> Official Date of Birth *
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      min="1940-01-01"
-                      max={getTodayISO()}
-                      value={profileForm.dob}
-                      onChange={(e) => setProfileForm({ ...profileForm, dob: e.target.value })}
-                      className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                {needsProfileUpdate(activeStudent).missingAddress && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-amber-400" /> Full Residential Address *
-                    </label>
-                    <textarea
-                      rows={2}
-                      required
-                      placeholder="House Name, Place, Post Office, Pin Code..."
-                      value={profileForm.address}
-                      onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                      className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                {needsProfileUpdate(activeStudent).missingGuardian && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-300">Parent / Guardian Name</label>
-                    <input
-                      type="text"
-                      placeholder="Father / Mother / Guardian full name"
-                      value={profileForm.guardianName}
-                      onChange={(e) => setProfileForm({ ...profileForm, guardianName: e.target.value })}
-                      className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
-                    />
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={profileSaving}
-                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {profileSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                  <span>Save & Update Official Record</span>
-                </button>
-              </form>
-            )}
-
-            <Link
-              to={`/grading-registration?admission_no=${encodeURIComponent(activeStudent.admission_no || activeStudent.admissionNo || '')}`}
-              className="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
-            >
-              <Award className="w-4 h-4" />
-              <span>Apply for Belt Grading Exam →</span>
-            </Link>
-
-            {/* WhatsApp Sensei direct communication */}
-            <a
-              href={`https://wa.me/919544085442?text=Hello%20Sensei,%20this%20is%20parent%20of%20cadet%20${encodeURIComponent(activeStudent.name)}%20(${encodeURIComponent(activeStudent.admissionNo || activeStudent.admission_no)}).`}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
-            >
-              <span>Chat with Sensei on WhatsApp</span>
-            </a>
-
-            <button
-              onClick={handleSignOut}
-              className="w-full py-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white font-bold text-xs rounded-xl transition cursor-pointer"
-            >
-              Sign Out
-            </button>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

@@ -3849,6 +3849,64 @@ export const verifyStudentDOBLogin = async (studentId, dobInput) => {
   }
 };
 
+export const fetchStudentPortalDetails = async (student) => {
+  if (!student) return null;
+  const targetId = String(student.id || '').trim();
+  const targetAdm = String(student.admission_no || student.admissionNo || '').trim().toLowerCase();
+  const norm = (v) => String(v || '').trim().toLowerCase();
+
+  const matchesCadet = (item, nestedKey = 'student_detail') => {
+    if (!item) return false;
+    const itemId = String(item[nestedKey]?.id || item.student || '').trim();
+    const itemAdm = norm(item[nestedKey]?.admission_no || item[nestedKey]?.admissionNo || item.admission_no || item.admissionNo);
+    return (targetId && itemId && itemId === targetId) || (targetAdm && itemAdm && itemAdm === targetAdm);
+  };
+
+  const [studentsRes, feeSettingsRes, regRes, gradingsRes, attRes] = await Promise.allSettled([
+    fetchStudents(),
+    fetchFeeSettings(),
+    api.get('/grading-registrations/'),
+    api.get('/belt-gradings/'),
+    targetId ? api.get(`/attendance/?student=${encodeURIComponent(targetId)}`) : Promise.resolve({ data: [] }),
+  ]);
+
+  let latestStudent = student;
+  if (studentsRes.status === 'fulfilled' && Array.isArray(studentsRes.value)) {
+    const found = studentsRes.value.find((s) =>
+      (targetId && String(s.id) === targetId) ||
+      (targetAdm && norm(s.admission_no || s.admissionNo) === targetAdm)
+    );
+    if (found) latestStudent = found;
+  }
+
+  const feeSettings = feeSettingsRes.status === 'fulfilled' && feeSettingsRes.value?.settings
+    ? feeSettingsRes.value.settings
+    : getGlobalFeeSettings();
+
+  const rawRegs = regRes.status === 'fulfilled'
+    ? (regRes.value?.data?.results || regRes.value?.data || [])
+    : [];
+  const gradingRegistrations = Array.isArray(rawRegs) ? rawRegs.filter((r) => matchesCadet(r)) : [];
+
+  const rawGradings = gradingsRes.status === 'fulfilled'
+    ? (gradingsRes.value?.data?.results || gradingsRes.value?.data || [])
+    : [];
+  const beltGradings = Array.isArray(rawGradings) ? rawGradings.filter((g) => matchesCadet(g)) : [];
+
+  const rawAtt = attRes.status === 'fulfilled'
+    ? (attRes.value?.data?.results || attRes.value?.data || [])
+    : [];
+  const attendanceRecords = Array.isArray(rawAtt) ? rawAtt.filter((a) => matchesCadet(a)) : [];
+
+  return {
+    student: latestStudent,
+    feeSettings,
+    gradingRegistrations,
+    beltGradings,
+    attendanceRecords,
+  };
+};
+
 // Web Admission Inquiries Backend Sync via Fly.io cms-config
 export const saveAdmissionInquiryBackend = async (inquiry) => {
   try {
