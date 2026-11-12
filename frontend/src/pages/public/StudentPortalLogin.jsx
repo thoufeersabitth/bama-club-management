@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import {
   Shield, Lock, Calendar, Phone, ArrowRight, AlertCircle,
   Loader2, CheckCircle2, Users, CreditCard, RefreshCw, Printer,
-  Check, Building2, MapPin, Award, Clock, MessageSquare, Heart, LogOut, X
+  Check, Building2, MapPin, Award, Clock, MessageSquare, Heart, LogOut, X,
+  LayoutGrid, User
 } from 'lucide-react';
 import {
   getStudentPortalAuth,
@@ -72,6 +73,7 @@ export default function StudentPortalLogin() {
   });
   const [portalRefreshing, setPortalRefreshing] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [activeSection, setActiveSection] = useState('OVERVIEW');
 
   const refreshActiveStudentData = async (studentObj) => {
     if (!studentObj) return;
@@ -224,6 +226,7 @@ export default function StudentPortalLogin() {
 
   const selectAndProceed = (student) => {
     setActiveStudent(student);
+    setActiveSection('OVERVIEW');
     setError('');
     // Direct verification via Date of Birth (No password creation loop!)
     setStep('VERIFY');
@@ -302,6 +305,7 @@ export default function StudentPortalLogin() {
     setActiveStudent(null);
     setStudentOptions([]);
     setShowReceiptModal(false);
+    setActiveSection('OVERVIEW');
     setDob('');
     setPassword('');
     setError('');
@@ -604,6 +608,33 @@ export default function StudentPortalLogin() {
             ? `Hello Sensei, this is parent of *${activeStudent.name}* (${admNo}, ${branchName}). Regarding pending fee balance of *₹${feeSummary.totalPending.toLocaleString()}*${dueLabels ? ` (${dueLabels})` : ''}${feeSummary.admissionPending > 0 ? ` + Admission ₹${feeSummary.admissionPending}` : ''}.`
             : `Hello Sensei, this is parent of cadet *${activeStudent.name}* (${admNo}, ${branchName}).`;
 
+          const profileCheck = needsProfileUpdate(activeStudent);
+          const examCount = portalDetails.gradingRegistrations.length + portalDetails.beltGradings.length;
+          const sectionTabs = [
+            { id: 'OVERVIEW', label: 'Overview', icon: LayoutGrid },
+            {
+              id: 'FEES',
+              label: 'Fees & Ledger',
+              icon: CreditCard,
+              badge: feeSummary.totalPending > 0 ? `₹${feeSummary.totalPending}` : 'Paid',
+              badgeTone: feeSummary.totalPending > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500/25 text-emerald-300'
+            },
+            {
+              id: 'EXAMS',
+              label: 'Exams & Belt',
+              icon: Award,
+              badge: examCount > 0 ? String(examCount) : null,
+              badgeTone: 'bg-amber-400/25 text-amber-300'
+            },
+            {
+              id: 'PROFILE',
+              label: 'Profile & Dojo',
+              icon: User,
+              badge: profileCheck.needsAttention ? '!' : null,
+              badgeTone: 'bg-amber-500 text-black'
+            }
+          ];
+
           return (
             <div className="space-y-5 text-xs animate-in fade-in duration-200">
               {/* Top Cadet Hero & Action Bar */}
@@ -704,6 +735,147 @@ export default function StudentPortalLogin() {
                 </div>
               </div>
 
+              {/* SECTION TABS NAVIGATION BAR */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-black/60 border border-white/10">
+                {sectionTabs.map((tab) => {
+                  const IconComp = tab.icon;
+                  const isActive = activeSection === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveSection(tab.id)}
+                      className={`px-3 py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                        isActive
+                          ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg'
+                          : 'text-gray-300 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <IconComp className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">{tab.label}</span>
+                      {tab.badge && (
+                        <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black leading-tight ${
+                          isActive ? 'bg-black/30 text-white' : tab.badgeTone
+                        }`}>
+                          {tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* SECTION 1: OVERVIEW */}
+              {activeSection === 'OVERVIEW' && (
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    feeSummary.totalPending === 0
+                      ? 'bg-emerald-950/50 border-emerald-500/40'
+                      : 'bg-rose-950/40 border-rose-500/40'
+                  }`}>
+                    <div>
+                      <span className={`text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 ${
+                        feeSummary.totalPending === 0 ? 'text-emerald-300' : 'text-rose-300'
+                      }`}>
+                        {feeSummary.totalPending === 0
+                          ? <><CheckCircle2 className="w-3.5 h-3.5" /> Account Status — Fully Cleared</>
+                          : <><AlertCircle className="w-3.5 h-3.5" /> Fee Balance Due</>}
+                      </span>
+                      <div className="text-2xl font-black font-mono text-white mt-0.5">
+                        {feeSummary.totalPending === 0
+                          ? '✓ ₹0 Pending'
+                          : `₹${feeSummary.totalPending.toLocaleString()} Pending`}
+                      </div>
+                      <p className="text-[11px] text-gray-300 mt-0.5">
+                        {feeSummary.planLabel} • Paid: <strong className="text-emerald-300 font-mono">₹{feeSummary.totalPaid.toLocaleString()}</strong>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection('FEES')}
+                      className="px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white font-black text-xs rounded-xl transition inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <CreditCard className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Open Full Fee Ledger →</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Fee Rate & Cleared</span>
+                      <strong className="text-sm font-black text-white block">
+                        ₹{feeSummary.feeRate.toLocaleString()} {feeSummary.isQuarterly ? '/ 3 Mos' : '/ Month'}
+                      </strong>
+                      <p className="text-[10px] text-gray-400">
+                        {feeSummary.duePeriods.length === 0
+                          ? `${feeSummary.paidPeriods.length} period(s) cleared`
+                          : `${feeSummary.duePeriods.length} period(s) due`}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Discipline & Rank</span>
+                      <strong className="text-sm font-black text-blue-300 block">{programName}</strong>
+                      <p className="text-[10px] text-gray-400">{beltRank} • {ageLabel}</p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold block">Guardian & Contact</span>
+                      <strong className="text-sm font-black text-white block truncate">
+                        {activeStudent.guardianName || activeStudent.guardian_name || 'Not Entered'}
+                      </strong>
+                      <p className="text-[10px] text-emerald-300 font-mono">{activeStudent.phone || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  {profileCheck.needsAttention && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-amber-200 font-bold text-xs">
+                        <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                        <span>Some profile details (DOB / Address / Guardian) are missing.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSection('PROFILE')}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-[11px] rounded-xl cursor-pointer flex-shrink-0"
+                      >
+                        Complete Profile →
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <Link
+                      to={`/grading-registration?admission_no=${encodeURIComponent(admNo)}`}
+                      className="py-3 px-4 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                    >
+                      <Award className="w-4 h-4" />
+                      <span>Apply Belt Exam</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setShowReceiptModal(true)}
+                      className="py-3 px-4 bg-white/10 hover:bg-white/15 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4 text-amber-300" />
+                      <span>Fee Statement</span>
+                    </button>
+                    <a
+                      href={`https://wa.me/919544085442?text=${encodeURIComponent(feeQueryText)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Chat with Sensei</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION 2: FEES & LEDGER */}
+              {activeSection === 'FEES' && (
+                <div className="space-y-5 animate-in fade-in duration-150">
               {/* FINANCIAL SUMMARY BANNER + 3 KPI CARDS */}
               <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 ${
                 feeSummary.totalPending === 0
@@ -932,136 +1104,14 @@ export default function StudentPortalLogin() {
                   </div>
                 )}
               </div>
-
-              {/* TWO-COLUMN DETAILS: CADET BIO & EXAMS / ACTIONS */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* LEFT: CADET & GUARDIAN BIO + MISSING INFO UPDATE */}
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-2.5">
-                    <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
-                      <Users className="w-4 h-4 text-blue-400" /> Cadet & Guardian Details
-                    </h4>
-                    <div className="space-y-1.5 text-[11px]">
-                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
-                        <span className="text-gray-400">Parent / Guardian:</span>
-                        <strong className="text-white text-right">{activeStudent.guardianName || activeStudent.guardian_name || 'Not Entered'}</strong>
-                      </div>
-                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
-                        <span className="text-gray-400">Phone / WhatsApp:</span>
-                        <strong className="text-emerald-300 font-mono text-right">{activeStudent.phone || 'N/A'}</strong>
-                      </div>
-                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
-                        <span className="text-gray-400">Date of Birth / Age:</span>
-                        <strong className="text-white font-mono text-right">
-                          {isValidStudentDOB(activeStudent.dob) ? `${normalizeDobToISO(activeStudent.dob)} (${ageLabel})` : ageLabel}
-                        </strong>
-                      </div>
-                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
-                        <span className="text-gray-400">Gender & Blood:</span>
-                        <strong className="text-white inline-flex items-center gap-1 text-right">
-                          {activeStudent.gender || 'N/A'} • <Heart className="w-3 h-3 text-rose-400 inline" /> {activeStudent.bloodGroup || activeStudent.blood_group || 'O+'}
-                        </strong>
-                      </div>
-                      <div className="pt-1">
-                        <span className="text-gray-400 block text-[10px] uppercase font-bold mb-0.5">
-                          <MapPin className="w-3 h-3 text-red-400 inline mr-1" /> Residential Address
-                        </span>
-                        <p className="text-gray-200 font-medium leading-relaxed">
-                          {activeStudent.address || 'Not Entered'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {needsProfileUpdate(activeStudent).needsAttention && (
-                    <form
-                      onSubmit={handleCompleteProfile}
-                      className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2.5 text-left"
-                    >
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-amber-200 font-black text-xs">
-                            Complete Official Cadet Profile
-                          </p>
-                          <p className="text-[10px] text-amber-100/80">
-                            Please enter missing Date of Birth / residential address / guardian name so exam forms & certificates stay accurate.
-                          </p>
-                        </div>
-                      </div>
-
-                      {profileMessage.text && (
-                        <div className={`px-3 py-2 rounded-xl text-[11px] font-bold ${
-                          profileMessage.type === 'success'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                        }`}>
-                          {profileMessage.text}
-                        </div>
-                      )}
-
-                      {needsProfileUpdate(activeStudent).missingDob && (
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-amber-400" /> Official Date of Birth *
-                          </label>
-                          <input
-                            type="date"
-                            required
-                            min="1940-01-01"
-                            max={getTodayISO()}
-                            value={profileForm.dob}
-                            onChange={(e) => setProfileForm({ ...profileForm, dob: e.target.value })}
-                            className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
-                          />
-                        </div>
-                      )}
-
-                      {needsProfileUpdate(activeStudent).missingAddress && (
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-amber-400" /> Full Residential Address *
-                          </label>
-                          <textarea
-                            rows={2}
-                            required
-                            placeholder="House Name, Place, Post Office, Pin Code..."
-                            value={profileForm.address}
-                            onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
-                            className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
-                          />
-                        </div>
-                      )}
-
-                      {needsProfileUpdate(activeStudent).missingGuardian && (
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-300">Parent / Guardian Name</label>
-                          <input
-                            type="text"
-                            placeholder="Father / Mother / Guardian full name"
-                            value={profileForm.guardianName}
-                            onChange={(e) => setProfileForm({ ...profileForm, guardianName: e.target.value })}
-                            className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
-                          />
-                        </div>
-                      )}
-
-                      <button
-                        type="submit"
-                        disabled={profileSaving}
-                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {profileSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                        <span>Save & Update Official Record</span>
-                      </button>
-                    </form>
-                  )}
                 </div>
+              )}
 
-                {/* RIGHT: GRADING / EXAMS / ATTENDANCE / DOJO ACTIONS */}
-                <div className="space-y-4">
+              {/* SECTION 3: EXAMS, BELTS & ATTENDANCE */}
+              {activeSection === 'EXAMS' && (
+                <div className="space-y-4 animate-in fade-in duration-150">
                   {/* Belt Grading & Exam Status */}
-                  <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-3">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-black/50 border border-white/10 space-y-3">
                     <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
                       <Award className="w-4 h-4 text-amber-400" /> Belt Grading & Exam Status
                     </h4>
@@ -1120,8 +1170,8 @@ export default function StudentPortalLogin() {
                   </div>
 
                   {/* Attendance Summary (only displayed when real backend attendance records exist) */}
-                  {attendanceStats && (
-                    <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-2">
+                  {attendanceStats ? (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-black/50 border border-white/10 space-y-2">
                       <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2">
                         <span className="flex items-center gap-1.5">
                           <Shield className="w-4 h-4 text-emerald-400" /> Class Attendance
@@ -1143,21 +1193,159 @@ export default function StudentPortalLogin() {
                         </div>
                       </div>
                     </div>
+                  ) : (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-black/50 border border-white/10 space-y-1.5 text-[11px]">
+                      <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
+                        <Clock className="w-4 h-4 text-amber-400" /> Training Batch Schedule
+                      </h4>
+                      <p className="text-white font-bold">{activeStudent.shift || 'Regular Dojo Timings'}</p>
+                      <p className="text-gray-400">
+                        Instructor: <strong className="text-amber-300">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong> • Branch: <strong className="text-white">{branchName}</strong>
+                      </p>
+                    </div>
                   )}
+                </div>
+              )}
 
-                  {/* Dojo Branch Info */}
-                  <div className="p-4 rounded-2xl bg-black/50 border border-white/10 space-y-1.5 text-[11px]">
+              {/* SECTION 4: PROFILE & DOJO INFO */}
+              {activeSection === 'PROFILE' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-150">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-black/50 border border-white/10 space-y-2.5">
                     <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
-                      <Building2 className="w-4 h-4 text-amber-400" /> Dojo Branch Info
+                      <Users className="w-4 h-4 text-blue-400" /> Cadet & Guardian Details
                     </h4>
-                    <p className="text-white font-bold">{branchName}</p>
-                    {activeStudent.branch_detail?.address && (
-                      <p className="text-gray-400">{activeStudent.branch_detail.address}</p>
+                    <div className="space-y-1.5 text-[11px]">
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Parent / Guardian:</span>
+                        <strong className="text-white text-right">{activeStudent.guardianName || activeStudent.guardian_name || 'Not Entered'}</strong>
+                      </div>
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Phone / WhatsApp:</span>
+                        <strong className="text-emerald-300 font-mono text-right">{activeStudent.phone || 'N/A'}</strong>
+                      </div>
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Date of Birth / Age:</span>
+                        <strong className="text-white font-mono text-right">
+                          {isValidStudentDOB(activeStudent.dob) ? `${normalizeDobToISO(activeStudent.dob)} (${ageLabel})` : ageLabel}
+                        </strong>
+                      </div>
+                      <div className="flex justify-between gap-2 border-b border-white/5 pb-1">
+                        <span className="text-gray-400">Gender & Blood:</span>
+                        <strong className="text-white inline-flex items-center gap-1 text-right">
+                          {activeStudent.gender || 'N/A'} • <Heart className="w-3 h-3 text-rose-400 inline" /> {activeStudent.bloodGroup || activeStudent.blood_group || 'O+'}
+                        </strong>
+                      </div>
+                      <div className="pt-1">
+                        <span className="text-gray-400 block text-[10px] uppercase font-bold mb-0.5">
+                          <MapPin className="w-3 h-3 text-red-400 inline mr-1" /> Residential Address
+                        </span>
+                        <p className="text-gray-200 font-medium leading-relaxed">
+                          {activeStudent.address || 'Not Entered'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {profileCheck.needsAttention && (
+                      <form
+                        onSubmit={handleCompleteProfile}
+                        className="p-4 sm:p-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2.5 text-left"
+                      >
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-amber-200 font-black text-xs">
+                              Complete Official Cadet Profile
+                            </p>
+                            <p className="text-[10px] text-amber-100/80">
+                              Please enter missing Date of Birth / residential address / guardian name so exam forms & certificates stay accurate.
+                            </p>
+                          </div>
+                        </div>
+
+                        {profileMessage.text && (
+                          <div className={`px-3 py-2 rounded-xl text-[11px] font-bold ${
+                            profileMessage.type === 'success'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          }`}>
+                            {profileMessage.text}
+                          </div>
+                        )}
+
+                        {profileCheck.missingDob && (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-amber-400" /> Official Date of Birth *
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              min="1940-01-01"
+                              max={getTodayISO()}
+                              value={profileForm.dob}
+                              onChange={(e) => setProfileForm({ ...profileForm, dob: e.target.value })}
+                              className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs font-bold focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+                        )}
+
+                        {profileCheck.missingAddress && (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-300 flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-amber-400" /> Full Residential Address *
+                            </label>
+                            <textarea
+                              rows={2}
+                              required
+                              placeholder="House Name, Place, Post Office, Pin Code..."
+                              value={profileForm.address}
+                              onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })}
+                              className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+                        )}
+
+                        {profileCheck.missingGuardian && (
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-300">Parent / Guardian Name</label>
+                            <input
+                              type="text"
+                              placeholder="Father / Mother / Guardian full name"
+                              value={profileForm.guardianName}
+                              onChange={(e) => setProfileForm({ ...profileForm, guardianName: e.target.value })}
+                              className="w-full bg-black/60 border border-white/15 rounded-xl px-3 py-2 text-white text-xs focus:border-amber-400 focus:outline-none"
+                            />
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={profileSaving}
+                          className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-black font-black text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {profileSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                          <span>Save & Update Official Record</span>
+                        </button>
+                      </form>
                     )}
-                    <p className="text-gray-300 font-mono">Dojo Helpline: +91 95440 85442</p>
+
+                    {/* Dojo Branch Info */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-black/50 border border-white/10 space-y-1.5 text-[11px]">
+                      <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-2">
+                        <Building2 className="w-4 h-4 text-amber-400" /> Dojo Branch Info
+                      </h4>
+                      <p className="text-white font-bold">{branchName}</p>
+                      <p className="text-gray-300">{activeStudent.shift || 'Regular Dojo Timings'}</p>
+                      {activeStudent.branch_detail?.address && (
+                        <p className="text-gray-400">{activeStudent.branch_detail.address}</p>
+                      )}
+                      <p className="text-gray-300 font-mono pt-1">Dojo Helpline: +91 95440 85442</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* PRINTABLE OFFICIAL FEE STATEMENT / RECEIPT MODAL */}
               {showReceiptModal && (
