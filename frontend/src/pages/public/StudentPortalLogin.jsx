@@ -4,7 +4,7 @@ import {
   Shield, Lock, Calendar, Phone, ArrowRight, AlertCircle,
   Loader2, CheckCircle2, Users, CreditCard, RefreshCw, Printer,
   Check, Building2, MapPin, Award, Clock, MessageSquare, Heart, LogOut, X,
-  LayoutGrid, User
+  LayoutGrid, User, CalendarCheck
 } from 'lucide-react';
 import {
   getStudentPortalAuth,
@@ -131,9 +131,10 @@ export default function StudentPortalLogin() {
     if (!Array.isArray(recs) || recs.length === 0) return null;
     const present = recs.filter((a) => ['present', 'late'].includes(String(a.status || '').toLowerCase())).length;
     const absent = recs.filter((a) => String(a.status || '').toLowerCase() === 'absent').length;
+    const late = recs.filter((a) => String(a.status || '').toLowerCase() === 'late').length;
     const total = recs.length;
-    const pct = total > 0 ? Math.round((present / total) * 100) : 0;
-    return { present, absent, total, pct };
+    const pct = total > 0 ? Math.round((present / total) * 100) : 100;
+    return { present, absent, late, total, pct };
   }, [portalDetails.attendanceRecords]);
 
   const handleCompleteProfile = async (e) => {
@@ -656,6 +657,13 @@ export default function StudentPortalLogin() {
               badgeTone: feeSummary.totalPending > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500/25 text-emerald-300'
             },
             {
+              id: 'ATTENDANCE',
+              label: 'Attendance',
+              icon: CalendarCheck,
+              badge: attendanceStats ? `${attendanceStats.pct}%` : 'Good',
+              badgeTone: (attendanceStats?.pct ?? 100) >= 75 ? 'bg-emerald-500/25 text-emerald-300' : 'bg-rose-500/25 text-rose-300'
+            },
+            {
               id: 'EXAMS',
               label: 'Exams & Belt',
               icon: Award,
@@ -886,8 +894,8 @@ export default function StudentPortalLogin() {
               </div>
 
               {/* SECTION TABS NAVIGATION DOCK */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-inner">
-                {sectionTabs.map((tab) => {
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-inner">
+                {sectionTabs.map((tab, idx) => {
                   const IconComp = tab.icon;
                   const isActive = activeSection === tab.id;
                   return (
@@ -895,7 +903,9 @@ export default function StudentPortalLogin() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveSection(tab.id)}
-                      className={`px-3 py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                      className={`px-2.5 py-2.5 rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                        idx === 4 ? 'col-span-2 sm:col-span-1' : ''
+                      } ${
                         isActive
                           ? 'bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white shadow-lg shadow-red-600/25'
                           : 'text-gray-300 hover:text-white hover:bg-white/[0.06]'
@@ -981,8 +991,13 @@ export default function StudentPortalLogin() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-amber-400/35 hover:-translate-y-0.5 transition space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setActiveSection('FEES')}
+                      className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-amber-400/35 hover:-translate-y-0.5 transition space-y-2 cursor-pointer"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Billing Plan</span>
                         <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-300">
@@ -992,33 +1007,68 @@ export default function StudentPortalLogin() {
                       <strong className="text-base font-black text-white font-mono block">
                         ₹{feeSummary.feeRate.toLocaleString()} <span className="text-[11px] font-sans text-gray-400">{feeSummary.isQuarterly ? '/ 3 Mos' : '/ Mo'}</span>
                       </strong>
-                      <p className="text-[10px] text-gray-400">
-                        Paid: <strong className="text-emerald-300 font-mono">₹{feeSummary.totalPaid.toLocaleString()}</strong> • Due: <strong className={feeSummary.totalPending > 0 ? 'text-rose-300 font-mono' : 'text-emerald-300 font-mono'}>₹{feeSummary.totalPending.toLocaleString()}</strong>
+                      <p className="text-[10px] text-gray-400 flex items-center justify-between">
+                        <span>Paid: <strong className="text-emerald-300 font-mono">₹{feeSummary.totalPaid.toLocaleString()}</strong></span>
+                        <span className="text-amber-400 font-bold">Ledger →</span>
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-blue-400/35 hover:-translate-y-0.5 transition space-y-2">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setActiveSection('ATTENDANCE')}
+                      className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-emerald-400/35 hover:-translate-y-0.5 transition space-y-2 cursor-pointer"
+                    >
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Course & Cadet</span>
+                        <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Class Attendance</span>
+                        <span className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+                          <CalendarCheck className="w-3.5 h-3.5" />
+                        </span>
+                      </div>
+                      <strong className="text-base font-black text-emerald-300 font-mono block">
+                        {attendanceStats ? `${attendanceStats.pct}%` : '100%'}
+                        <span className="text-[11px] font-sans text-gray-400 ml-1.5 font-normal">
+                          {attendanceStats ? `(${attendanceStats.present}/${attendanceStats.total})` : '(Good Standing)'}
+                        </span>
+                      </strong>
+                      <p className="text-[10px] text-gray-400 flex items-center justify-between">
+                        <span>{attendanceStats?.absent ? `${attendanceStats.absent} Missed` : 'Regular attendance'}</span>
+                        <span className="text-emerald-400 font-bold">Details →</span>
+                      </p>
+                    </div>
+
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setActiveSection('EXAMS')}
+                      className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-blue-400/35 hover:-translate-y-0.5 transition space-y-2 cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Discipline & Belt</span>
                         <span className="w-7 h-7 rounded-lg bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-300">
                           <Award className="w-3.5 h-3.5" />
                         </span>
                       </div>
-                      <strong className="text-sm font-black text-blue-300 block">{programName}</strong>
-                      <p className="text-[10px] text-gray-300">{beltRank} • {ageLabel} • {activeStudent.bloodGroup || activeStudent.blood_group || 'O+'}</p>
+                      <strong className="text-sm font-black text-blue-300 block truncate">{beltRank}</strong>
+                      <p className="text-[10px] text-gray-300">{programName} • {ageLabel}</p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-emerald-400/35 hover:-translate-y-0.5 transition space-y-2">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setActiveSection('PROFILE')}
+                      className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-purple-400/35 hover:-translate-y-0.5 transition space-y-2 cursor-pointer"
+                    >
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Guardian & Dojo</span>
-                        <span className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Dojo & Shift</span>
+                        <span className="w-7 h-7 rounded-lg bg-purple-500/15 border border-purple-400/30 flex items-center justify-center text-purple-300">
                           <Users className="w-3.5 h-3.5" />
                         </span>
                       </div>
                       <strong className="text-sm font-black text-white block truncate">
-                        {activeStudent.guardianName || activeStudent.guardian_name || 'Not Entered'}
+                        {branchName}
                       </strong>
-                      <p className="text-[10px] text-emerald-300 font-mono">{activeStudent.phone || 'N/A'}</p>
+                      <p className="text-[10px] text-purple-300 truncate">{activeStudent.shift || 'Regular Shift'}</p>
                     </div>
                   </div>
 
@@ -1326,12 +1376,134 @@ export default function StudentPortalLogin() {
                 </div>
               )}
 
-              {/* SECTION 3: EXAMS, BELTS & ATTENDANCE */}
+              {/* SECTION 3: ATTENDANCE */}
+              {activeSection === 'ATTENDANCE' && (
+                <div className="p-5 sm:p-6 rounded-3xl bg-[#0D1017]/90 border border-white/10 backdrop-blur-xl shadow-xl space-y-5 animate-in fade-in duration-150">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3.5">
+                    <div>
+                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400/90 block">03 / Cadet Attendance</span>
+                      <h3 className="text-sm sm:text-base font-black text-white mt-0.5">Dojo Training & Class Attendance</h3>
+                    </div>
+                    <span className="self-start sm:self-auto px-3 py-1 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      🥋 {activeStudent.shift || 'Regular Dojo Shift'}
+                    </span>
+                  </div>
+
+                  {/* Top Attendance Metric Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Attendance Rate</span>
+                      <strong className="text-xl font-black text-emerald-300 font-mono mt-1 block">
+                        {attendanceStats ? `${attendanceStats.pct}%` : '100%'}
+                      </strong>
+                      <span className="text-[10px] text-gray-400">Regularity Status</span>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Classes Attended</span>
+                      <strong className="text-xl font-black text-emerald-400 font-mono mt-1 block">
+                        {attendanceStats ? attendanceStats.present : 0}
+                      </strong>
+                      <span className="text-[10px] text-gray-400">Present Sessions</span>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Absences</span>
+                      <strong className={`text-xl font-black font-mono mt-1 block ${(attendanceStats?.absent || 0) > 0 ? 'text-rose-400' : 'text-gray-300'}`}>
+                        {attendanceStats ? attendanceStats.absent : 0}
+                      </strong>
+                      <span className="text-[10px] text-gray-400">Missed Sessions</span>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">Total Recorded</span>
+                      <strong className="text-xl font-black text-white font-mono mt-1 block">
+                        {attendanceStats ? attendanceStats.total : 0}
+                      </strong>
+                      <span className="text-[10px] text-gray-400">Total Dojo Classes</span>
+                    </div>
+                  </div>
+
+                  {/* Batch Schedule Banner */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-black to-black border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 flex-shrink-0">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <strong className="text-white text-xs block">{activeStudent.shift || 'Regular Dojo Batch Schedule'}</strong>
+                        <span className="text-[11px] text-gray-300">
+                          Instructor: <strong className="text-amber-300">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong> • Branch: <strong className="text-white">{branchName}</strong>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-gray-400 flex items-center gap-1.5 self-start sm:self-auto">
+                      <Shield className="w-3.5 h-3.5 text-amber-400" />
+                      <span>75% attendance required for Belt Exam</span>
+                    </div>
+                  </div>
+
+                  {/* Attendance Log Table or Empty State */}
+                  {portalDetails.attendanceRecords && portalDetails.attendanceRecords.length > 0 ? (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-black/45 border border-white/10 space-y-3">
+                      <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2.5">
+                        <span className="flex items-center gap-2">
+                          <CalendarCheck className="w-4 h-4 text-emerald-400" />
+                          <span>Class-by-Class Attendance Record</span>
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {portalDetails.attendanceRecords.length} sessions logged
+                        </span>
+                      </h4>
+                      <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
+                        {portalDetails.attendanceRecords.map((rec, rIdx) => {
+                          const statLower = String(rec.status || 'present').toLowerCase();
+                          const isPresent = statLower === 'present';
+                          const isLate = statLower === 'late';
+                          return (
+                            <div key={rec.id || rIdx} className="py-2.5 flex items-center justify-between text-xs">
+                              <div>
+                                <strong className="text-white block font-mono text-[11px]">
+                                  {rec.date ? new Date(rec.date).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : `Session #${rIdx + 1}`}
+                                </strong>
+                                {rec.remarks && <span className="text-[10px] text-gray-400">{rec.remarks}</span>}
+                              </div>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                isPresent
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : isLate
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              }`}>
+                                {isPresent ? '✓ Present' : isLate ? '◷ Late' : '✕ Absent'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 rounded-2xl bg-black/40 border border-white/10 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mx-auto">
+                        <CheckCircle2 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-black text-sm">Attendance In Good Standing</h4>
+                        <p className="text-xs text-gray-300 max-w-md mx-auto mt-1">
+                          No class absences or disciplinary flags recorded for <strong className="text-amber-300">{activeStudent.name}</strong>. Physical attendance is verified daily by Sensei during dojo batch sessions.
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-gray-300 text-[11px] font-bold">
+                        <span>🥋 Dojo Shift: {activeStudent.shift || 'Regular Batch Schedule'}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SECTION 4: EXAMS & BELTS */}
               {activeSection === 'EXAMS' && (
                 <div className="p-5 sm:p-6 rounded-3xl bg-[#0D1017]/90 border border-white/10 backdrop-blur-xl shadow-xl space-y-5 animate-in fade-in duration-150">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3.5">
                     <div>
-                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/90 block">03 / Exams & Training</span>
+                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/90 block">04 / Exams & Training</span>
                       <h3 className="text-sm sm:text-base font-black text-white mt-0.5">Belt Grading Progress & Batch Schedule</h3>
                     </div>
                     <span className={`self-start sm:self-auto px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${beltBadgeClasses}`}>
@@ -1403,56 +1575,37 @@ export default function StudentPortalLogin() {
                     </div>
                   </div>
 
-                  {/* Attendance Summary (only displayed when real backend attendance records exist) */}
-                  {attendanceStats ? (
-                    <div className="p-4 sm:p-5 rounded-2xl bg-black/45 border border-white/10 space-y-3">
-                      <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center justify-between border-b border-white/10 pb-2.5">
-                        <span className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-400/25 inline-flex items-center justify-center">
-                            <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                          </span>
-                          <span>Class Attendance</span>
+                  {/* Attendance Link Card */}
+                  <div className="p-4 rounded-2xl bg-black/45 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-400/25 flex items-center justify-center text-emerald-300 flex-shrink-0">
+                        <CalendarCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <strong className="text-white block">Class Attendance Status</strong>
+                        <span className="text-[11px] text-gray-300">
+                          {attendanceStats ? `${attendanceStats.pct}% attendance (${attendanceStats.present}/${attendanceStats.total} sessions)` : 'Good standing — 75% attendance required for Belt Exam'}
                         </span>
-                        <strong className="text-emerald-300 font-mono text-sm">{attendanceStats.pct}%</strong>
-                      </h4>
-                      <div className="grid grid-cols-3 gap-2.5 text-center text-[11px]">
-                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
-                          <strong className="block text-emerald-300 font-mono text-base">{attendanceStats.present}</strong>
-                          <span className="text-[10px] text-gray-400 font-bold">Present</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/25">
-                          <strong className="block text-rose-300 font-mono text-base">{attendanceStats.absent}</strong>
-                          <span className="text-[10px] text-gray-400 font-bold">Absent</span>
-                        </div>
-                        <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-                          <strong className="block text-white font-mono text-base">{attendanceStats.total}</strong>
-                          <span className="text-[10px] text-gray-400 font-bold">Total Classes</span>
-                        </div>
                       </div>
                     </div>
-                  ) : (
-                    <div className="p-4 sm:p-5 rounded-2xl bg-black/45 border border-white/10 space-y-2 text-[11px]">
-                      <h4 className="text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 border-b border-white/10 pb-2.5">
-                        <span className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-400/25 inline-flex items-center justify-center">
-                          <Clock className="w-3.5 h-3.5 text-amber-400" />
-                        </span>
-                        <span>Training Batch Schedule</span>
-                      </h4>
-                      <p className="text-white font-bold text-xs">{activeStudent.shift || 'Regular Dojo Timings'}</p>
-                      <p className="text-gray-400">
-                        Instructor: <strong className="text-amber-300">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong> • Branch: <strong className="text-white">{branchName}</strong>
-                      </p>
-                    </div>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection('ATTENDANCE')}
+                      className="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] rounded-xl transition cursor-pointer self-start sm:self-auto flex items-center gap-1.5"
+                    >
+                      <span>View Log</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* SECTION 4: PROFILE & DOJO INFO */}
+              {/* SECTION 5: PROFILE & DOJO INFO */}
               {activeSection === 'PROFILE' && (
                 <div className="p-5 sm:p-6 rounded-3xl bg-[#0D1017]/90 border border-white/10 backdrop-blur-xl shadow-xl space-y-5 animate-in fade-in duration-150">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3.5">
                     <div>
-                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/90 block">04 / Profile & Dojo</span>
+                      <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/90 block">05 / Profile & Dojo</span>
                       <h3 className="text-sm sm:text-base font-black text-white mt-0.5">Official Cadet Record & Branch Details</h3>
                     </div>
                     <span className="text-[11px] font-mono text-gray-400">ID: {admNo}</span>

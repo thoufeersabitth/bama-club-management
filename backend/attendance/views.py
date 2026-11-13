@@ -40,7 +40,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if date_param:
             queryset = queryset.filter(date=date_param)
         if student_id:
-            queryset = queryset.filter(student_id=student_id)
+            try:
+                s_uuid = uuid.UUID(str(student_id).strip())
+                queryset = queryset.filter(student_id=s_uuid)
+            except (ValueError, TypeError, AttributeError):
+                queryset = queryset.filter(student__admission_no__iexact=str(student_id).strip())
         return queryset
 
     def create(self, request, *args, **kwargs):

@@ -3881,7 +3881,7 @@ export const fetchStudentPortalDetails = async (student) => {
     fetchFeeSettings(),
     api.get('/grading-registrations/?page_size=1000&limit=1000'),
     api.get('/belt-gradings/?page_size=1000&limit=1000'),
-    targetId ? api.get(`/attendance/?student=${encodeURIComponent(targetId)}&page_size=1000`) : Promise.resolve({ data: [] }),
+    (targetId || targetAdm) ? api.get(`/attendance/?student=${encodeURIComponent(targetId || targetAdm)}&page_size=1000`) : Promise.resolve({ data: [] }),
   ]);
 
   let latestStudent = student;
@@ -3910,7 +3910,45 @@ export const fetchStudentPortalDetails = async (student) => {
   const rawAtt = attRes.status === 'fulfilled'
     ? (attRes.value?.data?.results || attRes.value?.data || [])
     : [];
-  const attendanceRecords = Array.isArray(rawAtt) ? rawAtt.filter((a) => matchesCadet(a)) : [];
+  let attendanceRecords = Array.isArray(rawAtt) ? rawAtt.filter((a) => matchesCadet(a)) : [];
+
+  // Resilient fallback: If server attendance is empty, check localStorage cached attendance records
+  if (attendanceRecords.length === 0 && typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const localRecords = [];
+      const keys = Object.keys(localStorage);
+      for (const k of keys) {
+        if (k.startsWith('bama_attendance_') && !k.includes('summary')) {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              const dateMatch = k.match(/\d{4}-\d{2}-\d{2}/);
+              const dateVal = dateMatch ? dateMatch[0] : '';
+              for (const [stKey, stat] of Object.entries(parsed)) {
+                if (
+                  (targetId && String(stKey).toLowerCase() === targetId.toLowerCase()) ||
+                  (targetAdm && norm(stKey) === targetAdm) ||
+                  (norm(student.name || student.student_name) && norm(stKey) === norm(student.name || student.student_name))
+                ) {
+                  localRecords.push({
+                    id: `local-${k}-${stKey}`,
+                    date: dateVal,
+                    status: stat,
+                    remarks: 'Recorded at Dojo'
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+      if (localRecords.length > 0) {
+        localRecords.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        attendanceRecords = localRecords;
+      }
+    } catch (e) {}
+  }
 
   return {
     student: latestStudent,
