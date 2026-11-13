@@ -525,7 +525,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     setIsLoading(true);
     try {
       const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_grading_ids') || '[]');
-      const res = await fetch(`${API_ROOT}/grading-registrations/`);
+      const res = await fetch(`${API_ROOT}/grading-registrations/?page_size=1000&limit=1000`);
       if (res.ok) {
         const data = await res.json();
         const rawList = Array.isArray(data) ? data : (data.results || []);
@@ -570,18 +570,67 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       const candPhone = String(r.phone || '').replace(/\D/g, '');
       const candName = String(r.student_name || r.name || '').toLowerCase().trim();
 
-      const candidateStudent = (students || []).find(st => {
-        const stAdm = String(st.admissionNo || st.admission_no || '').trim().toLowerCase();
-        const stPhone = String(st.phone || st.whatsapp || '').replace(/\D/g, '');
-        const stName = String(st.name || '').toLowerCase().trim();
+      // Bulletproof Sibling-Safe Student Resolver:
+      // Siblings share parent's phone number! NEVER blindly match by phone first.
+      const candidateStudent = (() => {
+        if (!students || students.length === 0) return null;
 
-        if (r.student && String(st.id) === String(r.student)) return true;
-        if (r.student_db_id && String(st.id) === String(r.student_db_id)) return true;
-        if (candAdm && stAdm && candAdm === stAdm) return true;
-        if (candName && stName && (candName === stName || candName.includes(stName) || stName.includes(candName))) return true;
-        if (candPhone && stPhone && candPhone.length >= 10 && stPhone.length >= 10 && (candPhone.endsWith(stPhone) || stPhone.endsWith(candPhone))) return true;
-        return false;
-      });
+        // 1. Direct database UUID match
+        const directId = r.student || r.student_db_id;
+        if (directId) {
+          const byId = students.find(st => String(st.id) === String(directId));
+          if (byId) return byId;
+        }
+
+        // 2. Exact Admission Number match (100% unique per cadet)
+        if (candAdm) {
+          const byAdm = students.find(st => {
+            const stAdm = String(st.admissionNo || st.admission_no || '').trim().toLowerCase();
+            return stAdm && stAdm === candAdm;
+          });
+          if (byAdm) return byAdm;
+        }
+
+        // 3. Name match (exact or compatible normalized name)
+        if (candName && candName.length >= 3) {
+          const byName = students.find(st => {
+            const stName = String(st.name || '').toLowerCase().trim();
+            if (!stName) return false;
+            if (stName === candName) return true;
+            const cClean = candName.replace(/[^a-z]/g, '');
+            const sClean = stName.replace(/[^a-z]/g, '');
+            if (cClean.length >= 4 && sClean.length >= 4 && (cClean === sClean || cClean.includes(sClean) || sClean.includes(cClean))) {
+              return true;
+            }
+            return false;
+          });
+          if (byName) return byName;
+        }
+
+        // 4. Phone Match ONLY as last resort when admission_no and name don't contradict (prevents sibling hijack!)
+        if (candPhone && candPhone.length >= 10) {
+          const phoneMatches = students.filter(st => {
+            const stPhone = String(st.phone || st.whatsapp || '').replace(/\D/g, '');
+            return stPhone && stPhone.length >= 10 && (stPhone === candPhone || stPhone.endsWith(candPhone) || candPhone.endsWith(stPhone));
+          });
+          if (phoneMatches.length === 1) {
+            const single = phoneMatches[0];
+            const singleAdm = String(single.admissionNo || single.admission_no || '').trim().toLowerCase();
+            if (!candAdm || !singleAdm || candAdm === singleAdm) return single;
+          } else if (phoneMatches.length > 1) {
+            // Multiple siblings found with same phone! Pick the one whose name best matches candName
+            const bestSibling = phoneMatches.find(st => {
+              const stName = String(st.name || '').toLowerCase().trim();
+              const cClean = candName.replace(/[^a-z]/g, '');
+              const sClean = stName.replace(/[^a-z]/g, '');
+              return cClean && sClean && (cClean.includes(sClean) || sClean.includes(cClean));
+            });
+            if (bestSibling) return bestSibling;
+          }
+        }
+
+        return null;
+      })();
 
       // PRESERVE SUBMITTED REGISTRATION APPLICATION DETAILS:
       // If student submitted an official application, respect what they applied for!
@@ -696,15 +745,15 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       }
     });
 
-    // Deduplicate candidate roster strictly by unique student identity
+    // Deduplicate candidate roster strictly by unique student identity (Admission No takes precedence)
     const uniqueCandidatesMap = new Map();
     list.forEach(c => {
-      const key = String(c.student_db_id || c.student || c.admission_no || c.student_name || c.id).toLowerCase().trim();
+      const key = String(c.admission_no || c.student_db_id || c.student || c.student_name || c.id).toLowerCase().trim();
       if (!uniqueCandidatesMap.has(key)) {
         uniqueCandidatesMap.set(key, c);
       } else {
         const existing = uniqueCandidatesMap.get(key);
-        // Prefer official backend registration (numeric ID) over cadet- placeholder ID!
+        // Prefer official backend registration over cadet- placeholder ID!
         if (String(existing.id).startsWith('cadet-') && !String(c.id).startsWith('cadet-')) {
           uniqueCandidatesMap.set(key, c);
         }

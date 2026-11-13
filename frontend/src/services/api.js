@@ -368,7 +368,15 @@ export const safeLocalStorageSet = (key, value) => {
             if (rawStudents) {
               let stParsed = JSON.parse(rawStudents);
               if (Array.isArray(stParsed)) {
-                stParsed = stParsed.map(s => ({ ...s, photo: '', avatar: '', image: '' }));
+                stParsed = stParsed.map(s => {
+                  const cleaned = { ...s };
+                  ['photo', 'avatar', 'image', 'img'].forEach(p => {
+                    if (typeof cleaned[p] === 'string' && cleaned[p].startsWith('data:image')) {
+                      cleaned[p] = '';
+                    }
+                  });
+                  return cleaned;
+                });
                 localStorage.setItem('bama_students_list', JSON.stringify(stParsed));
               }
             }
@@ -3859,15 +3867,21 @@ export const fetchStudentPortalDetails = async (student) => {
     if (!item) return false;
     const itemId = String(item[nestedKey]?.id || item.student || '').trim();
     const itemAdm = norm(item[nestedKey]?.admission_no || item[nestedKey]?.admissionNo || item.admission_no || item.admissionNo);
-    return (targetId && itemId && itemId === targetId) || (targetAdm && itemAdm && itemAdm === targetAdm);
+    const itemName = norm(item[nestedKey]?.name || item.student_name || item.name);
+    const targetName = norm(student.name || student.student_name);
+
+    if (targetId && itemId && itemId === targetId) return true;
+    if (targetAdm && itemAdm && itemAdm === targetAdm) return true;
+    if (targetName && itemName && targetName === itemName) return true;
+    return false;
   };
 
   const [studentsRes, feeSettingsRes, regRes, gradingsRes, attRes] = await Promise.allSettled([
     fetchStudents(),
     fetchFeeSettings(),
-    api.get('/grading-registrations/'),
-    api.get('/belt-gradings/'),
-    targetId ? api.get(`/attendance/?student=${encodeURIComponent(targetId)}`) : Promise.resolve({ data: [] }),
+    api.get('/grading-registrations/?page_size=1000&limit=1000'),
+    api.get('/belt-gradings/?page_size=1000&limit=1000'),
+    targetId ? api.get(`/attendance/?student=${encodeURIComponent(targetId)}&page_size=1000`) : Promise.resolve({ data: [] }),
   ]);
 
   let latestStudent = student;

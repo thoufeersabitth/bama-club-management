@@ -1394,7 +1394,8 @@ export default function StudentManagement() {
       const resolvedAge = normalizedDob
         ? calculateAgeFromDOB(normalizedDob)
         : (editingStudent.age ? parseInt(editingStudent.age, 10) || null : null);
-      const finalPhoto = editPhotoState.rawSrc ? (getCanvasDataUrl(editCanvasRef, editPhotoState.rawSrc) || editPhotoState.rawSrc) : editingStudent.photo;
+      const existingPhoto = editingStudent.photo || editingStudent.photoUrl || ((students || []).find(s => s.id === editingStudent.id || (s.admissionNo && s.admissionNo === editingStudent.admissionNo) || (s.admission_no && s.admission_no === editingStudent.admission_no))?.photo) || '';
+      const finalPhoto = editPhotoState.rawSrc ? (getCanvasDataUrl(editCanvasRef, editPhotoState.rawSrc) || editPhotoState.rawSrc) : existingPhoto;
       const initialPaid = parseInt(editingStudent.initialPaidAmount || editingStudent.initial_paid_amount || 0);
       const feeAmt = parseInt(editingStudent.feeAmount || editingStudent.fee_amount || 500);
       const admissionFeeAmt = editingStudent.admissionFee !== undefined ? Math.max(0, parseInt(editingStudent.admissionFee) || 0) : (editingStudent.admission_fee !== undefined ? Math.max(0, parseInt(editingStudent.admission_fee) || 0) : 1000);
