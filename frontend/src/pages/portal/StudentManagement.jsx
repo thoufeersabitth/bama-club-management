@@ -1573,9 +1573,9 @@ export default function StudentManagement() {
     const isSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'HEAD_OFFICE';
 
     let activeScope = 'ALL';
-    if (selectedBranch && selectedBranch !== 'ALL') {
+    if (selectedBranch) {
       activeScope = selectedBranch;
-    } else if (activeBranch && activeBranch !== 'ALL') {
+    } else if (activeBranch) {
       activeScope = activeBranch;
     }
 
@@ -1666,6 +1666,13 @@ export default function StudentManagement() {
     if (selectedTab === 'Inactive') matchesTab = isInactive;
     if (selectedTab === 'AdmissionFeePending') matchesTab = isAdmissionFeePending;
     if (selectedTab === 'MissingInfo') matchesTab = needsProfileUpdate(s).needsAttention;
+
+    // Global Search Override: If user specifically searches for a cadet by name, admission no, or phone,
+    // ensure matching cadets are never hidden by active branch or shift filter!
+    const hasSearch = search && search.trim().length > 0;
+    if (hasSearch && matchesSearch) {
+      return matchesBelt && matchesProgram && matchesCategory && matchesPlan && matchesTab;
+    }
 
     return matchesSearch && matchesBelt && matchesBranch && matchesProgram && matchesShiftFilter && matchesCategory && matchesPlan && matchesTab;
   });

@@ -660,23 +660,33 @@ export default function AttendanceManagement() {
   const totalCount = baseBranchShiftStudents.length;
   const attendanceRate = isHoliday ? '100.0' : (totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 100);
 
-  // Final filtered list considering search and active status filter
-  const filteredStudents = baseBranchShiftStudents.filter(s => {
+  // Final filtered list considering search and active status filter (searches across academy if searchQuery is active)
+  const filteredStudents = (() => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchName = (s.name || '').toLowerCase().includes(q);
-      const matchAdm = (s.admissionNo || s.admission_no || '').toLowerCase().includes(q);
-      const matchBelt = (s.beltRank || s.currentBelt || '').toLowerCase().includes(q);
-      if (!matchName && !matchAdm && !matchBelt) return false;
+      return (students || []).filter(s => {
+        const matchName = (s.name || '').toLowerCase().includes(q);
+        const matchAdm = (s.admissionNo || s.admission_no || '').toLowerCase().includes(q);
+        const matchBelt = (s.beltRank || s.currentBelt || '').toLowerCase().includes(q);
+        const matchPhone = (s.phone || s.whatsapp || '').includes(q);
+        if (!matchName && !matchAdm && !matchBelt && !matchPhone) return false;
+
+        if (statusFilter !== 'ALL') {
+          const stStatus = attendanceRecords[s.id || s.admissionNo] || 'PRESENT';
+          if (stStatus !== statusFilter) return false;
+        }
+        return true;
+      });
     }
 
-    if (statusFilter !== 'ALL') {
-      const stStatus = attendanceRecords[s.id || s.admissionNo] || 'PRESENT';
-      if (stStatus !== statusFilter) return false;
-    }
-
-    return true;
-  });
+    return baseBranchShiftStudents.filter(s => {
+      if (statusFilter !== 'ALL') {
+        const stStatus = attendanceRecords[s.id || s.admissionNo] || 'PRESENT';
+        if (stStatus !== statusFilter) return false;
+      }
+      return true;
+    });
+  })();
 
   // Format phone number for WhatsApp
   const formatWhatsAppPhone = (phoneStr) => {
