@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Award, Shield, Search, Filter, Printer, CheckCircle2, AlertCircle,
   Check, X, RefreshCw, UserCheck, CreditCard, FileText, ExternalLink,
-  Share2, Copy, Send, QrCode, Trash2, Trophy
+  Share2, Copy, Send, QrCode, Trash2, Trophy, Receipt
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
+import ExamFeeReceipt from '../../components/grading/ExamFeeReceipt';
+import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
 import { fetchStudents, updateStudent, invalidateStudentsCache, saveStoredStudents, openWhatsApp, fetchBeltExamFeesBackend, saveBeltExamFeesBackend } from '../../services/api';
 import { calculateAgeFromDOB, isPlaceholderText, normalizeDobToISO } from '../../utils/studentValidation';
 import { useAuth } from '../../context/AuthContext';
@@ -314,12 +316,29 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     openWhatsApp({ message: text });
   };
 
-  // Bulk Print Forms Handler
+  // States for Dedicated Print & Receipt Engine
+  const [printModalCandidate, setPrintModalCandidate] = useState(null);
+  const [printDocType, setPrintDocType] = useState('FORM'); // 'FORM' | 'RECEIPT'
+  const [bulkPrintCandidates, setBulkPrintCandidates] = useState([]);
+
+  // Open Single Candidate Print & Receipt Center
+  const handleOpenPrintModal = (candidate, defaultDocType = 'FORM') => {
+    setBulkPrintCandidates([]);
+    setPrintModalCandidate(candidate);
+    const isPaid = String(candidate?.payment_status || '').toLowerCase().includes('paid');
+    setPrintDocType(defaultDocType === 'RECEIPT' || (isPaid && defaultDocType !== 'FORM') ? 'RECEIPT' : 'FORM');
+  };
+
+  // Bulk Print Forms Handler (Multi-page clean print, strictly 1 page per cadet)
   const handleBulkPrintForms = () => {
-    const selectedList = filteredRegs.filter(r => selectedCandidateIds.includes(r.id));
-    if (!selectedList.length) return;
-    setSelectedPrintReg(selectedList[0]);
-    setTimeout(() => window.print(), 300);
+    const selectedList = combinedCandidates.filter(c => selectedCandidateIds.includes(c.id));
+    if (!selectedList.length) {
+      alert('Please select at least one candidate using the checkboxes first.');
+      return;
+    }
+    setPrintModalCandidate(null);
+    setBulkPrintCandidates(selectedList);
+    triggerBamaPrint(250);
   };
 
   // Bulk Mark Paid Handler (Proper Async Backend Sync)
@@ -1099,12 +1118,9 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     }
   };
 
-  // Trigger Print
-  const triggerPrintForm = (reg) => {
-    setSelectedPrintReg(reg);
-    setTimeout(() => {
-      window.print();
-    }, 300);
+  // Trigger Print & Receipt Center Modal
+  const triggerPrintForm = (reg, docType = 'FORM') => {
+    handleOpenPrintModal(reg, docType);
   };
 
   return (
@@ -1561,9 +1577,9 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                   </button>
 
                   <button
-                    onClick={() => triggerPrintForm(r)}
+                    onClick={() => handleOpenPrintModal(r, String(r.payment_status || '').toLowerCase().includes('paid') ? 'RECEIPT' : 'FORM')}
                     className="p-2 bg-gray-100 hover:bg-gray-900 text-gray-700 hover:text-white border border-gray-200 rounded-xl transition cursor-pointer shadow-sm flex items-center justify-center flex-shrink-0"
-                    title="Print Form"
+                    title={String(r.payment_status || '').toLowerCase().includes('paid') ? "Print Exam Fee Receipt or Official Form" : "Print Official Kyu/Dan Form"}
                   >
                     <Printer className="w-4 h-4" />
                   </button>
@@ -2264,13 +2280,12 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                     type="button"
                     onClick={() => {
                       const target = viewFormCandidate;
-                      setViewFormCandidate(null);
-                      triggerPrintForm(target);
+                      handleOpenPrintModal(target, 'FORM');
                     }}
                     className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition cursor-pointer flex items-center gap-2 shadow-xs"
                   >
                     <Printer className="w-4 h-4 text-gray-700" />
-                    <span>🖨️ Print Form</span>
+                    <span>🖨️ Print Form / Receipt</span>
                   </button>
 
                   {(normalizeDobToISO(c.dob) || (c.address && !isPlaceholderText(c.address))) && (c.student || c.admission_no) && (
@@ -2361,12 +2376,189 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
         );
       })()}
 
-      {/* Hidden Printable Component */}
-      {selectedPrintReg && (
-        <div className="hidden">
-          <GradingFormPrint reg={selectedPrintReg} />
+      {/* =========================================================================
+          CANDIDATE DEDICATED PRINT & RECEIPT CENTER MODAL
+          ========================================================================= */}
+      {printModalCandidate && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto bama-no-print">
+          <div className="w-full max-w-4xl bg-[#0F111A] text-white rounded-3xl border border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            
+            {/* Modal Top Header Bar */}
+            <div className="px-6 py-4 bg-gradient-to-r from-[#171A29] to-[#0F111A] border-b border-gray-800 flex items-center justify-between gap-4 flex-shrink-0">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                    PRINT & RECEIPT CENTER
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase font-mono border ${
+                    String(printModalCandidate.payment_status || '').toLowerCase().includes('paid')
+                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                  }`}>
+                    {printModalCandidate.payment_status || 'Pending'}
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <span>{printModalCandidate.student_name}</span>
+                  <span className="text-xs text-gray-400 font-mono font-normal">
+                    (Adm: {printModalCandidate.admission_no || printModalCandidate.registration_no || 'BAMA'})
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-400">
+                  {printModalCandidate.current_belt || 'White Belt'} ➔ <strong className="text-amber-400">{printModalCandidate.target_belt}</strong> • {printModalCandidate.branch_name} • Fee: ₹{printModalCandidate.exam_fee || 1500}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPrintModalCandidate(null)}
+                className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center justify-center transition cursor-pointer flex-shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Document Type Switcher Tabs & Quick Actions */}
+            <div className="px-6 py-3 bg-[#131627] border-b border-gray-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+              {/* Document Select Tabs */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setPrintDocType('FORM')}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer border ${
+                    printDocType === 'FORM'
+                      ? 'bg-amber-500 text-black border-amber-400 shadow-md font-black'
+                      : 'bg-gray-800/60 text-gray-300 border-gray-700/60 hover:bg-gray-800'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>🥋 Official Kyu/Dan Exam Form</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPrintDocType('RECEIPT')}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer border ${
+                    printDocType === 'RECEIPT'
+                      ? 'bg-emerald-500 text-black border-emerald-400 shadow-md font-black'
+                      : 'bg-gray-800/60 text-gray-300 border-gray-700/60 hover:bg-gray-800'
+                  }`}
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>🧾 Exam Fee Receipt Slip</span>
+                </button>
+              </div>
+
+              {/* Action Buttons: Print & WhatsApp */}
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = printModalCandidate;
+                    const fee = c.exam_fee || 1500;
+                    const isPaid = String(c.payment_status || '').toLowerCase().includes('paid');
+                    const text = printDocType === 'RECEIPT'
+                      ? `*B.A.M.A. BELT GRADING EXAM FEE RECEIPT*\n` +
+                        `----------------------------------------\n` +
+                        `Cadet Name: *${c.student_name}*\n` +
+                        `Admission No: *${c.admission_no || c.registration_no || 'BAMA'}*\n` +
+                        `Branch Dojo: *${c.branch_name}*\n` +
+                        `Belt Promotion: *${c.current_belt || 'White'}* ➔ *${c.target_belt}*\n` +
+                        `Exam Fee: *₹${fee}* (${isPaid ? 'PAID & VERIFIED ✅' : 'PENDING ⏳'})\n` +
+                        `Receipt No: *EXAM-REC-${c.registration_no || c.admission_no || '2026'}*\n\n` +
+                        `_Japan Karate Association (JKA) Affiliated_\n` +
+                        `Chief Examiner: Sensei Abdul Rahman (+91 95440 85442)`
+                      : `*B.A.M.A. BELT GRADING EXAM APPLICATION FORM*\n` +
+                        `----------------------------------------\n` +
+                        `Cadet Name: *${c.student_name}*\n` +
+                        `Ref No: *#${c.registration_no || c.admission_no || 'BAMA'}*\n` +
+                        `Target Belt: *${c.target_belt}*\n` +
+                        `Dojo Branch: *${c.branch_name}*\n` +
+                        `Fee Status: *₹${fee}* (${c.payment_status || 'Pending'})\n\n` +
+                        `Please carry your Kyu Exam form or fee receipt on examination day.\n` +
+                        `Brave Academy of Martial Arts (+91 95440 85442)`;
+
+                    const phoneClean = String(c.phone || '').replace(/\D/g, '');
+                    if (phoneClean.length >= 10) {
+                      window.open(`https://wa.me/91${phoneClean.slice(-10)}?text=${encodeURIComponent(text)}`, '_blank');
+                    } else {
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-sm"
+                  title="Share Receipt or Form to Candidate WhatsApp"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => triggerBamaPrint()}
+                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition cursor-pointer active:scale-98"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print 1-Page PDF</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Document Live Preview Area */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#0a0c14] flex justify-center">
+              <div className="w-full max-w-[210mm] bg-white rounded-lg shadow-2xl overflow-hidden p-2">
+                {printDocType === 'RECEIPT' ? (
+                  <ExamFeeReceipt reg={printModalCandidate} />
+                ) : (
+                  <GradingFormPrint reg={printModalCandidate} />
+                )}
+              </div>
+            </div>
+
+            {/* Modal Bottom Footer */}
+            <div className="px-6 py-3 bg-[#131627] border-t border-gray-800 flex items-center justify-between text-xs text-gray-400 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Optimized strictly for 1-Page A4 / Letter format. Browser headers/footers removed.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPrintModalCandidate(null)}
+                className="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg font-bold text-xs transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
+
+      {/* =========================================================================
+          DEDICATED BAMA HIGH-PRECISION PRINT PORTAL (STRICT 1-PAGE ENGINE)
+          ========================================================================= */}
+      <BamaPrintPortal>
+        {bulkPrintCandidates.length > 0 ? (
+          <div>
+            {bulkPrintCandidates.map((cand, idx) => (
+              <div
+                key={cand.id || idx}
+                className={idx < bulkPrintCandidates.length - 1 ? 'bama-print-page-break' : ''}
+                style={{ pageBreakAfter: idx < bulkPrintCandidates.length - 1 ? 'always' : 'auto' }}
+              >
+                <GradingFormPrint reg={cand} />
+              </div>
+            ))}
+          </div>
+        ) : printModalCandidate ? (
+          printDocType === 'RECEIPT' ? (
+            <ExamFeeReceipt reg={printModalCandidate} />
+          ) : (
+            <GradingFormPrint reg={printModalCandidate} />
+          )
+        ) : selectedPrintReg ? (
+          <GradingFormPrint reg={selectedPrintReg} />
+        ) : null}
+      </BamaPrintPortal>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   AlertCircle, Upload, Check, RefreshCw
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
+import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
 import { getStoredBeltFees, getFeeForBelt, DEFAULT_BELT_FEE_MAP } from '../office/OfficeGrading';
 
 export const NEXT_BELT_PROGRESSION_MAP = {
@@ -1363,9 +1364,15 @@ export default function GradingRegistration() {
                   <h2 className="text-lg font-black text-white uppercase">{submittedReg.student_name}</h2>
                   <p className="text-xs text-amber-400 font-mono">REG REF: #{submittedReg.registration_no}</p>
                 </div>
-                <span className="px-3 py-1 bg-red-950 text-amber-400 border border-red-800 text-[10px] font-black rounded-full uppercase">
-                  {submittedReg.form_type === 'JAPAN_DIRECT_BLACK_BELT' || submittedReg.form_type === 'JKA_JAPAN' ? 'JKA Japan Form' : 'JKA Kyu Form'}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => triggerBamaPrint()}
+                  className="px-3 py-1 bg-red-950 hover:bg-red-900 text-amber-400 border border-red-800 text-[10px] font-black rounded-full uppercase tracking-wider transition cursor-pointer flex items-center gap-1 shadow-sm"
+                  title="Click to Print 1-Page Form"
+                >
+                  <Printer className="w-3 h-3" />
+                  <span>{submittedReg.form_type === 'JAPAN_DIRECT_BLACK_BELT' || submittedReg.form_type === 'JKA_JAPAN' ? 'JKA Japan Form' : 'JKA Kyu Form'}</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs text-gray-300">
@@ -1379,29 +1386,31 @@ export default function GradingRegistration() {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => window.print()}
-                className="flex-1 py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                type="button"
+                onClick={() => triggerBamaPrint()}
+                className="flex-1 py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98 transition"
               >
                 <Printer className="w-4 h-4" />
-                <span>PRINT HALL TICKET / FORM</span>
+                <span>PRINT 1-PAGE HALL TICKET / FORM</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => {
                   const text = `*B.A.M.A. Color Belt Exam Registration Confirmation*\n\nCandidate: ${submittedReg.student_name}\nReg No: ${submittedReg.registration_no}\nTarget Belt: ${submittedReg.target_belt}\nBranch: ${submittedReg.branch_name}\nFee Status: ₹${submittedReg.exam_fee} (${submittedReg.payment_status})`;
                   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                 }}
-                className="py-3 px-6 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                className="py-3 px-6 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98 transition"
               >
                 <Share2 className="w-4 h-4" />
                 <span>SHARE TO WHATSAPP</span>
               </button>
             </div>
 
-            {/* Hidden Printable Component */}
-            <div className="hidden">
+            {/* Dedicated 1-Page BAMA Print Portal Component */}
+            <BamaPrintPortal>
               <GradingFormPrint reg={submittedReg} />
-            </div>
+            </BamaPrintPortal>
           </div>
         </div>
       )}

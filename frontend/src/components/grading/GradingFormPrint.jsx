@@ -17,7 +17,10 @@ export default function GradingFormPrint({ reg }) {
   let isCategoryA = !isCategoryB && !isCategoryC;
 
   return (
-    <div className="print-only bg-white text-black p-4 text-xs font-sans max-w-[210mm] mx-auto leading-tight border border-black shadow-none my-4">
+    <div
+      className="bama-exam-form bg-white text-black p-3 sm:p-4 text-xs font-sans max-w-[210mm] mx-auto leading-tight border border-black shadow-none my-2 print:my-0 print:p-2 print:border-black print:max-w-full"
+      style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
+    >
       
       {/* CATEGORY A: JKK WHITE TO BROWN-4 APPLICATION FORM (EXACT PHYSICAL PAPER FORM MATCH) */}
       {isCategoryA && (

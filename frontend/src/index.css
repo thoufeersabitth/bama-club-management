@@ -202,3 +202,63 @@
     transition-duration: 0.65s;
   }
 }
+
+/* ==========================================================================
+   BAMA PROFESSIONAL HIGH-PRECISION PRINT ENGINE (A4 / LETTER STRICT 1-PAGE)
+   ========================================================================== */
+@media screen {
+  #bama-print-portal {
+    display: none !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm 5mm 5mm 5mm !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* When printing through BAMA Print Portal */
+  body.bama-printing-active #root,
+  body:has(#bama-print-portal:not(:empty)) #root {
+    display: none !important;
+  }
+
+  body.bama-printing-active #bama-print-portal,
+  body:has(#bama-print-portal:not(:empty)) #bama-print-portal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .bama-no-print {
+    display: none !important;
+  }
+
+  .bama-print-page-break {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  /* Ensure printed tables and borders render crisply */
+  table {
+    border-collapse: collapse !important;
+  }
+}
