@@ -1380,6 +1380,10 @@ export default function GradingRegistration() {
                 <p>Target Exam Belt: <strong className="text-amber-400">{submittedReg.target_belt}</strong></p>
                 <p>Dojo Branch: <strong className="text-white">{submittedReg.branch_name}</strong></p>
                 <p>Fee Amount: <strong className="text-white font-mono">₹{submittedReg.exam_fee} ({submittedReg.payment_status})</strong></p>
+                <p className="col-span-2 text-amber-300 font-bold border-t border-gray-800/80 pt-2 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-red-500" />
+                  <span>Belt Exam Date: <strong className="text-white">{localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)'}</strong></span>
+                </p>
               </div>
             </div>
 
@@ -1397,7 +1401,15 @@ export default function GradingRegistration() {
               <button
                 type="button"
                 onClick={() => {
-                  const text = `*B.A.M.A. Color Belt Exam Registration Confirmation*\n\nCandidate: ${submittedReg.student_name}\nReg No: ${submittedReg.registration_no}\nTarget Belt: ${submittedReg.target_belt}\nBranch: ${submittedReg.branch_name}\nFee Status: ₹${submittedReg.exam_fee} (${submittedReg.payment_status})`;
+                  const examDateStr = localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)';
+                  const text = `*B.A.M.A. Color Belt Exam Registration Confirmation*\n\n` +
+                    `Candidate: ${submittedReg.student_name}\n` +
+                    `Reg No: ${submittedReg.registration_no}\n` +
+                    `Target Belt: ${submittedReg.target_belt}\n` +
+                    `Branch: ${submittedReg.branch_name}\n` +
+                    `Fee Status: ₹${submittedReg.exam_fee} (${submittedReg.payment_status})\n\n` +
+                    `📅 *Belt Exam Date: ${examDateStr}*\n` +
+                    `Brave Academy of Martial Arts (+91 95440 85442)`;
                   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                 }}
                 className="py-3 px-6 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg flex items-center justify-center gap-2 cursor-pointer active:scale-98 transition"

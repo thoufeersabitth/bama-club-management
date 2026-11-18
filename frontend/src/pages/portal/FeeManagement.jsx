@@ -3,6 +3,8 @@ import { CreditCard, Search, DollarSign, Printer, CheckCircle2, FileText, X, Ale
 import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, resolveStudentWhatsAppRecipient, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
 import { ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions, INITIAL_BRANCHES } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
+import CadetFeeReceiptPrint from '../../components/fees/CadetFeeReceiptPrint';
+import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
 
 const MONTHS_LIST = [
   'September',
@@ -1747,7 +1749,7 @@ export default function FeeManagement() {
 
       {/* MODAL: Printable Fee Receipt */}
       {activeReceipt && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto bama-no-print">
           <div className="w-full max-w-lg bg-white text-gray-900 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative border border-gray-200">
             <button onClick={() => setActiveReceipt(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black">
               <X className="w-5 h-5" />
@@ -1809,15 +1811,10 @@ export default function FeeManagement() {
                 <MessageSquare className="w-4 h-4" /> Send Receipt on WhatsApp
               </button>
 
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="w-full sm:w-auto px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
-              >
-                <Printer className="w-4 h-4" /> Print Receipt
-              </button>
+              <button type="button" onClick={() => triggerBamaPrint()} className="w-full sm:w-auto px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"><Printer className="w-4 h-4" /> Print Receipt</button>
             </div>
           </div>
+          <BamaPrintPortal><CadetFeeReceiptPrint receipt={activeReceipt} /></BamaPrintPortal>
         </div>
       )}
     </div>

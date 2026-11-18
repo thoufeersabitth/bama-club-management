@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Award, Shield, Search, Filter, Printer, CheckCircle2, AlertCircle,
   Check, X, RefreshCw, UserCheck, CreditCard, FileText, ExternalLink,
-  Share2, Copy, Send, QrCode, Trash2, Trophy, Receipt
-} from 'lucide-react';
+  Share2, Copy, Send, QrCode, Trash2, Trophy, Receipt, Calendar, Clock, Settings, MapPin } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
 import ExamFeeReceipt from '../../components/grading/ExamFeeReceipt';
 import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
@@ -320,6 +319,56 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
   const [printModalCandidate, setPrintModalCandidate] = useState(null);
   const [printDocType, setPrintDocType] = useState('FORM'); // 'FORM' | 'RECEIPT'
   const [bulkPrintCandidates, setBulkPrintCandidates] = useState([]);
+
+  // Exam Date, Time & Examiner Customization States (with localStorage sync)
+  const [examDate, setExamDate] = useState(() => localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)');
+  const [examTime, setExamTime] = useState(() => localStorage.getItem('bama_exam_time') || '09:00 AM onwards');
+  const [examVenue, setExamVenue] = useState(() => localStorage.getItem('bama_exam_venue') || 'Respective Branch Dojo');
+  const [examinerName, setExaminerName] = useState(() => localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih');
+  const [examinerTitle, setExaminerTitle] = useState(() => localStorage.getItem('bama_examiner_title') || 'Chief Examiner & Technical Director, B.A.M.A.');
+
+  const [showScheduleSettingsModal, setShowScheduleSettingsModal] = useState(false);
+  const [tempSchedule, setTempSchedule] = useState({
+    date: '28 November 2026 (Saturday)',
+    time: '09:00 AM onwards',
+    venue: 'Respective Branch Dojo',
+    name: 'Sensei Abdul Nafih',
+    title: 'Chief Examiner & Technical Director, B.A.M.A.'
+  });
+
+  const handleOpenScheduleSettings = () => {
+    setTempSchedule({
+      date: examDate,
+      time: examTime,
+      venue: examVenue,
+      name: examinerName,
+      title: examinerTitle
+    });
+    setShowScheduleSettingsModal(true);
+  };
+
+  const handleSaveExamScheduleSettings = () => {
+    const cleanDate = tempSchedule.date.trim() || '28 November 2026 (Saturday)';
+    const cleanTime = tempSchedule.time.trim() || '09:00 AM onwards';
+    const cleanVenue = tempSchedule.venue.trim() || 'Respective Branch Dojo';
+    const cleanName = tempSchedule.name.trim() || 'Sensei Abdul Nafih';
+    const cleanTitle = tempSchedule.title.trim() || 'Chief Examiner & Technical Director, B.A.M.A.';
+
+    localStorage.setItem('bama_exam_date', cleanDate);
+    localStorage.setItem('bama_exam_time', cleanTime);
+    localStorage.setItem('bama_exam_venue', cleanVenue);
+    localStorage.setItem('bama_examiner_name', cleanName);
+    localStorage.setItem('bama_examiner_title', cleanTitle);
+
+    setExamDate(cleanDate);
+    setExamTime(cleanTime);
+    setExamVenue(cleanVenue);
+    setExaminerName(cleanName);
+    setExaminerTitle(cleanTitle);
+
+    setShowScheduleSettingsModal(false);
+    alert('✅ Exam Schedule & Examiner details saved successfully! All receipts & forms updated.');
+  };
 
   // Open Single Candidate Print & Receipt Center
   const handleOpenPrintModal = (candidate, defaultDocType = 'FORM') => {
@@ -2458,7 +2507,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                     const fee = c.exam_fee || 1500;
                     const isPaid = String(c.payment_status || '').toLowerCase().includes('paid');
                     const text = printDocType === 'RECEIPT'
-                      ? `*B.A.M.A. BELT GRADING EXAM FEE RECEIPT*\n` +
+                      ? `*B.A.M.A. BELT GRADING EXAM FEE RECEIPT* 🥋\n` +
                         `----------------------------------------\n` +
                         `Cadet Name: *${c.student_name}*\n` +
                         `Admission No: *${c.admission_no || c.registration_no || 'BAMA'}*\n` +
@@ -2466,8 +2515,12 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                         `Belt Promotion: *${c.current_belt || 'White'}* ➔ *${c.target_belt}*\n` +
                         `Exam Fee: *₹${fee}* (${isPaid ? 'PAID & VERIFIED ✅' : 'PENDING ⏳'})\n` +
                         `Receipt No: *EXAM-REC-${c.registration_no || c.admission_no || '2026'}*\n\n` +
-                        `_Japan Karate Association (JKA) Affiliated_\n` +
-                        `Chief Examiner: Sensei Abdul Rahman (+91 95440 85442)`
+                        `📅 *EXAM SCHEDULE & VENUE:*\n` +
+                        `• Date: *${examDate}*\n` +
+                        `• Time: *${examTime}*\n` +
+                        `• Venue: *${c.branch_name || examVenue}*\n\n` +
+                        `Chief Examiner: *${examinerName}*\n` +
+                        `Brave Academy of Martial Arts (+91 95440 85442)`
                       : `*B.A.M.A. BELT GRADING EXAM APPLICATION FORM*\n` +
                         `----------------------------------------\n` +
                         `Cadet Name: *${c.student_name}*\n` +
@@ -2507,9 +2560,9 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-[#0a0c14] flex justify-center">
               <div className="w-full max-w-[210mm] bg-white rounded-lg shadow-2xl overflow-hidden p-2">
                 {printDocType === 'RECEIPT' ? (
-                  <ExamFeeReceipt reg={printModalCandidate} />
+                  <ExamFeeReceipt reg={printModalCandidate} examinerName={examinerName} examinerTitle={examinerTitle} examDate={examDate} examTime={examTime} examVenue={examVenue} />
                 ) : (
-                  <GradingFormPrint reg={printModalCandidate} />
+                  <GradingFormPrint reg={printModalCandidate} examinerName={examinerName} examinerTitle={examinerTitle} examDate={examDate} examVenue={examVenue} />
                 )}
               </div>
             </div>
@@ -2545,20 +2598,124 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 className={idx < bulkPrintCandidates.length - 1 ? 'bama-print-page-break' : ''}
                 style={{ pageBreakAfter: idx < bulkPrintCandidates.length - 1 ? 'always' : 'auto' }}
               >
-                <GradingFormPrint reg={cand} />
+                <GradingFormPrint reg={cand} examinerName={examinerName} examinerTitle={examinerTitle} examDate={examDate} examVenue={examVenue} />
               </div>
             ))}
           </div>
         ) : printModalCandidate ? (
           printDocType === 'RECEIPT' ? (
-            <ExamFeeReceipt reg={printModalCandidate} />
+            <ExamFeeReceipt reg={printModalCandidate} examinerName={examinerName} examinerTitle={examinerTitle} examDate={examDate} examTime={examTime} examVenue={examVenue} />
           ) : (
-            <GradingFormPrint reg={printModalCandidate} />
+            <GradingFormPrint reg={printModalCandidate} examinerName={examinerName} examinerTitle={examinerTitle} examDate={examDate} examVenue={examVenue} />
           )
         ) : selectedPrintReg ? (
-          <GradingFormPrint reg={selectedPrintReg} />
+          <GradingFormPrint reg={selectedPrintReg} examinerName={examinerName} examinerTitle={examinerTitle} examDate={examDate} examVenue={examVenue} />
         ) : null}
       </BamaPrintPortal>
+      {/* =========================================================================
+          EXAM SCHEDULE & SENSEI / EXAMINER SETTINGS MODAL
+          ========================================================================= */}
+      {showScheduleSettingsModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto bama-no-print">
+          <div className="w-full max-w-lg bg-[#0F111A] text-white rounded-3xl border border-gray-800 shadow-2xl overflow-hidden p-6 sm:p-8 space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold">
+                  ⚙️
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-tight">Exam Schedule & Sensei Settings</h3>
+                  <p className="text-xs text-gray-400">Configure exam date & instructor signature for all printouts</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScheduleSettingsModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center justify-center cursor-pointer transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="text-gray-300 font-bold block mb-1">📅 Exam Date (തീയതി)</label>
+                <input
+                  type="text"
+                  value={tempSchedule.date}
+                  onChange={(e) => setTempSchedule({ ...tempSchedule, date: e.target.value })}
+                  placeholder="e.g. 28 November 2026 (Saturday)"
+                  className="w-full bg-[#171A29] border border-gray-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-sm focus:border-amber-400 outline-none"
+                />
+                <span className="text-[10px] text-gray-400 pt-1 block">This date appears on all exam fee receipts & Kyu/Dan hall tickets.</span>
+              </div>
+
+              <div>
+                <label className="text-gray-300 font-bold block mb-1">⏰ Reporting Time (സമയം)</label>
+                <input
+                  type="text"
+                  value={tempSchedule.time}
+                  onChange={(e) => setTempSchedule({ ...tempSchedule, time: e.target.value })}
+                  placeholder="e.g. 09:00 AM onwards"
+                  className="w-full bg-[#171A29] border border-gray-700 rounded-xl px-3.5 py-2.5 text-white font-mono text-sm focus:border-amber-400 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-gray-300 font-bold block mb-1">📍 Examination Venue (സ്ഥലം)</label>
+                <input
+                  type="text"
+                  value={tempSchedule.venue}
+                  onChange={(e) => setTempSchedule({ ...tempSchedule, venue: e.target.value })}
+                  placeholder="e.g. Respective Branch Dojo / Pulikkal Dojo"
+                  className="w-full bg-[#171A29] border border-gray-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:border-amber-400 outline-none"
+                />
+              </div>
+
+              <div className="border-t border-gray-800 pt-3">
+                <label className="text-gray-300 font-bold block mb-1">🥋 Sensei / Chief Examiner Name (സെൻസി പേര്)</label>
+                <input
+                  type="text"
+                  value={tempSchedule.name}
+                  onChange={(e) => setTempSchedule({ ...tempSchedule, name: e.target.value })}
+                  placeholder="e.g. Sensei Abdul Nafih"
+                  className="w-full bg-[#171A29] border border-gray-700 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:border-amber-400 outline-none"
+                />
+                <span className="text-[10px] text-gray-400 pt-1 block">Your name on the bottom signature block and stamp.</span>
+              </div>
+
+              <div>
+                <label className="text-gray-300 font-bold block mb-1">📜 Sensei Designation / Title</label>
+                <input
+                  type="text"
+                  value={tempSchedule.title}
+                  onChange={(e) => setTempSchedule({ ...tempSchedule, title: e.target.value })}
+                  placeholder="e.g. Chief Examiner & Technical Director, B.A.M.A. (2nd Dan)"
+                  className="w-full bg-[#171A29] border border-gray-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:border-amber-400 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-800">
+              <button
+                type="button"
+                onClick={() => setShowScheduleSettingsModal(false)}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-bold text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveExamScheduleSettings}
+                className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-black rounded-xl text-xs flex items-center gap-2 shadow-lg transition cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Save & Apply Settings</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

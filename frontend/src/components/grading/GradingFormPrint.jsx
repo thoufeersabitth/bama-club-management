@@ -7,7 +7,13 @@ import React from 'react';
  * 2. BAMA_KYU (Image 2 - Kyu Exam Application Form)
  * 3. JKA_JAPAN (Image 3 - Official JKA Japan Dan/Senior Kyu Examiner's Record)
  */
-export default function GradingFormPrint({ reg }) {
+export default function GradingFormPrint({
+  reg,
+  examinerName: propExaminerName,
+  examinerTitle: propExaminerTitle,
+  examDate: propExamDate,
+  examVenue: propExamVenue
+}) {
   if (!reg) return null;
 
   const targetBeltStr = (reg.target_belt || reg.current_belt || '').toLowerCase();
@@ -15,6 +21,11 @@ export default function GradingFormPrint({ reg }) {
   let isCategoryC = reg.form_type === 'JAPAN_DIRECT_BLACK_BELT' || ['black', 'dan', 'shodan', 'nidan', 'sandan'].some(t => targetBeltStr.includes(t));
   let isCategoryB = reg.form_type === 'JKK_BROWN' || ['brown-3', 'brown 3', 'brown-2', 'brown 2', 'brown-1', 'brown 1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => targetBeltStr.includes(t));
   let isCategoryA = !isCategoryB && !isCategoryC;
+
+  const examinerName = propExaminerName || localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih';
+  const examinerTitle = propExaminerTitle || localStorage.getItem('bama_examiner_title') || 'Chief Examiner, B.A.M.A. (2nd Dan)';
+  const examDate = propExamDate || localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)';
+  const examVenue = propExamVenue || localStorage.getItem('bama_exam_venue') || reg.branch_name || 'Pulikkal Main Dojo';
 
   return (
     <div
@@ -162,7 +173,7 @@ export default function GradingFormPrint({ reg }) {
               </tr>
               <tr>
                 <td className="border border-black p-1 font-bold bg-gray-100">審査日 Date of exam</td>
-                <td className="border border-black p-1 font-bold">Year 2026 Month ____ Day ____</td>
+                <td className="border border-black p-1 font-bold font-mono">{examDate}</td>
                 <td className="border border-black p-1 font-bold bg-gray-100">審査場所 Place of exam</td>
                 <td className="border border-black p-1 font-bold">{reg.branch_name || 'Pulikkal Main Dojo'}</td>
               </tr>
@@ -172,7 +183,7 @@ export default function GradingFormPrint({ reg }) {
               </tr>
               <tr>
                 <td className="border border-black p-1 font-bold bg-gray-100">審査長 Chief examiner</td>
-                <td colSpan={3} className="border border-black p-1 font-bold">Sensei Abdul Rahman (5th Dan)</td>
+                <td colSpan={3} className="border border-black p-1 font-bold text-red-900 font-serif">{examinerName} ({examinerTitle})</td>
               </tr>
               <tr>
                 <td className="border border-black p-1 font-bold bg-gray-100">Remarks / Fee Status</td>
@@ -247,7 +258,7 @@ export default function GradingFormPrint({ reg }) {
                 <td className="border border-black p-1.5 font-bold bg-gray-100">Instructor Reference</td>
                 <td className="border border-black p-1.5 font-bold bg-gray-100">Name / Address</td>
                 <td colSpan={5} className="border border-black p-1.5 font-bold">
-                  {reg.instructor_reference_name || 'Sensei Abdul Rahman'} ({reg.instructor_reference_address || 'Pulikkal, Malappuram'})
+                  {reg.instructor_reference_name || examinerName || 'Sensei Abdul Nafih'} ({reg.instructor_reference_address || 'Pulikkal, Malappuram'})
                 </td>
               </tr>
             </tbody>
@@ -348,7 +359,7 @@ export default function GradingFormPrint({ reg }) {
                   <td className="border border-black p-1.5 font-bold bg-gray-100">Branch No.</td>
                   <td className="border border-black p-1.5 font-bold">{reg.branch_name || 'Pulikkal'}</td>
                   <td className="border border-black p-1.5 font-bold bg-gray-100">Date of Exam</td>
-                  <td className="border border-black p-1.5 font-mono font-bold">{reg.payment_mode || 'UPI / GPay'}</td>
+                  <td className="border border-black p-1.5 font-mono font-bold">{examDate}</td>
                 </tr>
               </tbody>
             </table>
@@ -372,7 +383,7 @@ export default function GradingFormPrint({ reg }) {
             </div>
             <div className="text-right text-[9px] font-mono space-y-1">
               <div>提出 Date: Year 2026 Month ___ Day ___</div>
-              <div>審査日 Date of Exam: Year 2026 Month ___ Day ___</div>
+              <div>審査日 Date of Exam: <strong className="font-mono">{examDate}</strong></div>
             </div>
           </div>
 
@@ -413,7 +424,7 @@ export default function GradingFormPrint({ reg }) {
               </tr>
               <tr>
                 <td className="border border-black p-1 font-bold bg-gray-100">Reference</td>
-                <td className="border border-black p-1 font-bold">Name: {reg.instructor_reference_name || 'Sensei Abdul Rahman'}</td>
+                <td className="border border-black p-1 font-bold">Name: {reg.instructor_reference_name || examinerName || 'Sensei Abdul Nafih'}</td>
                 <td colSpan={2} className="border border-black p-1 font-bold bg-gray-100">Relationship</td>
                 <td className="border border-black p-1 font-bold text-center">TEACHER</td>
                 <td className="border border-black p-1 font-bold bg-gray-100">Tel( )</td>
@@ -489,7 +500,7 @@ export default function GradingFormPrint({ reg }) {
 
                 <div className="border border-black p-1 text-[8px] flex justify-between">
                   <span>Examiner Sign: ___________________________</span>
-                  <span>Chief Examiner: Sensei Abdul Rahman (5th Dan)</span>
+                  <span>Chief Examiner: <strong>{examinerName}</strong> ({examinerTitle})</span>
                 </div>
               </div>
             </div>
@@ -514,7 +525,7 @@ export default function GradingFormPrint({ reg }) {
                   <td className="border border-black p-1 font-bold bg-gray-50">Karate Organization</td>
                   <td className="border border-black p-1 font-bold">{reg.organization || 'JKA INDIA'}</td>
                   <td className="border border-black p-1 font-bold bg-gray-50">Date of Exam</td>
-                  <td className="border border-black p-1 font-bold">Year 2026 Month ___ Day ___</td>
+                  <td className="border border-black p-1 font-bold font-mono">{examDate}</td>
                 </tr>
               </tbody>
             </table>

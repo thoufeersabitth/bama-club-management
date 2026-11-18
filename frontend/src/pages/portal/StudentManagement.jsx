@@ -11,6 +11,8 @@ import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStuden
 import { BELT_LEVELS, INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, PROGRAM_OPTIONS, ACADEMY_PROGRAMS, ACADEMY_INFO, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
 import { BAMA_LOGO_BASE64 } from '../../constants/bamaLogoBase64';
+import CadetFeeReceiptPrint from '../../components/fees/CadetFeeReceiptPrint';
+import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
 import {
   calculateAgeFromDOB,
   getTodayISO,
@@ -3763,7 +3765,7 @@ export default function StudentManagement() {
 
       {/* MODAL: Cadet Printable Fee Receipt in Student Management */}
       {studentActiveReceipt && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto bama-no-print">
           <div className="w-full max-w-lg bg-white text-gray-900 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative border border-gray-200">
             <button onClick={() => setStudentActiveReceipt(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black cursor-pointer">
               <X className="w-5 h-5" />
@@ -3846,13 +3848,18 @@ export default function StudentManagement() {
 
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => triggerBamaPrint()}
                 className="w-full sm:w-auto px-5 py-2.5 bg-gray-900 hover:bg-black text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer"
               >
                 <Printer className="w-4 h-4" /> Print / Save PDF
               </button>
             </div>
           </div>
+
+          {/* Dedicated 1-Page BAMA Print Portal Engine */}
+          <BamaPrintPortal>
+            <CadetFeeReceiptPrint receipt={studentActiveReceipt} />
+          </BamaPrintPortal>
         </div>
       )}
 

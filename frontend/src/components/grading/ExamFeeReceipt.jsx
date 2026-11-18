@@ -1,7 +1,14 @@
 import React from 'react';
-import { Award, CheckCircle2, Shield } from 'lucide-react';
+import { Award, CheckCircle2, Shield, Calendar, Clock, MapPin } from 'lucide-react';
 
-export default function ExamFeeReceipt({ reg }) {
+export default function ExamFeeReceipt({
+  reg,
+  examinerName: propExaminerName,
+  examinerTitle: propExaminerTitle,
+  examDate: propExamDate,
+  examTime: propExamTime,
+  examVenue: propExamVenue
+}) {
   if (!reg) return null;
 
   const receiptNo = `EXAM-REC-${reg.registration_no || reg.admission_no || '2026-001'}`;
@@ -13,8 +20,14 @@ export default function ExamFeeReceipt({ reg }) {
   const feeAmount = reg.exam_fee || reg.applied_fee || 1500;
   const isPaid = String(reg.payment_status || '').toLowerCase().includes('paid');
 
+  const examinerName = propExaminerName || localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih';
+  const examinerTitle = propExaminerTitle || localStorage.getItem('bama_examiner_title') || 'Chief Examiner & Technical Director, B.A.M.A.';
+  const examDate = propExamDate || localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)';
+  const examTime = propExamTime || localStorage.getItem('bama_exam_time') || '09:00 AM onwards';
+  const examVenue = propExamVenue || localStorage.getItem('bama_exam_venue') || reg.branch_name || 'Respective Branch Dojo';
+
   return (
-    <div className="bg-white text-black p-6 sm:p-8 max-w-[210mm] mx-auto font-sans leading-tight border-2 border-black rounded-none shadow-none print:m-0 print:p-6 print:border-black print:max-w-full">
+    <div className="bg-white text-black p-6 sm:p-8 max-w-[210mm] mx-auto font-sans leading-tight border-2 border-black rounded-none shadow-none print:m-0 print:p-6 print:border-black print:max-w-full" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
       {/* Academy Header & Crests */}
       <div className="border-b-2 border-black pb-4 mb-4 flex items-center justify-between gap-4">
         <div className="w-16 h-16 rounded-full border-2 border-black flex flex-col items-center justify-center p-1 text-center flex-shrink-0">
@@ -50,8 +63,8 @@ export default function ExamFeeReceipt({ reg }) {
         </div>
       </div>
 
-      {/* Top Meta Details (Receipt No & Date) */}
-      <div className="flex justify-between items-center text-xs border border-black p-2.5 bg-gray-50 mb-4">
+      {/* Top Meta Details (Receipt No & Issue Date) */}
+      <div className="flex justify-between items-center text-xs border border-black p-2.5 bg-gray-50 mb-3">
         <div>
           <span className="text-gray-600 font-bold">RECEIPT NO: </span>
           <strong className="font-mono text-gray-900 text-sm font-black">{receiptNo}</strong>
@@ -62,8 +75,33 @@ export default function ExamFeeReceipt({ reg }) {
         </div>
       </div>
 
+      {/* OFFICIAL EXAM SCHEDULE BANNER */}
+      <div className="border-2 border-black p-3 mb-3 bg-amber-50/80 space-y-1">
+        <div className="text-[10px] font-black uppercase text-red-800 border-b border-amber-300 pb-1 flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-red-700" />
+            <span>OFFICIAL BELT GRADING EXAM SCHEDULE</span>
+          </span>
+          <span className="px-2 py-0.5 bg-red-100 text-red-800 border border-red-300 rounded font-bold text-[9px]">CONFIRMED SCHEDULE</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
+          <div>
+            <span className="text-[9px] text-gray-600 font-bold block uppercase">Exam Date</span>
+            <strong className="text-sm font-black text-red-700 font-mono">{examDate}</strong>
+          </div>
+          <div className="border-l border-amber-300 pl-2">
+            <span className="text-[9px] text-gray-600 font-bold block uppercase">Reporting Time</span>
+            <strong className="text-xs font-black text-gray-900">{examTime}</strong>
+          </div>
+          <div className="border-l border-amber-300 pl-2">
+            <span className="text-[9px] text-gray-600 font-bold block uppercase">Exam Venue</span>
+            <strong className="text-xs font-bold text-gray-900">{examVenue}</strong>
+          </div>
+        </div>
+      </div>
+
       {/* Candidate Information Card */}
-      <div className="border-2 border-black p-3.5 mb-4 space-y-2">
+      <div className="border-2 border-black p-3.5 mb-3 space-y-2">
         <div className="text-[10px] font-black uppercase text-gray-700 border-b border-gray-300 pb-1 flex items-center justify-between">
           <span>Cadet Particulars</span>
           <span className="font-mono">REG REF: #{reg.registration_no || 'N/A'}</span>
@@ -90,11 +128,11 @@ export default function ExamFeeReceipt({ reg }) {
       </div>
 
       {/* Belt Promotion Particulars */}
-      <div className="border-2 border-black p-3.5 mb-4 bg-gray-50/50">
+      <div className="border-2 border-black p-3.5 mb-3 bg-gray-50/50">
         <div className="text-[10px] font-black uppercase text-gray-700 border-b border-gray-300 pb-1 mb-2">
           Examination & Promotion Target
         </div>
-        <div className="flex items-center justify-around py-2 text-center">
+        <div className="flex items-center justify-around py-1.5 text-center">
           <div>
             <span className="text-[10px] text-gray-500 block uppercase font-bold">Present Rank</span>
             <span className="text-sm font-bold text-gray-800">{reg.current_belt || 'White Belt'}</span>
@@ -112,7 +150,7 @@ export default function ExamFeeReceipt({ reg }) {
       </div>
 
       {/* Payment Details Table */}
-      <table className="w-full border-collapse border-2 border-black text-xs mb-4">
+      <table className="w-full border-collapse border-2 border-black text-xs mb-3">
         <thead>
           <tr className="bg-gray-100 font-bold border-b-2 border-black">
             <th className="border border-black p-2 text-left w-2/3">Fee Description</th>
@@ -121,11 +159,11 @@ export default function ExamFeeReceipt({ reg }) {
         </thead>
         <tbody>
           <tr>
-            <td className="border border-black p-2.5">
+            <td className="border border-black p-2">
               <div className="font-bold">Belt Grading Examination & JKA Kerala Assessment Fee</div>
               <div className="text-[10px] text-gray-600">Includes Official Examiner Evaluation, Certificate of Rank & Kyu Processing</div>
             </td>
-            <td className="border border-black p-2.5 text-right font-mono font-bold text-sm">
+            <td className="border border-black p-2 text-right font-mono font-bold text-sm">
               ₹{Number(feeAmount).toFixed(2)}
             </td>
           </tr>
@@ -139,7 +177,7 @@ export default function ExamFeeReceipt({ reg }) {
       </table>
 
       {/* Payment Status & Seal Banner */}
-      <div className="border-2 border-black p-3 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="border-2 border-black p-2.5 mb-5 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-gray-600">Payment Status:</span>
@@ -168,26 +206,26 @@ export default function ExamFeeReceipt({ reg }) {
       </div>
 
       {/* Signatures & Authorization */}
-      <div className="grid grid-cols-2 gap-8 pt-4 border-t-2 border-black text-xs">
+      <div className="grid grid-cols-2 gap-8 pt-3 border-t-2 border-black text-xs">
         <div>
-          <div className="h-10 border-b border-black"></div>
+          <div className="h-8 border-b border-black"></div>
           <p className="text-[10px] font-bold text-gray-700 pt-1">Parent / Guardian Signature</p>
         </div>
         <div className="text-right">
-          <div className="h-10 border-b border-black flex items-end justify-end">
-            <span className="font-serif italic font-bold text-xs text-red-900">Sensei Abdul Rahman</span>
+          <div className="h-8 border-b border-black flex items-end justify-end">
+            <span className="font-serif italic font-bold text-sm text-red-900">{examinerName}</span>
           </div>
           <p className="text-[10px] font-black uppercase text-gray-900 pt-1">
-            Sensei Abdul Rahman (5th Dan Black Belt, JKA)
+            {examinerName}
           </p>
-          <p className="text-[9px] text-gray-600">Chief Examiner & Technical Director, B.A.M.A.</p>
+          <p className="text-[9px] text-gray-600 font-bold">{examinerTitle}</p>
         </div>
       </div>
 
       {/* Footer Disclaimer */}
-      <div className="mt-6 pt-2 border-t border-gray-300 text-center text-[9px] text-gray-500 space-y-0.5">
+      <div className="mt-4 pt-1.5 border-t border-gray-300 text-center text-[9px] text-gray-500 space-y-0.5">
         <p>This is an official computer-generated fee receipt issued by Brave Academy of Martial Arts.</p>
-        <p>Candidates must carry this receipt or their official Kyu Form to the exam venue for identity verification.</p>
+        <p>Candidates must carry this receipt or their official Kyu Form to the exam venue on <strong className="text-black">{examDate}</strong>.</p>
       </div>
     </div>
   );
