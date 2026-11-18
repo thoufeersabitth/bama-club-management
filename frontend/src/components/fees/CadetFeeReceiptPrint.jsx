@@ -154,11 +154,19 @@ export default function CadetFeeReceiptPrint({ receipt }) {
         <div className="text-right">
           <div className="h-8 border-b border-black flex items-end justify-end">
             <span className="font-serif italic font-bold text-xs text-red-900">
-              {localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih'}
+              {(() => {
+    const saved = localStorage.getItem('bama_examiner_name');
+    if (saved && !saved.toLowerCase().includes('rahman')) return saved;
+    return 'Sensei Abdul Nafih';
+  })()}
             </span>
           </div>
           <p className="text-[10px] font-black uppercase text-gray-900 pt-1">
-            {localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih'}
+            {(() => {
+    const saved = localStorage.getItem('bama_examiner_name');
+    if (saved && !saved.toLowerCase().includes('rahman')) return saved;
+    return 'Sensei Abdul Nafih';
+  })()}
           </p>
           <p className="text-[9px] text-gray-600">Authorized Official, B.A.M.A.</p>
         </div>

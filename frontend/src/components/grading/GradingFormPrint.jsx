@@ -22,7 +22,11 @@ export default function GradingFormPrint({
   let isCategoryB = reg.form_type === 'JKK_BROWN' || ['brown-3', 'brown 3', 'brown-2', 'brown 2', 'brown-1', 'brown 1', '3rd kyu', '2nd kyu', '1st kyu'].some(t => targetBeltStr.includes(t));
   let isCategoryA = !isCategoryB && !isCategoryC;
 
-  const examinerName = propExaminerName || localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih';
+  const examinerName = propExaminerName || (() => {
+    const saved = localStorage.getItem('bama_examiner_name');
+    if (saved && !saved.toLowerCase().includes('rahman')) return saved;
+    return 'Sensei Abdul Nafih';
+  })();
   const examinerTitle = propExaminerTitle || localStorage.getItem('bama_examiner_title') || 'Chief Examiner, B.A.M.A. (2nd Dan)';
   const examDate = propExamDate || localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)';
   const examVenue = propExamVenue || localStorage.getItem('bama_exam_venue') || reg.branch_name || 'Pulikkal Main Dojo';
@@ -258,7 +262,7 @@ export default function GradingFormPrint({
                 <td className="border border-black p-1.5 font-bold bg-gray-100">Instructor Reference</td>
                 <td className="border border-black p-1.5 font-bold bg-gray-100">Name / Address</td>
                 <td colSpan={5} className="border border-black p-1.5 font-bold">
-                  {reg.instructor_reference_name || examinerName || 'Sensei Abdul Nafih'} ({reg.instructor_reference_address || 'Pulikkal, Malappuram'})
+                  {(!reg.instructor_reference_name || reg.instructor_reference_name.toLowerCase().includes('rahman')) ? examinerName : reg.instructor_reference_name} ({reg.instructor_reference_address || 'Pulikkal, Malappuram'})
                 </td>
               </tr>
             </tbody>
@@ -424,7 +428,7 @@ export default function GradingFormPrint({
               </tr>
               <tr>
                 <td className="border border-black p-1 font-bold bg-gray-100">Reference</td>
-                <td className="border border-black p-1 font-bold">Name: {reg.instructor_reference_name || examinerName || 'Sensei Abdul Nafih'}</td>
+                <td className="border border-black p-1 font-bold">Name: {(!reg.instructor_reference_name || reg.instructor_reference_name.toLowerCase().includes('rahman')) ? examinerName : reg.instructor_reference_name}</td>
                 <td colSpan={2} className="border border-black p-1 font-bold bg-gray-100">Relationship</td>
                 <td className="border border-black p-1 font-bold text-center">TEACHER</td>
                 <td className="border border-black p-1 font-bold bg-gray-100">Tel( )</td>

@@ -130,7 +130,7 @@ export default function GradingRegistration() {
     jka_member_no: '',
     jka_nationality: 'INDIAN',
     jka_organization: 'JKA INDIA',
-    instructor_reference_name: 'Sensei Abdul Rahman',
+    instructor_reference_name: 'Sensei Abdul Nafih',
     instructor_reference_address: 'Pulikkal, Malappuram',
     instructor_reference_phone: '+91 95440 85442',
     exam_fee: getFeeForBelt('Yellow Belt', getStoredBeltFees()),
@@ -1066,7 +1066,7 @@ export default function GradingRegistration() {
                     value={formData.instructor_reference_name}
                     onChange={handleChange}
                     required
-                    placeholder="e.g. Sensei Abdul Rahman"
+                    placeholder="e.g. Sensei Abdul Nafih"
                     className="w-full px-3.5 py-2.5 bg-black/80 border border-amber-500/50 rounded-xl text-white text-xs focus:border-amber-400 focus:outline-none"
                   />
                 </div>

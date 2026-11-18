@@ -809,7 +809,7 @@ export default function StudentPortalLogin() {
                     </div>
                     <div className="px-3 py-2 rounded-xl bg-black/35 border border-white/[0.08]">
                       <span className="text-gray-400 text-[9px] uppercase tracking-wider font-bold block">Instructor</span>
-                      <strong className="text-amber-300 block truncate">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong>
+                      <strong className="text-amber-300 block truncate">{activeStudent.instructor || 'Sensei Abdul Nafih'}</strong>
                     </div>
                     <div className="px-3 py-2 rounded-xl bg-black/35 border border-white/[0.08]">
                       <span className="text-gray-400 text-[9px] uppercase tracking-wider font-bold block">Member Since</span>
@@ -1430,7 +1430,7 @@ export default function StudentPortalLogin() {
                       <div>
                         <strong className="text-white text-xs block">{activeStudent.shift || 'Regular Dojo Batch Schedule'}</strong>
                         <span className="text-[11px] text-gray-300">
-                          Instructor: <strong className="text-amber-300">{activeStudent.instructor || 'Sensei Abdul Rahman'}</strong> • Branch: <strong className="text-white">{branchName}</strong>
+                          Instructor: <strong className="text-amber-300">{activeStudent.instructor || 'Sensei Abdul Nafih'}</strong> • Branch: <strong className="text-white">{branchName}</strong>
                         </span>
                       </div>
                     </div>

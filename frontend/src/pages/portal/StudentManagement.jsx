@@ -372,7 +372,7 @@ export default function StudentManagement() {
   const [promoteModalStudent, setPromoteModalStudent] = useState(null);
   const [promoTargetBelt, setPromoTargetBelt] = useState('Yellow Belt');
   const [promoExamDate, setPromoExamDate] = useState(new Date().toISOString().split('T')[0]);
-  const [promoExaminer, setPromoExaminer] = useState('Sensei Abdul Rahman (5th Dan)');
+  const [promoExaminer, setPromoExaminer] = useState('Sensei Abdul Nafih (2nd Dan)');
   const [promoCertNo, setPromoCertNo] = useState('');
   const [promoRemarks, setPromoRemarks] = useState('Promoted on merit via Academy Examination');
   const [promoSuccessData, setPromoSuccessData] = useState(null);
@@ -384,7 +384,7 @@ export default function StudentManagement() {
     setPromoteModalStudent(std);
     setPromoTargetBelt(nextB);
     setPromoExamDate(new Date().toISOString().split('T')[0]);
-    setPromoExaminer('Sensei Abdul Rahman (5th Dan)');
+    setPromoExaminer('Sensei Abdul Nafih (2nd Dan)');
     setPromoCertNo(`CERT-BAMA-${Math.floor(1000 + Math.random() * 9000)}`);
     setPromoRemarks(`Promoted from ${currentB} to ${nextB} on merit.`);
   };

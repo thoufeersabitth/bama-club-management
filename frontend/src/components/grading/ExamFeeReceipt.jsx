@@ -20,7 +20,11 @@ export default function ExamFeeReceipt({
   const feeAmount = reg.exam_fee || reg.applied_fee || 1500;
   const isPaid = String(reg.payment_status || '').toLowerCase().includes('paid');
 
-  const examinerName = propExaminerName || localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih';
+  const examinerName = propExaminerName || (() => {
+    const saved = localStorage.getItem('bama_examiner_name');
+    if (saved && !saved.toLowerCase().includes('rahman')) return saved;
+    return 'Sensei Abdul Nafih';
+  })();
   const examinerTitle = propExaminerTitle || localStorage.getItem('bama_examiner_title') || 'Chief Examiner & Technical Director, B.A.M.A.';
   const examDate = propExamDate || localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)';
   const examTime = propExamTime || localStorage.getItem('bama_exam_time') || '09:00 AM onwards';

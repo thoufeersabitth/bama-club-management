@@ -324,7 +324,11 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
   const [examDate, setExamDate] = useState(() => localStorage.getItem('bama_exam_date') || '28 November 2026 (Saturday)');
   const [examTime, setExamTime] = useState(() => localStorage.getItem('bama_exam_time') || '09:00 AM onwards');
   const [examVenue, setExamVenue] = useState(() => localStorage.getItem('bama_exam_venue') || 'Respective Branch Dojo');
-  const [examinerName, setExaminerName] = useState(() => localStorage.getItem('bama_examiner_name') || 'Sensei Abdul Nafih');
+  const [examinerName, setExaminerName] = useState(() => {
+    const saved = localStorage.getItem('bama_examiner_name');
+    if (saved && !saved.toLowerCase().includes('rahman')) return saved;
+    return 'Sensei Abdul Nafih';
+  });
   const [examinerTitle, setExaminerTitle] = useState(() => localStorage.getItem('bama_examiner_title') || 'Chief Examiner & Technical Director, B.A.M.A.');
 
   const [showScheduleSettingsModal, setShowScheduleSettingsModal] = useState(false);
@@ -2251,7 +2255,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                   {/* Instructor Reference if Brown or Black Belt */}
                   {(fType === 'JKK_BROWN' || fType === 'JAPAN_DIRECT_BLACK_BELT' || fType === 'JKA_JAPAN') && (
                     <>
-                      <p className="flex justify-between"><strong className="text-gray-700">Instructor Reference:</strong> <span className="font-bold text-gray-900">{c.instructor_reference_name || 'Sensei Abdul Rahman'}</span></p>
+                      <p className="flex justify-between"><strong className="text-gray-700">Instructor Reference:</strong> <span className="font-bold text-gray-900">{(!c.instructor_reference_name || c.instructor_reference_name.toLowerCase().includes('rahman')) ? examinerName : c.instructor_reference_name}</span></p>
                       <p className="flex justify-between"><strong className="text-gray-700">Reference Dojo / Phone:</strong> <span className="font-bold text-gray-900">{c.instructor_reference_address || c.instructor_reference_phone || '+91 95440 85442'}</span></p>
                     </>
                   )}

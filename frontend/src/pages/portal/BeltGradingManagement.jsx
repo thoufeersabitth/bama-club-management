@@ -47,7 +47,7 @@ export default function BeltGradingManagement() {
   const [eventVenue, setEventVenue] = useState('Pulikkal Head Dojo');
   const [dojoBranch, setDojoBranch] = useState('All Dojo Branches');
   const [eligibleBelts, setEligibleBelts] = useState('All Belts (White to Black)');
-  const [eventExaminer, setEventExaminer] = useState('Sensei Abdul Rahman (5th Dan)');
+  const [eventExaminer, setEventExaminer] = useState('Sensei Abdul Nafih (2nd Dan)');
   const [eventFee, setEventFee] = useState(1000);
 
   // New Competition Form
@@ -65,7 +65,7 @@ export default function BeltGradingManagement() {
   const [promoPrevBelt, setPromoPrevBelt] = useState('White Belt');
   const [promoTargetBelt, setPromoTargetBelt] = useState('Yellow Belt');
   const [promoDate, setPromoDate] = useState(new Date().toISOString().split('T')[0]);
-  const [promoExaminer, setPromoExaminer] = useState('Sensei Abdul Rahman (5th Dan)');
+  const [promoExaminer, setPromoExaminer] = useState('Sensei Abdul Nafih (2nd Dan)');
 
   useEffect(() => {
     fetchBeltGradings().then(data => setGradings(data || []));
@@ -80,7 +80,7 @@ export default function BeltGradingManagement() {
           registration_end: ex.registration_end_date || ex.registration_end,
           time: ex.time || '8:00 AM - 12:00 PM',
           venue: ex.venue || 'Main Dojo, Pulikkal',
-          examiner: ex.chief_examiner || 'Sensei Abdul Rahman (5th Dan)',
+          examiner: ex.chief_examiner || 'Sensei Abdul Nafih (2nd Dan)',
           targetBelts: [ex.eligible_belt || 'All Belts'],
           registrationFee: parseFloat(ex.exam_fee) || 1000,
           status: ex.status || 'Active',
@@ -406,7 +406,7 @@ export default function BeltGradingManagement() {
                         {g.exam_date || '2026-08-01'}
                       </td>
                       <td className="py-4 px-5 text-gray-700 font-bold">
-                        {g.examiner || 'Sensei Abdul Rahman (5th Dan)'}
+                        {g.examiner || 'Sensei Abdul Nafih (2nd Dan)'}
                       </td>
                       <td className="py-4 px-5 text-right">
                         <button
@@ -480,7 +480,7 @@ export default function BeltGradingManagement() {
                             certificate_no: `WIN-1ST-${comp.id}`,
                             target_belt: '🥇 1st Place Champion',
                             exam_date: comp.date,
-                            examiner: 'Sensei Abdul Rahman (5th Dan)',
+                            examiner: 'Sensei Abdul Nafih (2nd Dan)',
                             eventTitle: comp.title,
                             certType: 'COMPETITION'
                           })}
@@ -497,7 +497,7 @@ export default function BeltGradingManagement() {
                               certificate_no: `WIN-2ND-${comp.id}`,
                               target_belt: '🥈 2nd Place Runner-up',
                               exam_date: comp.date,
-                              examiner: 'Sensei Abdul Rahman (5th Dan)',
+                              examiner: 'Sensei Abdul Nafih (2nd Dan)',
                               eventTitle: comp.title,
                               certType: 'COMPETITION'
                             })}
@@ -515,7 +515,7 @@ export default function BeltGradingManagement() {
                               certificate_no: `WIN-3RD-${comp.id}`,
                               target_belt: '🥉 3rd Place Bronze Medalist',
                               exam_date: comp.date,
-                              examiner: 'Sensei Abdul Rahman (5th Dan)',
+                              examiner: 'Sensei Abdul Nafih (2nd Dan)',
                               eventTitle: comp.title,
                               certType: 'COMPETITION'
                             })}
@@ -936,7 +936,7 @@ export default function BeltGradingManagement() {
               </div>
 
               <div className="text-center space-y-0.5">
-                <p className="font-black text-gray-900 border-b border-black pb-1 px-4">{activeCert.examiner || 'Sensei Abdul Rahman (5th Dan)'}</p>
+                <p className="font-black text-gray-900 border-b border-black pb-1 px-4">{activeCert.examiner || 'Sensei Abdul Nafih (2nd Dan)'}</p>
                 <p className="text-[10px] text-gray-500 font-bold">Chief Examiner & Master</p>
               </div>
             </div>
