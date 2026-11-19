@@ -592,22 +592,35 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     }
   };
 
-  // Fetch all exam registrations
+  // Fetch all exam registrations across all paginated pages
   const fetchRegistrations = async () => {
     setIsLoading(true);
     try {
       const deletedIds = JSON.parse(localStorage.getItem('bama_deleted_grading_ids') || '[]');
-      const res = await fetch(`${API_ROOT}/grading-registrations/?page_size=1000&limit=1000`);
-      if (res.ok) {
+      let allResults = [];
+      let nextUrl = `${API_ROOT}/grading-registrations/?page_size=1000&limit=1000`;
+
+      while (nextUrl) {
+        const res = await fetch(nextUrl, { cache: 'no-store' });
+        if (!res.ok) break;
         const data = await res.json();
-        const rawList = Array.isArray(data) ? data : (data.results || []);
-        const filtered = rawList.filter(r => {
-          const rId = String(r.id || '').trim();
-          const rReg = String(r.registration_no || r.admission_no || '').trim();
-          return !deletedIds.includes(rId) && !deletedIds.includes(rReg);
-        });
-        setRegistrations(filtered);
+        if (Array.isArray(data)) {
+          allResults = data;
+          break;
+        } else if (data && data.results) {
+          allResults = allResults.concat(data.results);
+          nextUrl = data.next;
+        } else {
+          break;
+        }
       }
+
+      const filtered = allResults.filter(r => {
+        const rId = String(r.id || '').trim();
+        const rReg = String(r.registration_no || r.admission_no || '').trim();
+        return !deletedIds.includes(rId) && !deletedIds.includes(rReg);
+      });
+      setRegistrations(filtered);
     } catch (err) {
       console.error('Failed to fetch grading registrations:', err);
     } finally {

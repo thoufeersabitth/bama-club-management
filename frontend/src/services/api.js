@@ -3074,6 +3074,62 @@ export const fetchExamDashboardStatsBackend = async (examId = null) => {
   }
 };
 
+export const fetchAllGradingRegistrations = async () => {
+  let all = [];
+  let nextUrl = '/grading-registrations/?page_size=1000';
+  try {
+    while (nextUrl) {
+      const res = await api.get(nextUrl);
+      const data = res.data;
+      if (Array.isArray(data)) {
+        all = data;
+        break;
+      } else if (data && data.results) {
+        all = all.concat(data.results);
+        if (data.next) {
+          const match = data.next.match(/(\/api\/grading-registrations\/.*|\?.*)/);
+          nextUrl = match ? (match[1].startsWith('?') ? `/grading-registrations/${match[1]}` : match[1].replace('/api', '')) : null;
+        } else {
+          nextUrl = null;
+        }
+      } else {
+        break;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch all grading registrations:', err);
+  }
+  return all;
+};
+
+export const fetchAllBeltGradings = async () => {
+  let all = [];
+  let nextUrl = '/belt-gradings/?page_size=1000';
+  try {
+    while (nextUrl) {
+      const res = await api.get(nextUrl);
+      const data = res.data;
+      if (Array.isArray(data)) {
+        all = data;
+        break;
+      } else if (data && data.results) {
+        all = all.concat(data.results);
+        if (data.next) {
+          const match = data.next.match(/(\/api\/belt-gradings\/.*|\?.*)/);
+          nextUrl = match ? (match[1].startsWith('?') ? `/belt-gradings/${match[1]}` : match[1].replace('/api', '')) : null;
+        } else {
+          nextUrl = null;
+        }
+      } else {
+        break;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch all belt gradings:', err);
+  }
+  return all;
+};
+
 export const publicSubmitExamRegistrationBackend = async (data) => {
   try {
     const res = await api.post('/grading-registrations/public-register/', data);
@@ -3923,8 +3979,8 @@ export const fetchStudentPortalDetails = async (student) => {
   const [studentsRes, feeSettingsRes, regRes, gradingsRes, attRes] = await Promise.allSettled([
     fetchStudents(),
     fetchFeeSettings(),
-    api.get('/grading-registrations/?page_size=1000&limit=1000'),
-    api.get('/belt-gradings/?page_size=1000&limit=1000'),
+    fetchAllGradingRegistrations(),
+    fetchAllBeltGradings(),
     (targetId || targetAdm) ? api.get(`/attendance/?student=${encodeURIComponent(targetId || targetAdm)}&page_size=1000`) : Promise.resolve({ data: [] }),
   ]);
 
@@ -3942,12 +3998,12 @@ export const fetchStudentPortalDetails = async (student) => {
     : getGlobalFeeSettings();
 
   const rawRegs = regRes.status === 'fulfilled'
-    ? (regRes.value?.data?.results || regRes.value?.data || [])
+    ? (Array.isArray(regRes.value) ? regRes.value : (regRes.value?.data?.results || regRes.value?.data || []))
     : [];
   const gradingRegistrations = Array.isArray(rawRegs) ? rawRegs.filter((r) => matchesCadet(r)) : [];
 
   const rawGradings = gradingsRes.status === 'fulfilled'
-    ? (gradingsRes.value?.data?.results || gradingsRes.value?.data || [])
+    ? (Array.isArray(gradingsRes.value) ? gradingsRes.value : (gradingsRes.value?.data?.results || gradingsRes.value?.data || []))
     : [];
   const beltGradings = Array.isArray(rawGradings) ? rawGradings.filter((g) => matchesCadet(g)) : [];
 
