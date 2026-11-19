@@ -692,7 +692,7 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = [], programN
 
   const rawAdm = mappedFee.admission_fee ?? mappedFee.admissionFee ?? matched?.admission_fee ?? matched?.admissionFee;
   const rawMonthly = mappedFee.monthly_fee ?? mappedFee.monthlyFee ?? matched?.monthly_fee ?? matched?.monthlyFee;
-  const rawSchool = mappedFee.school_batch_fee ?? mappedFee.schoolBatchFee ?? matched?.school_batch_fee ?? matched?.schoolBatchFee;
+  const rawSchool = mappedFee.school_batch_fee ?? mappedFee.schoolBatchFee ?? matched?.school_batch_fee ?? matched?.schoolBatchFee ?? rawMonthly;
 
   const bNameStr = String(matched?.name || branchIdOrName || '').toLowerCase();
   const isKick = isKickProgram || bNameStr.includes('kick');

@@ -194,10 +194,14 @@ export default function AdmissionRegistration() {
     try {
       const isKick = formData.program === 'Kick Boxing' || formData.branch.toLowerCase().includes('kick');
       const feeInfo = getBranchFeeSettings(formData.branch, branchesList, formData.program);
-      const isSchool = formData.branch.toLowerCase().includes('school') || formData.branch.toLowerCase().includes('amlp') || formData.branch.toLowerCase().includes('gmlp') || formData.branch.toLowerCase().includes('ansar');
+      const isSchool = feeInfo.billingMode === 'TERM_ONLY' || formData.branch.toLowerCase().includes('school') || formData.branch.toLowerCase().includes('amlp') || formData.branch.toLowerCase().includes('gmlp') || formData.branch.toLowerCase().includes('ansar') || formData.branch.toLowerCase().includes('btamup');
       const bPlan = isSchool ? 'SCHOOL_BATCH' : 'REGULAR';
-      const monthlyOrSchool = bPlan === 'SCHOOL_BATCH' ? (feeInfo.schoolBatchFee || 500) : (feeInfo.monthlyFee || (isKick ? 1000 : 500));
-      const admFeeVal = feeInfo.admissionFee || (isKick ? 1500 : 1000);
+      const monthlyOrSchool = isSchool
+        ? ((feeInfo.schoolBatchFee && feeInfo.schoolBatchFee > 0) ? feeInfo.schoolBatchFee : (feeInfo.monthlyFee || 500))
+        : ((feeInfo.monthlyFee && feeInfo.monthlyFee > 0) ? feeInfo.monthlyFee : (isKick ? 1000 : 500));
+      const admFeeVal = (feeInfo.admissionFee !== undefined && feeInfo.admissionFee !== null && !isNaN(feeInfo.admissionFee))
+        ? feeInfo.admissionFee
+        : (isKick ? 1500 : 1000);
       const applicationId = `APP-${Date.now()}`;
       const tempAdmNo = `BAMA-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -283,9 +287,13 @@ export default function AdmissionRegistration() {
 
   const isKickBoxing = formData.program === 'Kick Boxing' || formData.branch.toLowerCase().includes('kick');
   const branchFee = getBranchFeeSettings(formData.branch, branchesList, formData.program);
-  const isSchoolBranch = formData.branch.toLowerCase().includes('school') || formData.branch.toLowerCase().includes('amlp') || formData.branch.toLowerCase().includes('gmlp') || formData.branch.toLowerCase().includes('ansar');
-  const displayMonthlyFee = isSchoolBranch ? (branchFee.schoolBatchFee || 500) : (branchFee.monthlyFee || (isKickBoxing ? 1000 : 500));
-  const displayAdmissionFee = branchFee.admissionFee || (isKickBoxing ? 1500 : 1000);
+  const isSchoolBranch = branchFee.billingMode === 'TERM_ONLY' || formData.branch.toLowerCase().includes('school') || formData.branch.toLowerCase().includes('amlp') || formData.branch.toLowerCase().includes('gmlp') || formData.branch.toLowerCase().includes('ansar') || formData.branch.toLowerCase().includes('btamup');
+  const displayMonthlyFee = isSchoolBranch
+    ? ((branchFee.schoolBatchFee && branchFee.schoolBatchFee > 0) ? branchFee.schoolBatchFee : (branchFee.monthlyFee || 500))
+    : ((branchFee.monthlyFee && branchFee.monthlyFee > 0) ? branchFee.monthlyFee : (isKickBoxing ? 1000 : 500));
+  const displayAdmissionFee = (branchFee.admissionFee !== undefined && branchFee.admissionFee !== null && !isNaN(branchFee.admissionFee))
+    ? branchFee.admissionFee
+    : (isKickBoxing ? 1500 : 1000);
   const totalInitialPayable = displayAdmissionFee + displayMonthlyFee;
 
   return (
