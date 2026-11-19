@@ -31,6 +31,16 @@ export const BAMA_DATA_VERSION = 'v6_ansar_cadets_restored';
 if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   try {
     if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {
+      // PRESERVE ANY UNSYNCED / OFFLINE CADETS BEFORE FLUSHING STALE CACHE
+      let unsyncedCadets = [];
+      try {
+        const raw = localStorage.getItem('bama_cadets_roster') || localStorage.getItem('bama_students') || '[]';
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          unsyncedCadets = parsed.filter(s => s && (s._is_pending_sync || (s.id && String(s.id).startsWith('std-'))));
+        }
+      } catch (err) {}
+
       localStorage.removeItem('bama_cadets_roster');
       localStorage.removeItem('bama_students');
       localStorage.removeItem('bama_cadets');
@@ -39,6 +49,12 @@ if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       localStorage.removeItem('bama_branches_list');
       localStorage.removeItem('bama_custom_branches');
       localStorage.removeItem('bama_active_branch');
+
+      if (unsyncedCadets.length > 0) {
+        localStorage.setItem('bama_cadets_roster', JSON.stringify(unsyncedCadets));
+        localStorage.setItem('bama_pending_cadet_creations', JSON.stringify(unsyncedCadets));
+      }
+
       localStorage.setItem('bama_data_version', BAMA_DATA_VERSION);
     }
   } catch (e) {}
