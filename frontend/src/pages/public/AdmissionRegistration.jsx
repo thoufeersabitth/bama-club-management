@@ -89,7 +89,7 @@ export default function AdmissionRegistration() {
   });
 
   useEffect(() => {
-    fetchBranches(false).then(bList => {
+    fetchBranches(true).then(bList => {
       if (Array.isArray(bList) && bList.length > 0) {
         setBranchesList(bList);
         const { branchName, programName, shiftName } = resolveTargetSelection(bList);

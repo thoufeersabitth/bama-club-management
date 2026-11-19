@@ -627,6 +627,7 @@ export const updateBranchFeeSettings = async (branchId, feeData) => {
       localStorage.setItem('bama_branch_fees_map', JSON.stringify(map));
     } catch (e) {}
 
+    invalidateBranchesCache();
     window.dispatchEvent(new Event('bama_branches_updated'));
     window.dispatchEvent(new Event('bama_fee_settings_updated'));
     return true;
