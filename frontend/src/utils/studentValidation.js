@@ -211,11 +211,8 @@ export function validateStudentPhone(value, { required = false } = {}) {
   if (!allDigits) return 'Please enter a valid mobile number.';
 
   const norm = normalizePhoneDigits(raw);
-  if (isAcademyFallbackPhone(raw)) {
-    return 'Academy number (+91 9544085442) cannot be saved as a student parent number.';
-  }
 
-  if (DUMMY_PHONE_DIGITS.has(norm) || new Set(norm).size === 1) {
+  if (DUMMY_PHONE_DIGITS.has(norm) || (new Set(norm).size === 1 && norm.length >= 10)) {
     return 'Dummy or repeated phone numbers are not allowed.';
   }
 

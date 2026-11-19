@@ -175,31 +175,50 @@ export default function AdmissionRegistration() {
     e.preventDefault();
     setErrorMsg('');
 
-    const validDob = normalizeDobToISO(formData.dob);
-    if (!validDob) {
-      setErrorMsg('Please enter a valid Date of Birth (year 1940 or later, not in the future).');
+    if (!String(formData.name || '').trim()) {
+      setErrorMsg('Please enter cadet full name.');
+      const el = document.getElementById('cadet_name_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    if (!String(formData.address || '').trim() || isPlaceholderText(formData.address)) {
-      setErrorMsg('Please enter real residential address (dummy/keyboard-mash text is not allowed).');
+    const validDob = normalizeDobToISO(formData.dob);
+    if (!validDob) {
+      setErrorMsg('Please enter a valid Date of Birth (year 1940 or later, not in the future).');
+      const el = document.getElementById('cadet_dob_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
     if (!String(formData.guardian_name || '').trim() || isPlaceholderText(formData.guardian_name)) {
       setErrorMsg('Please enter real Parent / Guardian full name.');
+      const el = document.getElementById('guardian_name_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
     const phoneErr = validateStudentPhone(formData.phone, { required: true });
     if (phoneErr) {
       setErrorMsg(phoneErr);
+      const el = document.getElementById('parent_phone_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
-    const waErr = validateStudentPhone(formData.whatsapp, { required: false });
-    if (waErr) {
-      setErrorMsg(`WhatsApp Number: ${waErr}`);
+    if (formData.whatsapp) {
+      const waErr = validateStudentPhone(formData.whatsapp, { required: false });
+      if (waErr) {
+        setErrorMsg(`WhatsApp Number: ${waErr}`);
+        return;
+      }
+    }
+
+    if (!String(formData.address || '').trim() || isPlaceholderText(formData.address)) {
+      setErrorMsg('Please enter real residential address (dummy/keyboard-mash text is not allowed).');
+      const el = document.getElementById('cadet_address_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -415,7 +434,7 @@ export default function AdmissionRegistration() {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6 text-xs">
+          <form noValidate onSubmit={handleSubmit} className="space-y-6 text-xs">
             {errorMsg && (
               <div className="p-3 bg-red-950/80 border border-red-500/50 rounded-xl text-red-200 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
@@ -433,6 +452,7 @@ export default function AdmissionRegistration() {
                 <div className="sm:col-span-2 space-y-1.5">
                   <label className="text-gray-300 font-bold block">Cadet Full Name *</label>
                   <input
+                    id="cadet_name_input"
                     type="text"
                     required
                     placeholder="Enter cadet's full name..."
@@ -459,6 +479,7 @@ export default function AdmissionRegistration() {
                 <div className="space-y-1.5">
                   <label className="text-gray-300 font-bold block">Date of Birth *</label>
                   <input
+                    id="cadet_dob_input"
                     type="date"
                     required
                     min="1940-01-01"
@@ -619,6 +640,7 @@ export default function AdmissionRegistration() {
                 <div className="space-y-1.5">
                   <label className="text-gray-300 font-bold block">Father / Guardian Full Name *</label>
                   <input
+                    id="guardian_name_input"
                     type="text"
                     required
                     placeholder="Enter parent / guardian name..."
@@ -647,6 +669,7 @@ export default function AdmissionRegistration() {
                 <div className="space-y-1.5">
                   <label className="text-gray-300 font-bold block">Mobile Phone Number (Cadet User ID) *</label>
                   <input
+                    id="parent_phone_input"
                     type="tel"
                     required
                     placeholder="10-digit mobile number"
@@ -675,6 +698,7 @@ export default function AdmissionRegistration() {
               <div className="space-y-1.5">
                 <label className="text-gray-300 font-bold block">Full Residential Address *</label>
                 <textarea
+                  id="cadet_address_input"
                   rows="2"
                   required
                   placeholder="House Name / Street / Town, Village / City, Pincode"
@@ -700,10 +724,22 @@ export default function AdmissionRegistration() {
               </div>
             </div>
 
+            {/* Prominent Inline Error Banner Right Above Submit Button */}
+            {errorMsg && (
+              <div className="p-4 bg-red-950/90 border-2 border-red-500 rounded-2xl text-red-200 text-xs flex items-center gap-3 shadow-2xl animate-shake">
+                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+                <div>
+                  <strong className="block text-red-300 font-black uppercase text-[10px] tracking-wider">Please fix before submitting:</strong>
+                  <span className="font-bold">{errorMsg}</span>
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer transition transform hover:-translate-y-0.5 disabled:opacity-50"
+              style={{ touchAction: 'manipulation' }}
+              className="w-full py-4 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer transition transform hover:-translate-y-0.5 active:scale-98 disabled:opacity-50"
             >
               {loading ? (
                 <>

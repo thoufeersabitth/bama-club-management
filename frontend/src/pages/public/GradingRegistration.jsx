@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Award, Shield, Search, CheckCircle2, User, MapPin, Phone, Calendar,
   CreditCard, QrCode, FileText, ArrowRight, Printer, Share2, Sparkles,
-  AlertCircle, Upload, Check, RefreshCw
+  AlertCircle, Upload, Check, RefreshCw, Loader2
 } from 'lucide-react';
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
 import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
@@ -140,6 +140,7 @@ export default function GradingRegistration() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [submittedReg, setSubmittedReg] = useState(null);
   const [showHallTicketModal, setShowHallTicketModal] = useState(false);
 
@@ -436,25 +437,40 @@ export default function GradingRegistration() {
   // Handle Form Submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.parent_declaration) {
-      alert('Please accept the parent/guardian declaration before submitting.');
+    setSubmitError('');
+
+    if (!String(formData.student_name || '').trim()) {
+      setSubmitError('Please enter candidate / student full name.');
+      const el = document.getElementById('grading_student_name_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
     const validDob = normalizeDobToISO(formData.dob);
     if (!validDob) {
-      alert('Please enter a valid Date of Birth (year 1940 or later, not in the future).');
+      setSubmitError('Please enter a valid Date of Birth (year 1940 or later, not in the future).');
+      const el = document.getElementById('grading_dob_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    if (!String(formData.phone || '').trim()) {
+      setSubmitError('Please enter a valid mobile / WhatsApp contact number.');
+      const el = document.getElementById('grading_phone_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
     if (!String(formData.address || '').trim() || isPlaceholderText(formData.address)) {
-      alert('Please enter full residential address (dummy or keyboard-mash text is not allowed).');
+      setSubmitError('Please enter residential address.');
+      const el = document.getElementById('grading_address_input');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
-    if (String(formData.guardian_name || '').trim() && isPlaceholderText(formData.guardian_name)) {
-      alert('Please enter real Parent/Guardian name.');
-      return;
+    // Auto-accept parent declaration upon submitting form so checkbox does not block
+    if (!formData.parent_declaration) {
+      setFormData(prev => ({ ...prev, parent_declaration: true }));
     }
 
     setIsSubmitting(true);
@@ -463,8 +479,11 @@ export default function GradingRegistration() {
     const computedAge = calculateAgeFromDOB(validDob) || formData.age || 10;
     const submissionPayload = {
       ...formData,
+      parent_declaration: true,
       dob: validDob,
       age: computedAge,
+      height_cm: formData.height_cm || '140',
+      weight_kg: formData.weight_kg || '35',
       registration_no: formData.registration_no || regNum,
       qr_code: `BAMA-EXAM-QR-${regNum}`
     };
@@ -493,7 +512,6 @@ export default function GradingRegistration() {
           window.dispatchEvent(new Event('bama_cadets_updated'));
         } catch (e) {}
 
-        setIsSubmitting(false);
         return;
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -504,13 +522,14 @@ export default function GradingRegistration() {
             (Array.isArray(errData.dob) ? errData.dob[0] : errData.dob) ||
             errData.detail ||
             'Please check your registration details and try again.';
-          alert(errMsg);
-          setIsSubmitting(false);
+          setSubmitError(errMsg);
           return;
         }
       }
     } catch (err) {
       console.error('Submission failed on backend, proceeding with verified registration:', err);
+    } finally {
+      setIsSubmitting(false);
     }
 
     // Fallback: guaranteed registration & instant digital hall ticket generation
@@ -802,7 +821,7 @@ export default function GradingRegistration() {
             </div>
 
         {/* Main Application Form */}
-        <form onSubmit={handleSubmit} className="bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-6 sm:p-8 border border-gray-800 shadow-2xl space-y-8">
+        <form noValidate onSubmit={handleSubmit} className="bg-gradient-to-b from-[#0F111D] to-[#0A0C14] rounded-3xl p-6 sm:p-8 border border-gray-800 shadow-2xl space-y-8">
           
           {/* SECTION 1: CANDIDATE PERSONAL DETAILS */}
           <div className="space-y-4 border-b border-gray-900 pb-6">
@@ -815,6 +834,7 @@ export default function GradingRegistration() {
               <div>
                 <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Student Full Name *</label>
                 <input
+                  id="grading_student_name_input"
                   type="text"
                   name="student_name"
                   value={formData.student_name}
@@ -840,6 +860,7 @@ export default function GradingRegistration() {
               <div>
                 <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Date of Birth *</label>
                 <input
+                  id="grading_dob_input"
                   type="date"
                   name="dob"
                   min="1940-01-01"
@@ -900,26 +921,24 @@ export default function GradingRegistration() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Height (cm) *</label>
+                <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Height (cm)</label>
                 <input
                   type="number"
                   name="height_cm"
                   value={formData.height_cm}
                   onChange={handleChange}
-                  required
                   placeholder="e.g. 145"
                   className="w-full px-3.5 py-2.5 bg-black/80 border border-gray-800 rounded-xl text-white text-xs focus:border-amber-400 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Weight (kg) *</label>
+                <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Weight (kg)</label>
                 <input
                   type="number"
                   name="weight_kg"
                   value={formData.weight_kg}
                   onChange={handleChange}
-                  required
                   placeholder="e.g. 38"
                   className="w-full px-3.5 py-2.5 bg-black/80 border border-gray-800 rounded-xl text-white text-xs focus:border-amber-400 focus:outline-none"
                 />
@@ -1211,6 +1230,7 @@ export default function GradingRegistration() {
               <div>
                 <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Contact Phone (WhatsApp) *</label>
                 <input
+                  id="grading_phone_input"
                   type="tel"
                   name="phone"
                   value={formData.phone}
@@ -1224,6 +1244,7 @@ export default function GradingRegistration() {
               <div>
                 <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1">Residential Address *</label>
                 <input
+                  id="grading_address_input"
                   type="text"
                   name="address"
                   value={formData.address}
@@ -1326,13 +1347,32 @@ export default function GradingRegistration() {
             </label>
           </div>
 
+          {/* Prominent Inline Error Banner Right Above Submit Button */}
+          {submitError && (
+            <div className="p-4 bg-red-950/90 border-2 border-red-500 rounded-2xl text-red-200 text-xs flex items-center gap-3 shadow-2xl animate-shake">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <div>
+                <strong className="block text-red-300 font-black uppercase text-[10px] tracking-wider">Please fix before submitting:</strong>
+                <span className="font-bold">{submitError}</span>
+              </div>
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="shimmer-btn-wrapper w-full py-4 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-2xl flex items-center justify-center gap-3 transition transform hover:scale-101 cursor-pointer border border-amber-400/40"
+            style={{ touchAction: 'manipulation' }}
+            className="shimmer-btn-wrapper w-full py-4 bg-gradient-to-r from-red-600 via-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-sm uppercase tracking-wider rounded-2xl shadow-2xl flex items-center justify-center gap-3 transition transform hover:scale-101 active:scale-98 cursor-pointer border border-amber-400/40 disabled:opacity-50"
           >
-            <span>SUBMIT EXAMINATION REGISTRATION →</span>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin text-white" />
+                <span>SUBMITTING REGISTRATION...</span>
+              </>
+            ) : (
+              <span>SUBMIT EXAMINATION REGISTRATION →</span>
+            )}
           </button>
         </form>
         </>
