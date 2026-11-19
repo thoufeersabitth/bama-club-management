@@ -635,7 +635,8 @@ export const updateBranchFeeSettings = async (branchId, feeData) => {
   }
 };
 
-export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
+export const getBranchFeeSettings = (branchIdOrName, branchesList = [], programName = '') => {
+  const isKickProgram = String(programName || '').toLowerCase().includes('kick');
   const global = getGlobalFeeSettings();
   if (!branchIdOrName || branchIdOrName === 'ALL') {
     return {
@@ -694,14 +695,17 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = []) => {
   const rawSchool = mappedFee.school_batch_fee ?? mappedFee.schoolBatchFee ?? matched?.school_batch_fee ?? matched?.schoolBatchFee;
 
   const bNameStr = String(matched?.name || branchIdOrName || '').toLowerCase();
+  const isKick = isKickProgram || bNameStr.includes('kick');
+  const defaultAdm = isKick ? 1500 : (global.defaultAdmissionFee ?? 1000);
+  const defaultMonthly = isKick ? 1000 : (global.defaultMonthlyFee ?? 500);
   const isDefaultSchool = bNameStr.includes('school') || bNameStr.includes('amlp') || bNameStr.includes('gmlp') || bNameStr.includes('ansar') || bNameStr.includes('btamup');
   const defaultMode = isDefaultSchool ? 'TERM_ONLY' : 'MONTHLY_ONLY';
   const foundMode = mappedFee.billing_mode || mappedFee.billingMode || matched?.billing_mode || matched?.billingMode;
   const rawMode = (foundMode === 'MONTHLY_ONLY' || foundMode === 'TERM_ONLY') ? foundMode : defaultMode;
 
   return {
-    admissionFee: (rawAdm !== undefined && rawAdm !== null && !isNaN(parseInt(rawAdm))) ? parseInt(rawAdm) : (global.defaultAdmissionFee ?? 1000),
-    monthlyFee: (rawMonthly !== undefined && rawMonthly !== null && !isNaN(parseInt(rawMonthly))) ? parseInt(rawMonthly) : (global.defaultMonthlyFee ?? 500),
+    admissionFee: (rawAdm !== undefined && rawAdm !== null && !isNaN(parseInt(rawAdm))) ? parseInt(rawAdm) : defaultAdm,
+    monthlyFee: (rawMonthly !== undefined && rawMonthly !== null && !isNaN(parseInt(rawMonthly))) ? parseInt(rawMonthly) : defaultMonthly,
     schoolBatchFee: (rawSchool !== undefined && rawSchool !== null && !isNaN(parseInt(rawSchool))) ? parseInt(rawSchool) : (global.defaultSchoolBatchFee ?? 500),
     billingMode: rawMode
   };

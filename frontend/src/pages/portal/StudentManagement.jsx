@@ -4,7 +4,7 @@ import {
   Users, Search, Filter, Plus, QrCode, Edit, Eye, Trash2,
   X, Check, Shield, Award, MapPin, Phone, Mail, FileText,
   Calendar, CreditCard, MessageSquare, UserCheck, Upload, Camera, Image as ImageIcon,
-  AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, CheckCircle2,
+  AlertTriangle, RefreshCw, Scissors, Sparkles, Settings, ZoomIn, Move, Send, Copy, CheckCircle2,
   DollarSign, AlertCircle, Clock, Printer, Briefcase, Heart, Droplet, User, Download, Loader2, FileSpreadsheet, Building2
 } from 'lucide-react';
 import { fetchStudents, invalidateStudentsCache, getStoredStudents, createStudent, updateStudent, deleteStudent, saveStoredStudents, getGlobalFeeSettings, saveGlobalFeeSettings, saveFeeSettingsBackend, fetchFeeSettings, isMonthOnOrAfterEffective, fetchBranches, fetchTrainingSchedules, getApplicableFees, promoteStudent, openWhatsApp, resolveStudentWhatsAppRecipient, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, getCoveredMonthsFromDate, saveFeePaymentBackend, exportCadetsBackupJSON, getStandardBranchName, updateBranchFeeSettings, getBranchFeeSettings, fetchAdmissionInquiriesBackend, saveAdmissionInquiriesListBackend } from '../../services/api';
@@ -609,10 +609,11 @@ export default function StudentManagement() {
 
   // Start Sensei Approval for an Online Admission or Web Lead
   const handleStartApproval = (inquiry) => {
-    const bFees = getBranchFeeSettings(inquiry.branch, branchesList);
+    const isKick = (inquiry.program || '').toLowerCase().includes('kick') || (inquiry.branch || '').toLowerCase().includes('kick');
+    const bFees = getBranchFeeSettings(inquiry.branch, branchesList, inquiry.program);
     const isSchool = (inquiry.branch || '').toLowerCase().includes('school') || (inquiry.branch || '').toLowerCase().includes('amlp') || (inquiry.branch || '').toLowerCase().includes('gmlp') || (inquiry.branch || '').toLowerCase().includes('ansar');
-    const admFee = bFees.admissionFee || 1000;
-    const monFee = isSchool ? (bFees.schoolBatchFee || 500) : (bFees.monthlyFee || 500);
+    const admFee = inquiry.admission_fee || inquiry.admissionFee || bFees.admissionFee || (isKick ? 1500 : 1000);
+    const monFee = inquiry.fee_amount || inquiry.feeAmount || (isSchool ? (bFees.schoolBatchFee || 500) : (bFees.monthlyFee || (isKick ? 1000 : 500)));
 
     const year = new Date().getFullYear();
     const nextSeq = String(students.length + 1).padStart(3, '0');
@@ -3143,11 +3144,22 @@ export default function StudentManagement() {
             type="button"
             title="രക്ഷിതാക്കൾക്ക് അയക്കാൻ ഓൺലൈൻ അഡ്മിഷൻ ഫോം ലിങ്ക് കോപ്പി ചെയ്യുക"
             onClick={() => {
-              const url = window.location.origin + '/register';
+              const curBranchObj = selectedBranch !== 'ALL' ? branchesList.find(b => b.id === selectedBranch || b.name === selectedBranch) : null;
+              const curBranchName = curBranchObj ? curBranchObj.name : '';
+              const isKick = curBranchName && curBranchName.toLowerCase().includes('kick');
+              let url = window.location.origin + '/register';
+              let branchTitle = 'B.A.M.A.';
+              let feeDesc = '';
+              if (curBranchName) {
+                const bFee = getBranchFeeSettings(curBranchName, branchesList, isKick ? 'Kick Boxing' : '');
+                url += `?branch=${encodeURIComponent(curBranchName)}&program=${encodeURIComponent(isKick ? 'Kick Boxing' : 'Karate (Shotokan)')}`;
+                branchTitle = curBranchName.toUpperCase();
+                feeDesc = `\n📌 Admission Fee: ₹${bFee.admissionFee}\n📌 Monthly Training Fee: ₹${bFee.monthlyFee} / Month\n`;
+              }
               if (navigator.clipboard) {
                 navigator.clipboard.writeText(url);
               }
-              const msg = '🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n\nപുതിയ ബാച്ചുകളിലേക്കുള്ള ഓൺലൈൻ അഡ്മിഷൻ ആരംഭിച്ചിരിക്കുന്നു! താഴെ കാണുന്ന ഒഫീഷ്യൽ ലിങ്ക് വഴി അഡ്മിഷൻ ഫോം പൂരിപ്പിക്കാവുന്നതാണ്:\n\n👉 ' + url;
+              const msg = `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n*ONLINE ADMISSION - ${branchTitle}*${feeDesc}\nപുതിയ ബാച്ചുകളിലേക്കുള്ള ഓൺലൈൻ അഡ്മിഷൻ ആരംഭിച്ചിരിക്കുന്നു! താഴെ കാണുന്ന ഒഫീഷ്യൽ ലിങ്ക് വഴി അഡ്മിഷൻ ഫോം പൂരിപ്പിക്കാവുന്നതാണ്:\n\n👉 ` + url;
               openWhatsApp({ phone: '', message: msg });
             }}
             className="flex-1 sm:flex-initial px-3 sm:px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
@@ -5676,6 +5688,66 @@ export default function StudentManagement() {
                   </label>
                 </div>
               </div>
+
+              {/* Direct Online Admission Link for this Branch */}
+              {(() => {
+                const activeBName = selectedFeeBranch === 'ALL'
+                  ? 'Pulikkal Branch (Head Office)'
+                  : (branchesList.find(b => b.id === selectedFeeBranch || b.name === selectedFeeBranch)?.name || selectedFeeBranch);
+                const isKick = activeBName.toLowerCase().includes('kick');
+                const directLink = `${window.location.origin}/register?branch=${encodeURIComponent(activeBName)}&program=${encodeURIComponent(isKick ? 'Kick Boxing' : 'Karate (Shotokan)')}`;
+                const currentAdmFee = branchFeeData.admissionFee || 1000;
+                const currentMonFee = branchFeeData.monthlyFee || 500;
+
+                return (
+                  <div className="p-3 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-300 rounded-2xl space-y-2">
+                    <div className="flex items-center justify-between text-xs font-black text-amber-900">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span>Direct Admission Link ({activeBName})</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 bg-amber-200/80 text-amber-950 font-bold rounded-md">
+                        ₹${currentAdmFee} Adm + ₹${currentMonFee}/mo
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={directLink}
+                        className="flex-1 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 text-[11px] font-mono text-gray-700 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (navigator.clipboard) {
+                            navigator.clipboard.writeText(directLink);
+                          }
+                          alert(`Direct Link Copied for ${activeBName}:\n\n${directLink}`);
+                        }}
+                        className="px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-800 font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-1 flex-shrink-0 shadow-xs"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-gray-600" />
+                        <span>Copy</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const waMsg = `🥋 *BRAVE ACADEMY OF MARTIAL ARTS (B.A.M.A.)*\n*ONLINE ADMISSION - ${activeBName.toUpperCase()}*\n\n📌 Admission Fee: ₹${currentAdmFee}\n📌 Monthly Training Fee: ₹${currentMonFee} / Month\n\n👉 താഴെ കാണുന്ന ഒഫീഷ്യൽ ലിങ്ക് വഴി അഡ്മിഷൻ ഫോം പൂരിപ്പിക്കാവുന്നതാണ്:\n${directLink}`;
+                          openWhatsApp({ phone: '', message: waMsg });
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-1 flex-shrink-0 shadow-xs"
+                      >
+                        <Send className="w-3.5 h-3.5 text-white" />
+                        <span>WhatsApp</span>
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-500 italic">
+                      രക്ഷിതാക്കൾക്ക് ഈ ലിങ്ക് അയച്ചു നൽകിയാൽ ${activeBName} ഫീസുകൾ (₹${currentAdmFee} + ₹${currentMonFee}) ഫോമിൽ ഓട്ടോമാറ്റിക്കായി സെറ്റാകും.
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="p-3.5 sm:px-5 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 flex-shrink-0">

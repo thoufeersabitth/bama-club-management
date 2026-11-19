@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Shield, CheckCircle2, User, Phone, MapPin, Calendar, Award,
   Camera, Upload, Sparkles, Clock, AlertCircle, Loader2, ArrowRight,
@@ -16,61 +16,128 @@ import {
 } from '../../utils/studentValidation';
 
 export default function AdmissionRegistration() {
+  const [searchParams] = useSearchParams();
+  const queryBranch = searchParams.get('branch') || searchParams.get('dojo') || '';
+  const queryProgram = searchParams.get('program') || searchParams.get('course') || '';
+  const queryShift = searchParams.get('shift') || searchParams.get('batch') || '';
+
+  const resolveTargetSelection = (bList) => {
+    let matchedBranch = null;
+    let matchedProg = 'Karate (Shotokan)';
+
+    if (queryProgram) {
+      const qp = queryProgram.toLowerCase().trim();
+      const fProg = PROGRAM_OPTIONS.find(p => p.toLowerCase() === qp || p.toLowerCase().includes(qp));
+      if (fProg) matchedProg = fProg;
+    }
+
+    if (queryBranch) {
+      const qb = queryBranch.toLowerCase().trim();
+      matchedBranch = bList.find(b =>
+        String(b.id || '').toLowerCase() === qb ||
+        String(b.name || '').toLowerCase() === qb ||
+        String(b.code || '').toLowerCase() === qb ||
+        String(b.name || '').toLowerCase().includes(qb)
+      );
+    }
+
+    if (!matchedBranch && (queryProgram.toLowerCase().includes('kick') || queryBranch.toLowerCase().includes('kick'))) {
+      matchedBranch = bList.find(b => b.name && b.name.toLowerCase().includes('kick'));
+      matchedProg = 'Kick Boxing';
+    }
+
+    if (!matchedBranch) {
+      matchedBranch = bList[0] || INITIAL_BRANCHES[0];
+    }
+
+    const finalBranch = matchedBranch?.name || 'Pulikkal Branch (Head Office)';
+    if (finalBranch.toLowerCase().includes('kick')) {
+      matchedProg = 'Kick Boxing';
+    }
+
+    const shifts = getDynamicShiftOptions(finalBranch, matchedProg, bList);
+    const finalShift = queryShift && shifts.includes(queryShift) ? queryShift : (shifts[0] || 'Evening Batch (5:00 PM - 7:00 PM)');
+
+    return { branchName: finalBranch, programName: matchedProg, shiftName: finalShift };
+  };
+
   const [branchesList, setBranchesList] = useState(INITIAL_BRANCHES);
   const [loading, setLoading] = useState(false);
   const [submittedCadet, setSubmittedCadet] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const [formData, setFormData] = useState({
-    name: '',
-    photo: '',
-    gender: 'Male',
-    dob: '',
-    age: 10,
-    blood_group: 'O+',
-    guardian_name: '',
-    relationship: 'Father',
-    phone: '',
-    whatsapp: '',
-    address: '',
-    branch: 'Pulikkal Branch (Head Office)',
-    program: 'Karate (Shotokan)',
-    shift: 'Evening Batch (5:00 PM - 7:00 PM)',
-    password: '',
-    confirm_password: ''
+  const [formData, setFormData] = useState(() => {
+    const init = resolveTargetSelection(INITIAL_BRANCHES);
+    return {
+      name: '',
+      photo: '',
+      gender: 'Male',
+      dob: '',
+      age: 10,
+      blood_group: 'O+',
+      guardian_name: '',
+      relationship: 'Father',
+      phone: '',
+      whatsapp: '',
+      address: '',
+      branch: init.branchName,
+      program: init.programName,
+      shift: init.shiftName,
+      password: '',
+      confirm_password: ''
+    };
   });
 
   useEffect(() => {
     fetchBranches(false).then(bList => {
       if (Array.isArray(bList) && bList.length > 0) {
         setBranchesList(bList);
-        const firstB = bList[0];
-        const shifts = getDynamicShiftOptions(firstB.name, 'Karate (Shotokan)', bList);
-        setFormData(prev => ({
-          ...prev,
-          branch: firstB.name,
-          shift: shifts[0] || 'Evening Batch (5:00 PM - 7:00 PM)'
-        }));
+        const { branchName, programName, shiftName } = resolveTargetSelection(bList);
+        setFormData(prev => {
+          const isDefaultKarate = prev.branch === 'Pulikkal Branch (Head Office)' && prev.program === 'Karate (Shotokan)';
+          if (queryBranch || queryProgram || isDefaultKarate) {
+            return {
+              ...prev,
+              branch: branchName,
+              program: queryProgram ? programName : (branchName.toLowerCase().includes('kick') ? 'Kick Boxing' : prev.program),
+              shift: shiftName
+            };
+          }
+          return prev;
+        });
       }
     }).catch(() => {});
-  }, []);
+  }, [queryBranch, queryProgram, queryShift]);
 
   const calculateAge = (dobStr) => calculateAgeFromDOB(dobStr) ?? '';
 
   const handleBranchChange = (branchName) => {
-    const shifts = getDynamicShiftOptions(branchName, formData.program, branchesList);
+    let targetProg = formData.program;
+    if (branchName.toLowerCase().includes('kick') && !targetProg.toLowerCase().includes('kick')) {
+      targetProg = 'Kick Boxing';
+    } else if (!branchName.toLowerCase().includes('kick') && targetProg.toLowerCase().includes('kick')) {
+      targetProg = 'Karate (Shotokan)';
+    }
+    const shifts = getDynamicShiftOptions(branchName, targetProg, branchesList);
     setFormData(prev => ({
       ...prev,
       branch: branchName,
+      program: targetProg,
       shift: shifts[0] || 'Evening Batch (5:00 PM - 7:00 PM)'
     }));
   };
 
   const handleProgramChange = (progName) => {
-    const shifts = getDynamicShiftOptions(formData.branch, progName, branchesList);
+    let targetBranch = formData.branch;
+    if (progName.toLowerCase().includes('kick') && !targetBranch.toLowerCase().includes('kick')) {
+      const kbBranch = branchesList.find(b => b.name && b.name.toLowerCase().includes('kick'));
+      if (kbBranch) targetBranch = kbBranch.name;
+    }
+    const shifts = getDynamicShiftOptions(targetBranch, progName, branchesList);
     setFormData(prev => ({
       ...prev,
       program: progName,
+      branch: targetBranch,
       shift: shifts[0] || 'Evening Batch (5:00 PM - 7:00 PM)'
     }));
   };
@@ -125,10 +192,12 @@ export default function AdmissionRegistration() {
 
     setLoading(true);
     try {
-      const feeInfo = getBranchFeeSettings(formData.branch, branchesList);
+      const isKick = formData.program === 'Kick Boxing' || formData.branch.toLowerCase().includes('kick');
+      const feeInfo = getBranchFeeSettings(formData.branch, branchesList, formData.program);
       const isSchool = formData.branch.toLowerCase().includes('school') || formData.branch.toLowerCase().includes('amlp') || formData.branch.toLowerCase().includes('gmlp') || formData.branch.toLowerCase().includes('ansar');
       const bPlan = isSchool ? 'SCHOOL_BATCH' : 'REGULAR';
-      const monthlyOrSchool = bPlan === 'SCHOOL_BATCH' ? (feeInfo.schoolBatchFee || 500) : (feeInfo.monthlyFee || 500);
+      const monthlyOrSchool = bPlan === 'SCHOOL_BATCH' ? (feeInfo.schoolBatchFee || 500) : (feeInfo.monthlyFee || (isKick ? 1000 : 500));
+      const admFeeVal = feeInfo.admissionFee || (isKick ? 1500 : 1000);
       const applicationId = `APP-${Date.now()}`;
       const tempAdmNo = `BAMA-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -154,7 +223,7 @@ export default function AdmissionRegistration() {
         program: formData.program,
         shift: formData.shift,
         billing_plan: bPlan,
-        admission_fee: feeInfo.admissionFee || 1000,
+        admission_fee: admFeeVal,
         fee_amount: monthlyOrSchool,
         password: formData.password || '',
         message: `Online Cadet Admission submitted for ${formData.branch} (${formData.shift}). Fees: Admission ₹${feeInfo.admissionFee}, Monthly ₹${monthlyOrSchool}.`,
@@ -212,9 +281,12 @@ export default function AdmissionRegistration() {
     }
   };
 
-  const branchFee = getBranchFeeSettings(formData.branch, branchesList);
+  const isKickBoxing = formData.program === 'Kick Boxing' || formData.branch.toLowerCase().includes('kick');
+  const branchFee = getBranchFeeSettings(formData.branch, branchesList, formData.program);
   const isSchoolBranch = formData.branch.toLowerCase().includes('school') || formData.branch.toLowerCase().includes('amlp') || formData.branch.toLowerCase().includes('gmlp') || formData.branch.toLowerCase().includes('ansar');
-  const displayMonthlyFee = isSchoolBranch ? (branchFee.schoolBatchFee || 500) : (branchFee.monthlyFee || 500);
+  const displayMonthlyFee = isSchoolBranch ? (branchFee.schoolBatchFee || 500) : (branchFee.monthlyFee || (isKickBoxing ? 1000 : 500));
+  const displayAdmissionFee = branchFee.admissionFee || (isKickBoxing ? 1500 : 1000);
+  const totalInitialPayable = displayAdmissionFee + displayMonthlyFee;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10 relative overflow-hidden bg-black">
@@ -477,17 +549,23 @@ export default function AdmissionRegistration() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <div className="bg-black/40 border border-white/10 rounded-xl p-3 text-center">
                     <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">One-Time Admission Fee</span>
-                    <span className="text-xl font-black text-white">₹{branchFee.admissionFee}</span>
+                    <span className="text-xl font-black text-white">₹{displayAdmissionFee}</span>
                   </div>
                   <div className="bg-black/40 border border-white/10 rounded-xl p-3 text-center">
-                    <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Monthly Training Fee</span>
+                    <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">
+                      {isSchoolBranch ? 'School Term Fee (3 Mo)' : 'Monthly Training Fee'}
+                    </span>
                     <span className="text-xl font-black text-emerald-400">
                       ₹{displayMonthlyFee}
-                      <span className="text-xs font-normal text-gray-400">/mo</span>
+                      <span className="text-xs font-normal text-gray-400">{isSchoolBranch ? '/term' : '/mo'}</span>
                     </span>
+                  </div>
+                  <div className="bg-black/40 border border-amber-500/30 rounded-xl p-3 text-center">
+                    <span className="text-[10px] text-amber-300 font-bold block uppercase tracking-wider">Total Initial Joining</span>
+                    <span className="text-xl font-black text-amber-400">₹{totalInitialPayable}</span>
                   </div>
                 </div>
 
