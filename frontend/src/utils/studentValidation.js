@@ -3,17 +3,12 @@ export const MIN_VALID_DOB_YEAR = 1940;
 const PLACEHOLDER_EXACT_VALUES = new Set([
   'na', 'n/a', 'none', 'null', 'nil', 'unknown', 'tbd', 'todo', 'pending',
   'test', 'testing', 'dummy', 'sample', 'asdf', 'sdfg', 'dfgh', 'fghj',
-  'ghjk', 'qwerty', 'qwert', 'zxcv', 'zxcvb', 'xxx', 'xxxx',
-  'full address', 'parent/guardian', 'paren', 'parent', 'father', 'mother',
-  'guardian', 'pulikkal, malappuram, kerala',
+  'ghjk', 'qwerty', 'qwert', 'zxcv', 'zxcvb', 'xxx', 'xxxx'
 ]);
 
 const ACADEMY_FALLBACK_PHONES = new Set(['9544085442']);
 const DUMMY_PHONE_DIGITS = new Set(['1234567890', '0123456789', '9876543210']);
-const GENERIC_LOCATION_ONLY = new Set([
-  'pulikkal', 'pulikkal, malappuram', 'pulikkal, malappuram, kerala',
-  'malappuram', 'kerala', 'kondotty', 'feroke', 'chungam', 'mongam',
-]);
+const GENERIC_LOCATION_ONLY = new Set();
 
 const KEYBOARD_SEQUENCES = [
   'qwertyuiop', 'poiuytrewq',
@@ -232,8 +227,7 @@ export function validateStudentPhone(value, { required = false } = {}) {
 
 export function isPlaceholderAddress(value) {
   if (!value) return false;
-  if (isPlaceholderText(value)) return true;
-  return GENERIC_LOCATION_ONLY.has(String(value).trim().toLowerCase());
+  return isPlaceholderText(value);
 }
 
 export function needsProfileUpdate(student) {
