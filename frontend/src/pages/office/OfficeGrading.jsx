@@ -1225,6 +1225,37 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           </div>
         </div>
       )}
+            {/* 🥋 UPCOMING EXAM SCHEDULE & SENSEI CONTROLS (ALWAYS VISIBLE) */}
+      <div className="bg-gradient-to-r from-gray-900 via-[#131627] to-gray-900 p-4 sm:p-5 rounded-3xl border-2 border-amber-500/40 text-white flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl bama-no-print">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 text-xs w-full md:w-auto">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="font-black text-amber-400 uppercase tracking-wider text-[11px]">UPCOMING BELT EXAM:</span>
+          </div>
+          <div className="bg-black/70 px-3 py-1.5 rounded-xl border border-gray-700 font-mono flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-amber-400" />
+            <strong className="text-white text-xs">{examDate}</strong>
+          </div>
+          <div className="bg-black/70 px-3 py-1.5 rounded-xl border border-gray-700 font-mono flex items-center gap-2">
+            <Clock className="w-4 h-4 text-gray-400" />
+            <span>{examTime}</span>
+          </div>
+          <div className="bg-black/70 px-3 py-1.5 rounded-xl border border-gray-700 flex items-center gap-2">
+            <Award className="w-4 h-4 text-red-500" />
+            <span>Chief Examiner: <strong className="text-amber-300 font-bold">{examinerName}</strong></span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleOpenScheduleSettings}
+          className="w-full md:w-auto px-5 py-2.5 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-black font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition transform hover:-translate-y-0.5 cursor-pointer flex items-center justify-center gap-2 flex-shrink-0 active:scale-98"
+        >
+          <Settings className="w-4 h-4 text-black" />
+          <span>⚙️ CHANGE EXAM DATE & SENSEI NAME</span>
+        </button>
+      </div>
+
       {/* ULTRA-PREMIUM CLEAN ANNOUNCEMENT & ACTION BAR */}
       <div className="bg-white rounded-2xl p-5 border border-gray-200/90 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex-1 w-full">
@@ -1255,21 +1286,32 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
           <button
+            type="button"
+            onClick={handleOpenScheduleSettings}
+            className="w-full px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-red-600/20 transition transform hover:-translate-y-0.5 cursor-pointer whitespace-nowrap"
+          >
+            <Settings className="w-4 h-4" />
+            <span>⚙️ EXAM DATE & SENSEI NAME</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowBeltFeeModal(true)}
             className="w-full px-4 py-2.5 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition transform hover:-translate-y-0.5 cursor-pointer whitespace-nowrap"
           >
             <Award className="w-4 h-4 text-amber-200" />
-            <span>⚙️ CONFIGURE BELT EXAM FEES</span>
+            <span>⚙️ CONFIGURE BELT FEES</span>
           </button>
 
           <button
+            type="button"
             onClick={handleWhatsAppBroadcast}
             className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition cursor-pointer whitespace-nowrap"
           >
             <Send className="w-4 h-4" />
-            <span>📲 WHATSAPP ANNOUNCEMENT</span>
+            <span>📲 WHATSAPP ANNOUNCE</span>
           </button>
         </div>
       </div>
@@ -2462,13 +2504,23 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setPrintModalCandidate(null)}
-                className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center justify-center transition cursor-pointer flex-shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenScheduleSettings}
+                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>⚙️ Edit Date / Sensei</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrintModalCandidate(null)}
+                  className="w-9 h-9 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center justify-center transition cursor-pointer flex-shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Document Type Switcher Tabs & Quick Actions */}
