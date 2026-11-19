@@ -236,6 +236,14 @@
     display: none !important;
   }
 
+  body.bama-printing-active .fixed,
+  body.bama-printing-active [class*="fixed"],
+  body.bama-printing-active [class*="backdrop-blur"],
+  .bama-no-print,
+  .print\:hidden {
+    display: none !important;
+  }
+
   body.bama-printing-active #bama-print-portal,
   body:has(#bama-print-portal:not(:empty)) #bama-print-portal {
     display: block !important;

@@ -6,22 +6,36 @@ import { createPortal } from 'react-dom';
  * Automatically toggles body.bama-printing-active so #root is completely
  * detached from layout calculation, preventing multi-page overflow.
  */
-export function triggerBamaPrint(delayMs = 150) {
+export function triggerBamaPrint(delayMs = 200) {
   if (typeof document === 'undefined') return;
 
   document.body.classList.add('bama-printing-active');
+
+  const cleanup = () => {
+    document.body.classList.remove('bama-printing-active');
+    window.removeEventListener('afterprint', cleanup);
+  };
+
+  window.addEventListener('afterprint', cleanup);
 
   setTimeout(() => {
     try {
       window.print();
     } catch (e) {
       console.error('Print trigger error:', e);
-    } finally {
-      // Remove class once print dialog closes or after timeout
-      setTimeout(() => {
-        document.body.classList.remove('bama-printing-active');
-      }, 1000);
+      cleanup();
     }
+
+    // Safe fallback for mobile Chrome/Android where afterprint fires lazily or print spooler takes time
+    const fallbackTimer = setTimeout(cleanup, 45000);
+    const onUserInteraction = () => {
+      clearTimeout(fallbackTimer);
+      cleanup();
+      window.removeEventListener('focus', onUserInteraction);
+      window.removeEventListener('touchstart', onUserInteraction);
+    };
+    window.addEventListener('focus', onUserInteraction, { once: true });
+    window.addEventListener('touchstart', onUserInteraction, { once: true });
   }, delayMs);
 }
 

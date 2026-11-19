@@ -1342,7 +1342,7 @@ export default function GradingRegistration() {
 
       {/* DIGITAL HALL TICKET MODAL POPUP */}
       {showHallTicketModal && submittedReg && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto bama-no-print print:hidden">
           <div className="bg-[#0D0F1B] border border-amber-400/50 rounded-3xl max-w-2xl w-full p-6 space-y-6 shadow-2xl relative">
             <div className="flex items-center justify-between border-b border-gray-800 pb-4">
               <div className="flex items-center gap-2 text-amber-400 font-black uppercase tracking-wider text-xs">
