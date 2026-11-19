@@ -89,6 +89,24 @@ export default function AdmissionRegistration() {
   });
 
   useEffect(() => {
+    // Self-heal any stale Karate fallbacks cached in local storage for Kick Boxing
+    try {
+      const storedMap = localStorage.getItem('bama_branch_fees_map');
+      if (storedMap) {
+        const map = JSON.parse(storedMap);
+        let changed = false;
+        for (const [k, v] of Object.entries(map)) {
+          if (String(k).toLowerCase().includes('kick') || k === '3bf0add8-00bb-4de3-afa7-0ae857a81daa') {
+            if (v && (v.monthly_fee <= 600 || v.admission_fee === 1000)) {
+              delete map[k];
+              changed = true;
+            }
+          }
+        }
+        if (changed) localStorage.setItem('bama_branch_fees_map', JSON.stringify(map));
+      }
+    } catch (e) {}
+
     fetchBranches(true).then(bList => {
       if (Array.isArray(bList) && bList.length > 0) {
         setBranchesList(bList);
@@ -288,12 +306,19 @@ export default function AdmissionRegistration() {
   const isKickBoxing = formData.program === 'Kick Boxing' || formData.branch.toLowerCase().includes('kick');
   const branchFee = getBranchFeeSettings(formData.branch, branchesList, formData.program);
   const isSchoolBranch = branchFee.billingMode === 'TERM_ONLY' || formData.branch.toLowerCase().includes('school') || formData.branch.toLowerCase().includes('amlp') || formData.branch.toLowerCase().includes('gmlp') || formData.branch.toLowerCase().includes('ansar') || formData.branch.toLowerCase().includes('btamup');
-  const displayMonthlyFee = isSchoolBranch
+  
+  let displayMonthlyFee = isSchoolBranch
     ? ((branchFee.schoolBatchFee && branchFee.schoolBatchFee > 0) ? branchFee.schoolBatchFee : (branchFee.monthlyFee || 500))
     : ((branchFee.monthlyFee && branchFee.monthlyFee > 0) ? branchFee.monthlyFee : (isKickBoxing ? 1000 : 500));
-  const displayAdmissionFee = (branchFee.admissionFee !== undefined && branchFee.admissionFee !== null && !isNaN(branchFee.admissionFee))
+  let displayAdmissionFee = (branchFee.admissionFee !== undefined && branchFee.admissionFee !== null && !isNaN(branchFee.admissionFee))
     ? branchFee.admissionFee
     : (isKickBoxing ? 1500 : 1000);
+
+  // Bulletproof Kick Boxing Rate Enforcement: Overrides any old Karate fallback cached on device
+  if (isKickBoxing) {
+    if (displayAdmissionFee === 1000 || !displayAdmissionFee) displayAdmissionFee = 1500;
+    if (displayMonthlyFee <= 600 || !displayMonthlyFee) displayMonthlyFee = 1000;
+  }
   const totalInitialPayable = displayAdmissionFee + displayMonthlyFee;
 
   return (

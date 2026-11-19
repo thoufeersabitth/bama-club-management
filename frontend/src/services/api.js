@@ -704,10 +704,20 @@ export const getBranchFeeSettings = (branchIdOrName, branchesList = [], programN
   const foundMode = mappedFee.billing_mode || mappedFee.billingMode || matched?.billing_mode || matched?.billingMode;
   const rawMode = (foundMode === 'MONTHLY_ONLY' || foundMode === 'TERM_ONLY') ? foundMode : defaultMode;
 
+  let finalAdm = (rawAdm !== undefined && rawAdm !== null && !isNaN(parseInt(rawAdm))) ? parseInt(rawAdm) : defaultAdm;
+  let finalMonthly = (rawMonthly !== undefined && rawMonthly !== null && !isNaN(parseInt(rawMonthly))) ? parseInt(rawMonthly) : defaultMonthly;
+  let finalSchool = (rawSchool !== undefined && rawSchool !== null && !isNaN(parseInt(rawSchool))) ? parseInt(rawSchool) : (global.defaultSchoolBatchFee ?? 500);
+
+  // Strict Kick Boxing protection: discard old Karate fallback values (1000 adm or <= 600 monthly)
+  if (isKick) {
+    if (finalAdm === 1000 || !finalAdm) finalAdm = 1500;
+    if (finalMonthly <= 600 || !finalMonthly) finalMonthly = 1000;
+  }
+
   return {
-    admissionFee: (rawAdm !== undefined && rawAdm !== null && !isNaN(parseInt(rawAdm))) ? parseInt(rawAdm) : defaultAdm,
-    monthlyFee: (rawMonthly !== undefined && rawMonthly !== null && !isNaN(parseInt(rawMonthly))) ? parseInt(rawMonthly) : defaultMonthly,
-    schoolBatchFee: (rawSchool !== undefined && rawSchool !== null && !isNaN(parseInt(rawSchool))) ? parseInt(rawSchool) : (global.defaultSchoolBatchFee ?? 500),
+    admissionFee: finalAdm,
+    monthlyFee: finalMonthly,
+    schoolBatchFee: finalSchool,
     billingMode: rawMode
   };
 };
@@ -1750,7 +1760,20 @@ export const getStoredBranches = () => {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const cleaned = sanitizeBranches(parsed);
+        const merged = parsed.map(b => {
+          const isK = b.name && b.name.toLowerCase().includes('kick');
+          if (isK && (!b.admission_fee || b.admission_fee === 1000 || !b.monthly_fee || b.monthly_fee <= 600)) {
+            return {
+              ...b,
+              admission_fee: 1500,
+              admissionFee: 1500,
+              monthly_fee: 1000,
+              monthlyFee: 1000
+            };
+          }
+          return b;
+        });
+        const cleaned = sanitizeBranches(merged);
         if (cleaned.length > 0) return cleaned;
       }
     }
