@@ -77,12 +77,27 @@ class StudentViewSet(viewsets.ModelViewSet):
         if shift_param and shift_param.upper() != 'ALL':
             queryset = queryset.filter(shift__icontains=shift_param)
         if search:
-            queryset = queryset.filter(
-                models.Q(name__icontains=search) |
-                models.Q(admission_no__icontains=search) |
-                models.Q(phone__icontains=search) |
-                models.Q(guardian_name__icontains=search)
-            )
+            s_clean = search.strip()
+            # Multi-word and dot-agnostic search (e.g. 'Fathima naja P' matches 'Fathima naja. P')
+            words = [w.strip() for w in s_clean.replace('.', ' ').split() if len(w.strip()) >= 2]
+            if len(words) > 1:
+                name_q = models.Q()
+                for w in words:
+                    name_q &= models.Q(name__icontains=w)
+                queryset = queryset.filter(
+                    models.Q(name__icontains=s_clean) |
+                    name_q |
+                    models.Q(admission_no__icontains=s_clean) |
+                    models.Q(phone__icontains=s_clean) |
+                    models.Q(guardian_name__icontains=s_clean)
+                )
+            else:
+                queryset = queryset.filter(
+                    models.Q(name__icontains=s_clean) |
+                    models.Q(admission_no__icontains=s_clean) |
+                    models.Q(phone__icontains=s_clean) |
+                    models.Q(guardian_name__icontains=s_clean)
+                )
         return queryset
 
     def perform_create(self, serializer):

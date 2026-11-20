@@ -323,10 +323,18 @@ export default function GradingRegistration() {
         );
       }
 
-      // Name match
+      // Name match (flexible dot-agnostic, multi-word matching)
       let nameMatches = false;
       if (itemName && qLower.length >= 3) {
-        nameMatches = itemName === qLower || itemName.includes(qLower);
+        const cleanItemName = itemName.replace(/[^a-z0-9]/g, '');
+        const cleanQuery = qLower.replace(/[^a-z0-9]/g, '');
+        const qWords = qLower.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length >= 2);
+        const allWordsMatch = qWords.length > 1 && qWords.every(w => itemName.includes(w));
+
+        nameMatches = itemName === qLower ||
+                      itemName.includes(qLower) ||
+                      (cleanQuery.length >= 3 && cleanItemName.includes(cleanQuery)) ||
+                      allWordsMatch;
       }
 
       if (phoneMatches || admMatches || nameMatches) {

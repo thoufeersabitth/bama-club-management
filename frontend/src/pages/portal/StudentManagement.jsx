@@ -1674,8 +1674,17 @@ export default function StudentManagement() {
 
   // Filter cadets based on Search, Belt, Branch, Shift Batch, Category, and Selected Tab
   const filteredStudents = students.filter(s => {
-    const matchesSearch = (s.name || '').toLowerCase().includes(search.toLowerCase()) ||
-                          (s.admissionNo || s.admission_no || '').toLowerCase().includes(search.toLowerCase()) ||
+    const sName = (s.name || '').toLowerCase();
+    const qLower = (search || '').toLowerCase();
+    const cleanSearch = qLower.replace(/[^a-z0-9]/g, '');
+    const cleanName = sName.replace(/[^a-z0-9]/g, '');
+    const searchWords = qLower.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length >= 2);
+    const wordsMatch = searchWords.length > 1 && searchWords.every(w => sName.includes(w));
+
+    const matchesSearch = sName.includes(qLower) ||
+                          (cleanSearch.length >= 3 && cleanName.includes(cleanSearch)) ||
+                          wordsMatch ||
+                          (s.admissionNo || s.admission_no || '').toLowerCase().includes(qLower) ||
                           (s.phone || '').includes(search);
     const matchesBelt = selectedBelt === 'ALL' || (s.currentBelt || s.current_belt) === selectedBelt;
     
