@@ -27,7 +27,7 @@ export const SUPABASE_CONFIG = {
 };
 
 // Automatic one-time cache purge for clean roster deduplication & branch sync
-export const BAMA_DATA_VERSION = 'v8_fathima_naja_p_restored';
+export const BAMA_DATA_VERSION = 'v9_grading_deduplicated_sync';
 if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   try {
     if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {

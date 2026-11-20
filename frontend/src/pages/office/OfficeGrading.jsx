@@ -848,6 +848,10 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     return Array.from(uniqueCandidatesMap.values());
   }, [safeRegistrations, students]);
 
+  const submittedCandidatesCount = React.useMemo(() => {
+    return combinedCandidates.filter(r => !r.isAcademyCadet).length;
+  }, [combinedCandidates]);
+
   // Direct Inline Candidate Fee & Payment Handlers (Triple-Tier Waterproof Persistence)
   const handleFeeChange = async (candidateId, newFee) => {
     // 1. Save to LocalStorage immediately (Tier 2 Waterproof)
@@ -1511,7 +1515,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
                 : 'text-emerald-700 hover:bg-emerald-50'
             }`}
           >
-            <span>📝 Submitted ({safeRegistrations.length})</span>
+            <span>📝 Submitted ({submittedCandidatesCount})</span>
           </button>
         </div>
       </div>

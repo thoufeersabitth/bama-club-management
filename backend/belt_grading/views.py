@@ -203,6 +203,25 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
         if not data.get('qr_code'):
             data['qr_code'] = f"BAMA-EXAM-QR-{data['registration_no']}"
             
+        # Prevent duplicate submissions for the same student (auto-update existing registration)
+        existing_reg = None
+        if st_obj:
+            existing_reg = GradingRegistration.objects.filter(student=st_obj).first()
+        if not existing_reg and data.get('admission_no'):
+            existing_reg = GradingRegistration.objects.filter(admission_no__iexact=str(data.get('admission_no')).strip()).first()
+        if not existing_reg and data.get('student_name') and data.get('phone'):
+            existing_reg = GradingRegistration.objects.filter(
+                student_name__iexact=str(data.get('student_name')).strip(),
+                phone__iexact=str(data.get('phone')).strip()
+            ).first()
+
+        if existing_reg:
+            serializer = self.get_serializer(existing_reg, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            _heal_student_profile_from_reg(serializer.instance.student, serializer.instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -260,6 +279,25 @@ class GradingRegistrationViewSet(viewsets.ModelViewSet):
         if not data.get('registration_no'):
             rand_num = random.randint(1000, 9999)
             data['registration_no'] = f"EXAM-2026-{rand_num}"
+
+        # Prevent duplicate submissions for the same student (auto-update existing registration)
+        existing_reg = None
+        if student:
+            existing_reg = GradingRegistration.objects.filter(student=student).first()
+        if not existing_reg and data.get('admission_no'):
+            existing_reg = GradingRegistration.objects.filter(admission_no__iexact=str(data.get('admission_no')).strip()).first()
+        if not existing_reg and data.get('student_name') and data.get('phone'):
+            existing_reg = GradingRegistration.objects.filter(
+                student_name__iexact=str(data.get('student_name')).strip(),
+                phone__iexact=str(data.get('phone')).strip()
+            ).first()
+
+        if existing_reg:
+            serializer = self.get_serializer(existing_reg, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            _heal_student_profile_from_reg(serializer.instance.student, serializer.instance)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
