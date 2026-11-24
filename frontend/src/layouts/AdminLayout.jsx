@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { INITIAL_BRANCHES } from '../services/initialData';
-import { fetchBranches } from '../services/api';
+import { fetchBranches, fetchAdmissionInquiriesBackend } from '../services/api';
 import BamaPageLoader from '../components/common/BamaPageLoader';
 
 export default function AdminLayout({ children }) {
@@ -70,6 +70,51 @@ export default function AdminLayout({ children }) {
       } catch (e) {}
     };
     window.addEventListener('bama_notification_updated', handleNotifUpdate);
+
+    // Synchronize live cloud web admission inquiries to admin alerts
+    fetchAdmissionInquiriesBackend().then(cloudInqs => {
+      if (Array.isArray(cloudInqs) && cloudInqs.length > 0) {
+        setNotifications(prev => {
+          const map = new Map();
+          const cleanPrev = (prev || []).filter(n => n.id !== 'notif-1' && n.id !== 'notif-2');
+          cleanPrev.forEach(n => map.set(n.id, n));
+
+          cloudInqs.forEach(inq => {
+            const notifId = `inq-${inq.id || (inq.phone + '_' + inq.name)}`;
+            const isAdmitted = inq.status === 'ADMITTED';
+            const title = isAdmitted
+              ? `✅ Cadet Admitted: ${inq.name}`
+              : `🥋 New Online Cadet Admission: ${inq.name}!`;
+            const desc = `Branch: ${inq.branch || inq.branch_name || 'Main Dojo'} | Batch: ${inq.shift || inq.program || 'Karate'} | Phone: ${inq.phone}`;
+
+            if (!map.has(notifId)) {
+              map.set(notifId, {
+                id: notifId,
+                type: 'ONLINE_ADMISSION',
+                title,
+                desc,
+                time: inq.date ? `${inq.date} ${inq.time || ''}`.trim() : 'Recent',
+                read: isAdmitted,
+                inquiryId: inq.id
+              });
+            } else {
+              // Update status if changed
+              const existing = map.get(notifId);
+              if (isAdmitted && !existing.read) {
+                map.set(notifId, { ...existing, title, read: true });
+              }
+            }
+          });
+
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem('bama_admin_notifications', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
+      }
+    }).catch(() => {});
+
     return () => window.removeEventListener('bama_notification_updated', handleNotifUpdate);
   }, []);
 

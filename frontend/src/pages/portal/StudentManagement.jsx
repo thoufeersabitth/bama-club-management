@@ -245,16 +245,15 @@ export default function StudentManagement() {
       if (Array.isArray(backendInqs) && backendInqs.length > 0) {
         setInquiriesList(prev => {
           const map = new Map();
-          (prev || []).forEach(i => map.set(i.id || i.phone, i));
+          const getInqKey = (i) => i.id || `${i.phone || ''}_${i.name || ''}`;
+          (prev || []).forEach(i => map.set(getInqKey(i), i));
           backendInqs.forEach(i => {
-            const k = i.id || i.phone;
+            const k = getInqKey(i);
             if (!map.has(k)) {
               map.set(k, i);
             } else {
               const existing = map.get(k);
-              if (existing.status === 'PENDING' && i.status === 'ADMITTED') {
-                map.set(k, i);
-              }
+              map.set(k, { ...existing, ...i });
             }
           });
           const merged = Array.from(map.values()).filter(i => i.id !== 'INQ-101' && i.id !== 'INQ-102');

@@ -36,16 +36,19 @@ class CmsConfigAPIView(APIView):
             if not config_obj:
                 config_obj = GlobalCmsConfig.objects.create(data=data)
             else:
-                config_obj.data = data
+                existing = config_obj.data if isinstance(config_obj.data, dict) else {}
+                merged = {**existing, **data}
+                config_obj.data = merged
                 config_obj.save()
 
             try:
+                merged_data = config_obj.data
                 with open(CMS_JSON_FILE, 'w', encoding='utf-8') as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
+                    json.dump(merged_data, f, ensure_ascii=False, indent=2)
             except Exception:
                 pass
 
-            return Response({'status': 'success', 'data': data}, status=status.HTTP_200_OK)
+            return Response({'status': 'success', 'data': config_obj.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

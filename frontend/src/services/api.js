@@ -27,7 +27,7 @@ export const SUPABASE_CONFIG = {
 };
 
 // Automatic one-time cache purge for clean roster deduplication & branch sync
-export const BAMA_DATA_VERSION = 'v9_grading_deduplicated_sync';
+export const BAMA_DATA_VERSION = 'v10_siddeeque_twins_admitted';
 if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   try {
     if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {
@@ -4062,7 +4062,17 @@ export const fetchStudentPortalDetails = async (student) => {
 // Web Admission Inquiries Backend Sync via Fly.io cms-config
 export const saveAdmissionInquiryBackend = async (inquiry) => {
   try {
+    let cleanInquiry = { ...inquiry };
+    // If photo is a large data URL, compress and upload to Supabase storage first
+    if (cleanInquiry.photo && cleanInquiry.photo.startsWith('data:image')) {
+      try {
+        const cdnUrl = await compressAndUploadCadetPhoto(cleanInquiry.photo, cleanInquiry.id || 'inquiry');
+        if (cdnUrl) cleanInquiry.photo = cdnUrl;
+      } catch (e) {}
+    }
+
     let currentInquiries = [];
+    let existingConfig = {};
     try {
       const res = await fetch(`https://bama-club-backend.fly.dev/api/cms-config/?_t=${Date.now()}`, {
         headers: { 'Accept': 'application/json' },
@@ -4070,19 +4080,39 @@ export const saveAdmissionInquiryBackend = async (inquiry) => {
       });
       if (res.ok) {
         const json = await res.json();
-        const configData = json?.data || json || {};
-        if (Array.isArray(configData.admission_inquiries)) {
-          currentInquiries = configData.admission_inquiries;
+        existingConfig = (json && typeof json === 'object' && json.data) ? json.data : (json || {});
+        if (Array.isArray(existingConfig.admission_inquiries)) {
+          currentInquiries = existingConfig.admission_inquiries;
         }
       }
     } catch (e) {}
 
-    const updated = [inquiry, ...currentInquiries.filter(i => i.id !== inquiry.id && i.phone !== inquiry.phone)];
+    // SIBLING-SAFE DEDUPLICATION:
+    // Siblings share the same guardian phone number! NEVER delete by phone alone.
+    // Only replace if same inquiry ID, or exact same student name + phone.
+    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const inqNameNorm = norm(cleanInquiry.name);
+    const inqPhoneNorm = norm(cleanInquiry.phone);
+
+    const filtered = currentInquiries.filter(i => {
+      if (i.id && i.id === cleanInquiry.id) return false;
+      const existNameNorm = norm(i.name);
+      const existPhoneNorm = norm(i.phone);
+      if (existNameNorm && existPhoneNorm && existNameNorm === inqNameNorm && existPhoneNorm === inqPhoneNorm) {
+        return false;
+      }
+      return true;
+    });
+
+    const updated = [cleanInquiry, ...filtered];
 
     await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ admission_inquiries: updated })
+      body: JSON.stringify({
+        ...existingConfig,
+        admission_inquiries: updated
+      })
     });
 
     return updated;
@@ -4099,8 +4129,9 @@ export const saveAdmissionInquiriesListBackend = async (inquiriesList) => {
       headers: { 'Accept': 'application/json' },
       cache: 'no-store'
     });
-    const existingData = existingRes.ok ? await existingRes.json() : {};
-    const updatedData = { ...existingData, admission_inquiries: inquiriesList };
+    const json = existingRes.ok ? await existingRes.json() : {};
+    const baseConfig = (json && typeof json === 'object' && json.data) ? json.data : (json || {});
+    const updatedData = { ...baseConfig, admission_inquiries: inquiriesList };
     const res = await fetch('https://bama-club-backend.fly.dev/api/cms-config/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
