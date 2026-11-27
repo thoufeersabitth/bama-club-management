@@ -259,3 +259,49 @@ export function needsProfileUpdate(student) {
     needsAttention: missingDob || missingAddress || missingGuardian || missingPhone,
   };
 }
+
+/**
+ * Bulletproof, initial-tolerant, fuzzy student search helper.
+ * Resolves Kerala name nuances (e.g. "Fathima naja. P" vs "Fathima naja. M", dots, initials).
+ * Matches by Name, Admission/Register No, Phone/WhatsApp, and Parent/Guardian name.
+ */
+export function matchStudentSearch(student, rawQuery) {
+  if (!rawQuery || typeof rawQuery !== 'string' || !rawQuery.trim()) return true;
+  if (!student || typeof student !== 'object') return false;
+
+  const q = rawQuery.toLowerCase().trim();
+  const cleanQ = q.replace(/[^a-z0-9]/g, '');
+  if (!cleanQ) return true;
+
+  // 1. Admission Number / Register Number Match (Exact or partial)
+  const admNo = String(student.admissionNo || student.admission_no || student.registration_no || student.registrationNo || '').toLowerCase();
+  if (admNo && (admNo.includes(q) || admNo.replace(/[^a-z0-9]/g, '').includes(cleanQ))) return true;
+
+  // 2. Phone / WhatsApp Match (handles 10-digit suffix, formatted numbers)
+  const phone = String(student.phone || student.whatsapp || student.emergency_contact || '').replace(/\D/g, '');
+  const qPhone = q.replace(/\D/g, '');
+  if (qPhone.length >= 4 && phone.includes(qPhone)) return true;
+
+  // 3. Name Substring Match (Case-insensitive & punctuation-stripped)
+  const name = String(student.name || student.student_name || '').toLowerCase();
+  const cleanName = name.replace(/[^a-z0-9]/g, '');
+  if (name.includes(q) || (cleanQ.length >= 3 && cleanName.includes(cleanQ))) return true;
+
+  // 4. Multi-word / Initial-tolerant Name Match:
+  // Split query into words. e.g. "Fathima naja. p" -> major words: ["fathima", "naja"] (ignoring 1-letter initials like "p")
+  const queryTokens = q.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean);
+  const majorTokens = queryTokens.filter(w => w.length >= 2);
+
+  if (majorTokens.length > 0) {
+    const allMajorTokensMatch = majorTokens.every(t => name.includes(t) || cleanName.includes(t));
+    if (allMajorTokensMatch) return true;
+  }
+
+  // 5. Guardian / Parent Name Match
+  const guardian = String(student.guardianName || student.guardian_name || student.parentName || student.fatherName || '').toLowerCase();
+  const cleanGuardian = guardian.replace(/[^a-z0-9]/g, '');
+  if (guardian && (guardian.includes(q) || (cleanQ.length >= 3 && cleanGuardian.includes(cleanQ)))) return true;
+  if (guardian && majorTokens.length > 0 && majorTokens.every(t => guardian.includes(t))) return true;
+
+  return false;
+}

@@ -3,6 +3,7 @@ import { CreditCard, Search, DollarSign, Printer, CheckCircle2, FileText, X, Ale
 import { fetchStudents, getStoredStudents, saveStoredStudents, updateStudent, getGlobalFeeSettings, isMonthOnOrAfterEffective, saveFeePaymentBackend, openWhatsApp, resolveStudentWhatsAppRecipient, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
 import { ACADEMY_INFO, SHIFT_OPTIONS, getDynamicShiftOptions, INITIAL_BRANCHES } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
+import { matchStudentSearch } from '../../utils/studentValidation';
 import CadetFeeReceiptPrint from '../../components/fees/CadetFeeReceiptPrint';
 import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
 
@@ -645,10 +646,8 @@ export default function FeeManagement() {
 
 
     const matchesSearch = !search || 
-                          (std.name || '').toLowerCase().includes(search.toLowerCase()) ||
-                          (std.admissionNo || std.admission_no || '').toLowerCase().includes(search.toLowerCase()) ||
-                          (f.receipt_no || '').toLowerCase().includes(search.toLowerCase()) ||
-                          (std.guardianName || std.guardian_name || '').toLowerCase().includes(search.toLowerCase());
+                          matchStudentSearch(std, search) ||
+                          (f.receipt_no || '').toLowerCase().includes(search.toLowerCase());
 
     const matchesMonth = selectedMonth === 'All' || f.month === selectedMonth;
 

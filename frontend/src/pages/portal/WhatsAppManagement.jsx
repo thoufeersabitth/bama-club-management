@@ -3,6 +3,7 @@ import { MessageSquare, Send, CheckCircle2, Copy, FileText, Search, UserCheck, C
 import { WHATSAPP_TEMPLATES, INITIAL_BRANCHES, isStudentInBranch } from '../../services/initialData';
 import { fetchStudents, fetchBranches, openWhatsApp, resolveStudentWhatsAppRecipient, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { matchStudentSearch } from '../../utils/studentValidation';
 
 export default function WhatsAppManagement() {
   const { user, activeBranch } = useAuth();
@@ -153,11 +154,7 @@ export default function WhatsAppManagement() {
 
     const query = cadetSearch.toLowerCase().trim();
     if (!query) return true;
-
-    return (s.name || '').toLowerCase().includes(query) ||
-           (s.guardianName || s.guardian_name || '').toLowerCase().includes(query) ||
-           (s.phone || '').includes(query) ||
-           (s.admissionNo || s.admission_no || '').toLowerCase().includes(query);
+    return matchStudentSearch(s, cadetSearch);
   });
 
   const handleSelectAllToggle = () => {

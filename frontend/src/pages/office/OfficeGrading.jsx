@@ -7,7 +7,7 @@ import GradingFormPrint from '../../components/grading/GradingFormPrint';
 import ExamFeeReceipt from '../../components/grading/ExamFeeReceipt';
 import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
 import { fetchStudents, updateStudent, invalidateStudentsCache, saveStoredStudents, openWhatsApp, fetchBeltExamFeesBackend, saveBeltExamFeesBackend, getBranchNameFromShift } from '../../services/api';
-import { calculateAgeFromDOB, isPlaceholderText, normalizeDobToISO } from '../../utils/studentValidation';
+import { calculateAgeFromDOB, isPlaceholderText, normalizeDobToISO, matchStudentSearch } from '../../utils/studentValidation';
 import { useAuth } from '../../context/AuthContext';
 
 const API_ROOT = 'https://bama-club-backend.fly.dev/api';
@@ -135,7 +135,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
   const [filterFormType, setFilterFormType] = useState('ALL'); // 'ALL' | 'JKK_WHITE_TO_BROWN_4' | 'JKK_BROWN' | 'JAPAN_DIRECT_BLACK_BELT'
   const [filterBelt, setFilterBelt] = useState('ALL');
   const [filterPayment, setFilterPayment] = useState('ALL');
-  const [filterSource, setFilterSource] = useState('SUBMITTED_ONLY'); // Default: Only Submitted Forms
+  const [filterSource, setFilterSource] = useState('ALL'); // Default: All Cadets Visible
   const [filterExamSchedule, setFilterExamSchedule] = useState('ALL');
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -1031,19 +1031,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       else formCat = 'JKK_WHITE_TO_BROWN_4';
     }
 
-    const sName = (r.student_name || '').toLowerCase();
-    const qLower = (searchTerm || '').toLowerCase().trim();
-    const cleanSearch = qLower.replace(/[^a-z0-9]/g, '');
-    const cleanName = sName.replace(/[^a-z0-9]/g, '');
-    const searchWords = qLower.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length >= 2);
-    const wordsMatch = searchWords.length > 0 && searchWords.every(w => sName.includes(w));
-
-    const matchesSearch = !qLower || 
-      sName.includes(qLower) ||
-      (cleanSearch.length >= 3 && cleanName.includes(cleanSearch)) ||
-      wordsMatch ||
-      (r.registration_no || r.admission_no || '').toLowerCase().includes(qLower) ||
-      (r.phone && r.phone.includes(qLower));
+    const matchesSearch = matchStudentSearch(r, searchTerm);
 
     const activeBranchName = activeBranch || localStorage.getItem('bama_active_branch') || 'ALL';
     const effectiveScope = (filterBranch !== 'ALL' ? filterBranch : (activeBranchName && !activeBranchName.toLowerCase().includes('all') ? activeBranchName : 'ALL')).toLowerCase();
@@ -1061,7 +1049,8 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
     const matchesForm = filterFormType === 'ALL' || formCat === filterFormType;
     const matchesBelt = filterBelt === 'ALL' || (r.current_belt && r.current_belt.toLowerCase().includes(filterBelt.toLowerCase())) || (r.target_belt && r.target_belt.toLowerCase().includes(filterBelt.toLowerCase()));
     const matchesPayment = filterPayment === 'ALL' || (filterPayment === 'Paid / Verified' ? r.payment_status?.includes('Paid') : !r.payment_status?.includes('Paid'));
-    const matchesSource = filterSource === 'ALL' || (filterSource === 'SUBMITTED_ONLY' ? !r.isAcademyCadet : true);
+    // If user is searching by text, search across ALL cadets automatically so no candidate is hidden
+    const matchesSource = (searchTerm && searchTerm.trim().length > 0) || filterSource === 'ALL' || (filterSource === 'SUBMITTED_ONLY' ? !r.isAcademyCadet : true);
 
     return matchesSearch && matchesBranch && matchesForm && matchesBelt && matchesPayment && matchesSource;
   });

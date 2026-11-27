@@ -3,6 +3,7 @@ import { Calendar, CalendarCheck, Search, Filter, Check, X, Clock, MessageSquare
 import { fetchStudents, getStoredStudents, saveAttendanceToBackend, fetchAttendanceFromBackend, fetchDayStatusFromBackend, saveDayStatusToBackend, fetchMonthlyDayStatusesFromBackend, openWhatsApp, getPreferredWhatsAppChannel, setPreferredWhatsAppChannel, fetchBranches, getStandardBranchName } from '../../services/api';
 import { INITIAL_BRANCHES, SHIFT_OPTIONS, getDynamicShiftOptions, isShiftCompatibleWithBranch, getBranchKeyFromStr, matchesShift } from '../../services/initialData';
 import { useAuth } from '../../context/AuthContext';
+import { matchStudentSearch } from '../../utils/studentValidation';
 
 export default function AttendanceManagement() {
   const [students, setStudents] = useState(getStoredStudents);
@@ -665,11 +666,7 @@ export default function AttendanceManagement() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (students || []).filter(s => {
-        const matchName = (s.name || '').toLowerCase().includes(q);
-        const matchAdm = (s.admissionNo || s.admission_no || '').toLowerCase().includes(q);
-        const matchBelt = (s.beltRank || s.currentBelt || '').toLowerCase().includes(q);
-        const matchPhone = (s.phone || s.whatsapp || '').includes(q);
-        if (!matchName && !matchAdm && !matchBelt && !matchPhone) return false;
+        if (!matchStudentSearch(s, searchQuery)) return false;
 
         if (statusFilter !== 'ALL') {
           const stStatus = attendanceRecords[s.id || s.admissionNo] || 'PRESENT';
