@@ -27,7 +27,7 @@ export const SUPABASE_CONFIG = {
 };
 
 // Automatic one-time cache purge for clean roster deduplication & branch sync
-export const BAMA_DATA_VERSION = 'v10_siddeeque_twins_admitted';
+export const BAMA_DATA_VERSION = 'v11_fathima_naja_neerad';
 if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
   try {
     if (localStorage.getItem('bama_data_version') !== BAMA_DATA_VERSION) {

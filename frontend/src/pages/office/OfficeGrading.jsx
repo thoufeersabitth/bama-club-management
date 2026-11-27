@@ -6,7 +6,7 @@ import {
 import GradingFormPrint from '../../components/grading/GradingFormPrint';
 import ExamFeeReceipt from '../../components/grading/ExamFeeReceipt';
 import { BamaPrintPortal, triggerBamaPrint } from '../../utils/bamaPrint';
-import { fetchStudents, updateStudent, invalidateStudentsCache, saveStoredStudents, openWhatsApp, fetchBeltExamFeesBackend, saveBeltExamFeesBackend } from '../../services/api';
+import { fetchStudents, updateStudent, invalidateStudentsCache, saveStoredStudents, openWhatsApp, fetchBeltExamFeesBackend, saveBeltExamFeesBackend, getBranchNameFromShift } from '../../services/api';
 import { calculateAgeFromDOB, isPlaceholderText, normalizeDobToISO } from '../../utils/studentValidation';
 import { useAuth } from '../../context/AuthContext';
 
@@ -799,7 +799,8 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           formCat = 'JKK_BROWN';
         }
 
-        const bName = st.branch_name || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : st.branch) || 'Pulikkal Main Dojo';
+        const rawBranchName = st.branch_name || st.branch_detail?.name || (typeof st.branch === 'object' ? st.branch?.name : null);
+        const bName = rawBranchName || getBranchNameFromShift(st.shift) || (typeof st.branch === 'string' && st.branch.length < 30 ? st.branch : null) || 'Pulikkal Main Dojo';
         const defaultFee = getExamFeeForCandidate({ target_belt: targetBelt, form_type: formCat });
         const customFee = feeOverrides[cadetId] !== undefined ? feeOverrides[cadetId] : (st.custom_exam_fee !== undefined ? st.custom_exam_fee : defaultFee);
         const customPayment = paymentOverrides[cadetId] || 'Pending';
@@ -816,7 +817,7 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
           current_belt: currBelt,
           target_belt: targetBelt,
           form_type: formCat,
-          branch_name: String(bName).length > 20 ? 'Pulikkal Main Dojo' : bName,
+          branch_name: bName,
           phone: st.phone || st.whatsapp || '',
           whatsapp: st.whatsapp || st.phone || '',
           guardian_name: st.guardianName || st.guardian_name || '',
@@ -1030,10 +1031,19 @@ export default function OfficeGrading({ hideDuplicateHeader = false }) {
       else formCat = 'JKK_WHITE_TO_BROWN_4';
     }
 
-    const matchesSearch = !searchTerm || 
-      r.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.registration_no.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (r.phone && r.phone.includes(searchTerm));
+    const sName = (r.student_name || '').toLowerCase();
+    const qLower = (searchTerm || '').toLowerCase().trim();
+    const cleanSearch = qLower.replace(/[^a-z0-9]/g, '');
+    const cleanName = sName.replace(/[^a-z0-9]/g, '');
+    const searchWords = qLower.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length >= 2);
+    const wordsMatch = searchWords.length > 0 && searchWords.every(w => sName.includes(w));
+
+    const matchesSearch = !qLower || 
+      sName.includes(qLower) ||
+      (cleanSearch.length >= 3 && cleanName.includes(cleanSearch)) ||
+      wordsMatch ||
+      (r.registration_no || r.admission_no || '').toLowerCase().includes(qLower) ||
+      (r.phone && r.phone.includes(qLower));
 
     const activeBranchName = activeBranch || localStorage.getItem('bama_active_branch') || 'ALL';
     const effectiveScope = (filterBranch !== 'ALL' ? filterBranch : (activeBranchName && !activeBranchName.toLowerCase().includes('all') ? activeBranchName : 'ALL')).toLowerCase();
